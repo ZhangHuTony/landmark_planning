@@ -75,12 +75,7 @@ Practical guidance:
 
 ### Landmark configurations
 
-Toggle `LANDMARK_SCENARIO` (line 35) to switch between three predefined landmark layouts:
-
-- **`:shoreline`** (default)
-  - 3 landmarks at y=-300m: (200, -300), (500, -300), (800, -300)
-  - Simulates a shoreline the agents travel alongside
-  - Provides cross-track observability but limited along-track control
+Toggle `LANDMARK_SCENARIO` to switch between four predefined landmark layouts:
 
 - **`:single`**
   - 1 landmark at (600, -250)
@@ -88,23 +83,26 @@ Toggle `LANDMARK_SCENARIO` (line 35) to switch between three predefined landmark
   - Tests planner robustness with limited landmark coverage
 
 - **`:dual`**
-  - 2 landmarks at (250, 200) and (750, -250)
-  - Symmetric configuration for balanced observability
+  - 2 landmarks at (700, 200) and (750, -250)
   - Off-axis placement creates incentive to deviate from Euclidean shortest path
 
-- **`:random`**
-  - 8 landmarks randomly spaced across the area (reproducible by the script seed)
-  - Each landmark covariance is scaled by `8 * rand()` to create diverse landmark quality
-  - Useful for stress-testing planner behavior under heterogeneous landmark configurations
+- **`:clustered`**
+  - 3 closely-spaced landmarks near (700, -200)
+  - Tests behaviour when all fixes come from one tight region
+
+- **`:shoreline`**
+  - 5 landmarks spaced along y ≈ -220 to -300m: (100, -300), (300, -270), (500, -240), (700, -220), (900, -200)
+  - Simulates a shoreline the agents travel alongside
+  - Provides cross-track observability but limited along-track control
 
 Each scenario uses `random_landmark_cov()` for consistent initialization across runs.
 
 ### A* collection mode
 
-Toggle `ASTAR_MODE` (line 34) to select discrete search strategy:
+Toggle `ASTAR_MODE` to select discrete search strategy:
 
 - **`:limit`** (default)
-  - Runs A* collector until `ASTAR_ITERATION_LIMIT` (line 33) is reached
+  - Runs A* collector until `ASTAR_ITERATION_LIMIT` is reached
   - Collects **all** Pareto-optimal solutions (non-dominated on distance vs. uncertainty)
   - Returns all seeds to `PARETO_COLLECTED` for continuous refinement
   - Best for exploring trade-off frontier; finds multiple distinct solutions
@@ -124,23 +122,22 @@ Toggle `ASTAR_MODE` (line 34) to select discrete search strategy:
 
 ## Output plots
 
-Each continuous optimization run generates two plots:
+Each run produces:
 
-1. **`fig1_discrete_*.png`** — A* discrete path solution (waypoints connected linearly)
-   - Shows nodes visited by A* planning
-   - Displays initial discrete uncertainty at goal
-   - **Length** = path length through waypoint sequence
-   - **Unc** = goal uncertainty from Kalman fusion
+- **`fig1_joint_discrete_astar.png`** — A* discrete path solution (waypoints connected linearly).
+  Shows covariance ellipses along the primary path.
+- **`mainfig_compare_discrete_continuous_<len>.png`** — Side-by-side comparison of the discrete A*
+  seed (left) vs the refined B-spline solution (right). `<len>` is the optimized primary path length.
 
-2. **`fig2_continuous_opt_*.png`** — Fully refined continuous B-spline solution
-   - Shows optimized waypoint positions after barrier method + Adam optimizer
-   - Displays refined uncertainty at goal (typically lower than discrete)
-   - **Length** = smooth B-spline path length
-   - **Unc** = goal uncertainty evaluated on refined path
+When `ASTAR_MODE = :limit`, additional Pareto-seed files are produced per seed `N`:
 
-Additional plots:
-- **`fig_pareto_discrete.png`** — Pareto front of (distance, uncertainty) pairs from A* (discrete stage only)
-- **`fig_pareto_continuous_overlay.png`** — All refined Pareto solutions overlaid (when `ASTAR_MODE = :limit`)
+- **`fig_pareto_discrete.png`** — Pareto front of (distance, uncertainty) pairs from A*.
+- **`pareto_<N>fig_compare_discrete_continuous_<len>.png`** — Discrete vs continuous comparison for each Pareto seed.
+- **`fig_pareto_continuous_overlay.png`** — All refined Pareto paths overlaid on one plot.
+
+CSV control-point files (one row per control point, columns: `agent,ctrl_index,x,y`):
+- **`main_ctrls.csv`** — control points for the main optimized solution.
+- **`pareto_<N>_ctrls.csv`** — control points for each Pareto seed's optimized solution.
 
 ## Guarantees (concise)
 

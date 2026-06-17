@@ -40,14 +40,14 @@ const LANDMARK_SCENARIO = :single
 
 # Global holder for pareto seeds collected by A* (populated by run_discrete_seed_search)
 PARETO_COLLECTED = Vector{Tuple{Vector{Vector{Int}}, Float64, Float64, Int}}()
-# Physical scale: 1 unit = 100m. Graph spans ~1600m x 1500m.
+# Physical scale: all coordinates and distances in meters. Graph spans ~1600m x 1500m.
 # Platform: AUV with DVL+IMU dead reckoning, acoustic landmark fixes.
 #
-# DIR_UNCERTAINTY_PER_METER : 10% dead-reckoning drift (DVL+IMU, along-track)
+# DIR_UNCERTAINTY_PER_METER : along-track dead-reckoning drift per meter traveled (DVL+IMU)
 # MAJ_MIN_UNC_RATIO         : along-track drift ~3x cross-track (DVL characteristic)
-# SENSOR_NOISE              : USBL/LBL fix accuracy on the order of 10m (0.1 units)
-# COMM_RADIUS               : acoustic modem range on the order of a few hundred meters
-# UNC_RADIUS_THRESHOLD      : max acceptable determinant-based uncertainty at goal (~50m = 0.5 units)
+# SENSOR_NOISE              : USBL/LBL fix accuracy (meters)
+# COMM_RADIUS               : acoustic modem range (meters)
+# UNC_RADIUS_THRESHOLD      : max acceptable det-based uncertainty radius at goal (meters)
 
 const DIR_UNCERTAINTY_PER_METER  = 0.05    # LOWERED from 0.30 to make path length more impactful on final uncertainty
 const MAJ_MIN_UNC_RATIO          = 3
@@ -56,8 +56,9 @@ const MARKER_PROPORTION          = 5.0
 const SENSOR_NOISE               = 0.038   # High-precision bearing-based landmark acoustic fixes
 const COMM_RADIUS                = 300.0    # conservative acoustic modem range (~3 units)
 const VISIBILITY_SIGMA           = 75.0     # 1σ detection range for landmark observations
-const COMM_INTERVAL              = 100.0    # synchronous communication checkpoint every 50m of travel
+const COMM_INTERVAL              = 100.0    # synchronous communication checkpoint every 100m of travel
 const COMM_SIGMA                 = 50.0    # Gaussian taper for comm weighting; soft falloff over ~1-3σ
+const COMM_WEIGHT_MIN            = 1e-4    # skip fusion when Gaussian comm weight falls below this floor
 const HEX_WIDTH_M                = 100.0
 const HEX_RADIUS_M               = HEX_WIDTH_M / sqrt(3.0)  # pointy-top hex: width = sqrt(3)*radius
 const SUPPORT_PLOT_OFFSET_M      = 3.0  # visualization-only offset so support paths stay visible
@@ -110,8 +111,13 @@ const SUPPORT_IDLE_PENALTY  = 30.0
 # Joseph form stability and explicit information matrix inversion.
 # ========================================================================================
 
-# Primary agent state: (node, cumulative distance, covariance at node).
-# Dominance is over (dist, determinant-based uncertainty).
+# ==========================================================================
+# Core data structures
+# ==========================================================================
+
+# Single-agent A* state: (node, cumulative distance, covariance at node).
+# Dominance is over (dist, covariance) using PSD order: state A dominates B iff
+# A.dist ≤ B.dist AND (B.cov - A.cov) is positive semidefinite (cov_dominates).
 # `visited` is a BitVector per state for cycle detection (supports arbitrary graph sizes).
 struct State
     node::Int
@@ -136,6 +142,10 @@ struct LandmarkGraph
     neighbors::Vector{Vector{Int}}   # sparse adjacency list (empty = fully connected)
     shortest_paths::Matrix{Float64}  # Floyd-Warshall: shortest graph distance between all pairs
 end
+
+# ==========================================================================
+# Graph construction utilities
+# ==========================================================================
 
 # Floyd-Warshall: compute shortest-path distances between all pairs via graph edges
 function floyd_warshall(dist::Matrix{Float64}, neighbors::Vector{Vector{Int}})
@@ -178,6 +188,10 @@ function generate_graph(landmarks::Vector{Landmark}; neighbors::Vector{Vector{In
     sp = floyd_warshall(dist, adj)
     return LandmarkGraph(n, landmarks, dist, orient, adj, sp)
 end
+
+# ==========================================================================
+# Uncertainty metrics and covariance math helpers
+# ==========================================================================
 
 # Determinant-based scalar uncertainty metric.
 # For isotropic Σ = σ²I, this returns σ (same units as position),
@@ -479,10 +493,12 @@ function pad_support_paths_to_primary(support_paths::Vector{Vector{Int}}, primar
 end
 
 # ---------- physics constants ----------
-# BEARING_NOISE_RATIO : ratio of cross-bearing to along-bearing sensor noise
-# COMM_INTERVAL_DIST : arc-distance between inter-agent communication events
+# BEARING_NOISE_RATIO  : ratio of cross-bearing to along-bearing sensor noise
+# COMM_INTERVAL_DIST   : arc-distance sync window used inside A* — two agents must be
+#                        within this many meters of the same cumulative arc distance to
+#                        trigger pairwise_comm during graph expansion.
 const BEARING_NOISE_RATIO = 2.2               # cross-range noise 2.2× along-range—tighter sensor
-const COMM_INTERVAL_DIST  = 5.0               # comm event every ~500m of travel (5 units)
+const COMM_INTERVAL_DIST  = 5.0               # 5m arc-distance sync window for in-search comm
 
 
 # ==========================================================================
@@ -536,6 +552,39 @@ const COMM_INTERVAL_DIST  = 5.0               # comm event every ~500m of travel
     return (t22*inv_det, -t12*inv_det, t11*inv_det)  # (I11, I12, I22) of information matrix
 end
 
+# Accumulate information matrix contributions from all visible landmarks at (ax, ay).
+# Returns (I11, I12, I22) — the summed information matrix to add to the prior.
+# Returns (0, 0, 0) when no landmark is close enough to contribute.
+# Shared by propagate_cov_discrete and propagate_cov_continuous.
+@inline function accumulate_landmark_info(ax::Float64, ay::Float64, lms::Vector{Landmark})
+    I11 = 0.0; I12 = 0.0; I22 = 0.0
+    for lm in lms
+        unc_radius(lm.cov) < 1e-8 && continue
+        info = landmark_info(ax, ay, lm)
+        info === nothing && continue
+        I11 += info[1]; I12 += info[2]; I22 += info[3]
+    end
+    return I11, I12, I22
+end
+
+# Apply an information-filter Kalman update to covariance `cov` using the
+# accumulated information (I11, I12, I22) from visible landmarks.
+# Returns the updated 2×2 covariance matrix, or `nothing` if the prior or
+# posterior covariance is numerically degenerate (det < 1e-20).
+# Shared by propagate_cov_discrete and propagate_cov_continuous.
+@inline function kalman_info_update(cov::Matrix{Float64}, I11::Float64, I12::Float64, I22::Float64)
+    det_c = cov[1,1]*cov[2,2] - cov[1,2]*cov[2,1]
+    abs(det_c) < 1e-20 && return nothing
+    inv_det = 1.0 / det_c
+    J11 = I11 + cov[2,2]*inv_det
+    J12 = I12 - cov[1,2]*inv_det
+    J22 = I22 + cov[1,1]*inv_det
+    det_j = J11*J22 - J12*J12
+    abs(det_j) < 1e-20 && return nothing
+    inv_dj = 1.0 / det_j
+    return [J22*inv_dj  -J12*inv_dj; -J12*inv_dj  J11*inv_dj]
+end
+
 # propagate_cov_discrete: covariance propagation at discrete waypoints
 # Input: positions (x,y) at waypoints
 # Outputs: covariance at each waypoint after dead-reckoning + landmark fusion
@@ -567,24 +616,14 @@ function propagate_cov_discrete(positions::Vector{Tuple{Float64,Float64}},
         cov_before_fusion = copy(cov)
         
         # 2. Landmark fusion at current position (Kalman update via information filter)
-        I11 = 0.0; I12 = 0.0; I22 = 0.0
-        for lm in lms
-            unc_radius(lm.cov) < 1e-8 && continue
-            info = landmark_info(x_curr, y_curr, lm)
-            info === nothing && continue
-            I11 += info[1]; I12 += info[2]; I22 += info[3]
-        end
+        I11, I12, I22 = accumulate_landmark_info(x_curr, y_curr, lms)
         if I11 > 0.0 || I22 > 0.0
             # Information filter (Joseph form) Kalman update: combine prior covariance with landmark info
-            det_c = cov[1,1]*cov[2,2] - cov[1,2]*cov[2,1]
-            inv_det = 1.0 / det_c
-            J11 = I11 + cov[2,2]*inv_det
-            J12 = I12 - cov[1,2]*inv_det
-            J22 = I22 + cov[1,1]*inv_det
-            det_j = J11*J22 - J12*J12
-            inv_dj = 1.0 / det_j
-            cov = [J22*inv_dj  -J12*inv_dj; -J12*inv_dj  J11*inv_dj]
-            fusion_count += 1
+            updated = kalman_info_update(cov, I11, I12, I22)
+            if updated !== nothing
+                cov = updated
+                fusion_count += 1
+            end
         end
         covs[i] = copy(cov)
     end
@@ -620,25 +659,14 @@ function propagate_cov_continuous(xs::Vector{Float64},
         cov = cov + growth_covariance(seg, heading)
         
         # 2. Landmark fusion at current position
-        I11 = 0.0; I12 = 0.0; I22 = 0.0
-        for lm in lms
-            unc_radius(lm.cov) < 1e-8 && continue
-            info = landmark_info(x_curr, y_curr, lm)
-            info === nothing && continue
-            I11 += info[1]; I12 += info[2]; I22 += info[3]
-        end
+        I11, I12, I22 = accumulate_landmark_info(x_curr, y_curr, lms)
         if I11 > 0.0 || I22 > 0.0
             # Information filter update
-            det_c = cov[1,1]*cov[2,2] - cov[1,2]*cov[2,1]
-            abs(det_c) < 1e-20 && (covs[i] = copy(cov); continue)
-            inv_det = 1.0 / det_c
-            J11 = I11 + cov[2,2]*inv_det
-            J12 = I12 - cov[1,2]*inv_det
-            J22 = I22 + cov[1,1]*inv_det
-            det_j = J11*J22 - J12*J12
-            abs(det_j) < 1e-20 && (covs[i] = copy(cov); continue)
-            inv_dj = 1.0 / det_j
-            cov = [J22*inv_dj  -J12*inv_dj; -J12*inv_dj  J11*inv_dj]
+            updated = kalman_info_update(cov, I11, I12, I22)
+            if updated === nothing
+                covs[i] = copy(cov); continue
+            end
+            cov = updated
         end
         covs[i] = copy(cov)
     end
@@ -757,7 +785,7 @@ function apply_synchronized_propagation!(agent_positions::Vector{Vector{Tuple{Fl
                 # Tapered Gaussian weight: exp(-dist² / (2σ²))
                 weight = exp(-dist^2 / (2 * COMM_SIGMA^2))
                 
-                if weight > 1e-4  # Only fuse if weight is significant
+                if weight > COMM_WEIGHT_MIN
                     # Bidirectional Kalman fusion via information filter
                     S_s = all_covs[sender][idx_s] + SENSOR_NOISE^2 * I(2)
                     S_r = all_covs[receiver][idx_r] + SENSOR_NOISE^2 * I(2)
@@ -828,9 +856,10 @@ end
 # Each agent has its own admissible heuristic:
 #
 #   Primary (last agent):
-#     h_primary(v) = Euclidean distance from v to goal node.
-#     This lower-bounds the remaining primary arc-distance, so
-#     f = g + h_primary is admissible (never overestimates total primary length).
+#     h_primary(v) = Floyd-Warshall shortest graph-path distance from v to goal.
+#     Precomputed in graph.shortest_paths; O(1) lookup at each expansion.
+#     This lower-bounds the remaining primary arc-distance (graph path ≤ any path),
+#     so f = g + h_primary is admissible (never overestimates total primary length).
 #
 #   Support agent a:
 #     The support does not need to reach the goal — it only needs to position
@@ -844,7 +873,7 @@ end
 # -------------------
 # f(s) = g(s) + h(s)
 #       = primary_dist_so_far + h_primary(primary_node)
-#       ≤ primary_dist_so_far + remaining_primary_dist   (Euclidean ≤ path dist)
+#       ≤ primary_dist_so_far + remaining_primary_dist   (shortest graph path ≤ actual path)
 #       ≤ true_total_primary_dist
 # So f never overestimates — A* is admissible and returns optimal primary length.
 #
@@ -1361,6 +1390,9 @@ function joint_astar(graph::LandmarkGraph,
         end
 
         # ── Expansion: move all agents synchronously one edge at a time ──────
+        # NOTE: joint_astar_collect contains a near-duplicate of this closure.
+        # The two differ in: (a) pruning gates present only here, (b) exact_state_best
+        # guard condition, (c) enqueue style. See joint_astar_collect for the collect variant.
         candidate_nodes = Vector{Int}(undef, na)
         move_order = Vector{Int}(undef, na)
         move_order[1] = primary
@@ -1439,12 +1471,11 @@ function joint_astar(graph::LandmarkGraph,
                     return
                 end
 
-                prim_unc_key = prim_unc
                 push!(states, JointState(copy(new_paths), new_covs, new_dists,
                                           new_g, si, new_visited))
                 new_si = length(states)
                 exact_state_best[new_path_key] = new_si
-                enqueue!(pq, new_si, (f_exact, prim_unc_key, support_idle_score(new_dists)))
+                enqueue!(pq, new_si, (f_exact, prim_unc, support_idle_score(new_dists)))
                 return
             end
 
@@ -1456,7 +1487,6 @@ function joint_astar(graph::LandmarkGraph,
                 candidate_nodes[agent] = u
                 if agent == primary
                     primary_dist_next = S.dists[primary] + graph.distance[curr_node, u]
-                    primary_h_next = graph.shortest_paths[u, goal]
                     expand_joint_moves(agent_idx + 1, primary_dist_next)
                 else
                     support_dist_next = S.dists[agent] + graph.distance[curr_node, u]
@@ -1597,7 +1627,9 @@ function joint_astar_collect(graph::LandmarkGraph,
             continue
         end
 
-        # Expansion (reuse expand_joint_moves closure from joint_astar)
+        # ── Expansion (near-duplicate of joint_astar's expand_joint_moves) ──────
+        # Differences from joint_astar: no pruning gates, different exact_state_best
+        # guard (haskey + > 0 check), inline f-value in enqueue call.
         candidate_nodes = Vector{Int}(undef, na)
         move_order = Vector{Int}(undef, na)
         move_order[1] = primary; order_pos = 2
@@ -1728,10 +1760,10 @@ end
 # ==========================================================================
 # Hex-grid world (pointy-top) with heading-aware transitions
 # ==========================================================================
-# Motion primitives mirror sim.py semantics:
+# Motion primitives (pointy-top hex, 6 discrete headings at 60° intervals):
 #   action 0: forward
-#   action 1: forward-left  (turn left, then move)
-#   action 2: forward-right (turn right, then move)
+#   action 1: forward-left  (turn left by 60°, then move)
+#   action 2: forward-right (turn right by 60°, then move)
 #
 # Each graph node is (hex_cell, heading), so support/primary trajectories are
 # constrained by vehicle heading, not just geometric adjacency.
@@ -1988,7 +2020,7 @@ function draw_hex_tiles!(plt, graph::LandmarkGraph;
                          fill_alpha::Float64=0.98,
                          line_alpha::Float64=1.0)
     centers = route_tile_centers(graph)
-    # Match sim.py pointy-top orientation: vertices at 30° + k*60°
+    # Pointy-top orientation: vertices at 30° + k*60°
     θ = [π/6 + k*(π/3) for k in 0:6]
     for (cx, cy) in centers
         xs = [cx + HEX_RADIUS_M * cos(t) for t in θ]
@@ -2093,19 +2125,15 @@ function draw_covariance_ellipse!(plt, x, y, cov; npts=50, nstd=2, color=:red, a
     plot!(plt, x.+pts[1,:], y.+pts[2,:], seriestype=:shape, color=color, alpha=alpha, label=false)
 end
 
+# ==========================================================================
+# Top-level execution (script entry point — runs when file is executed)
+# ==========================================================================
+
 goal_node = graph.n
 
-# ────────────────────────────────────────────────────────────────────────────
-# MULTI-AGENT PLANNING: Sequential with Synchronized Kalman Fusion
-# ────────────────────────────────────────────────────────────────────────────
-# NOTE: This uses sequential planning (primary then supports) but benefits from:
-# 1. All agents using synchronized Kalman filtering at fixed intervals
-# 2. Synchronized inter-agent communication with Gaussian tapering
-# 3. Global uncertainty computed via joint covariance propagation
-# 4. All agents' trajectories optimized together in continuous phase
-#
-# Future enhancement: Implement full joint A* search for global optimality guarantee
-# across all agents simultaneously (state space = joint positions of all agents)
+# ── Multi-agent discrete seed search ────────────────────────────────────────
+# Joint A* searches the full joint state space of all agents simultaneously,
+# propagating covariances and applying inter-agent Kalman communication at each step.
 
 println("\n── MULTI-AGENT PLANNING (Synchronized Kalman) ──")
 seed = nothing
@@ -2203,7 +2231,7 @@ if isempty(primary_path)
     dists = Float64[]
     uncs = Float64[]
     final_global_cov = Matrix{Float64}[]
-    solo_unc = Inf
+    primary_goal_unc = Inf
 else
     # All agents' paths assembled with support agents first, primary last
     paths = vcat(support_paths, [primary_path])
@@ -2212,7 +2240,7 @@ else
     # This ensures all agents benefit from inter-agent communication at fixed intervals
     final_global_cov, dists = evaluate_full_paths(paths, graph, landmarks, NUM_AGENTS)
     uncs = [unc_radius(final_global_cov[a]) for a in 1:NUM_AGENTS]
-    solo_unc = uncs[end]
+    primary_goal_unc = uncs[end]
     
     println("\n✓ Multi-agent solution with synchronized Kalman fusion:")
     for a in 1:(NUM_AGENTS-1)
@@ -2224,8 +2252,8 @@ else
     println("  ├─ Communication: every $(COMM_INTERVAL)m, Gaussian taper σ=$(COMM_SIGMA)m")
     println("  └─ All agents' uncertainties benefit from synchronized Kalman fusion at checkpoints")
 
-    if PIPELINE_MODE == :discrete_then_continuous && CONTINUE_ASTAR_ON_INFEASIBLE && ASTAR_MODE != :limit && unc_exceeds_threshold(solo_unc, disc_unc_threshold)
-        println("\n  Seed exceeded relaxed discrete threshold (goal_unc=$(round(solo_unc, digits=4)) > threshold=$(round(disc_unc_threshold, digits=4))).")
+    if PIPELINE_MODE == :discrete_then_continuous && CONTINUE_ASTAR_ON_INFEASIBLE && ASTAR_MODE != :limit && unc_exceeds_threshold(primary_goal_unc, disc_unc_threshold)
+        println("\n  Seed exceeded relaxed discrete threshold (goal_unc=$(round(primary_goal_unc, digits=4)) > threshold=$(round(disc_unc_threshold, digits=4))).")
         println("  Continuing A* under relaxed threshold...")
         next_support_paths, next_primary_path, next_primary_dist = run_discrete_seed_search(disc_unc_threshold)
 
@@ -2235,7 +2263,7 @@ else
             dists = Float64[]
             uncs = Float64[]
             final_global_cov = Matrix{Float64}[]
-            solo_unc = Inf
+            primary_goal_unc = Inf
         else
             support_paths = next_support_paths
             primary_path = next_primary_path
@@ -2243,8 +2271,8 @@ else
             paths = vcat(support_paths, [primary_path])
             final_global_cov, dists = evaluate_full_paths(paths, graph, landmarks, NUM_AGENTS)
             uncs = [unc_radius(final_global_cov[a]) for a in 1:NUM_AGENTS]
-            solo_unc = uncs[end]
-            println("  ✓ Continued A* found relaxed-feasible seed: goal_unc=$(round(solo_unc, digits=4))")
+            primary_goal_unc = uncs[end]
+            println("  ✓ Continued A* found relaxed-feasible seed: goal_unc=$(round(primary_goal_unc, digits=4))")
         end
     end
 end
@@ -2379,10 +2407,10 @@ let
         # Primary is last agent
         prim_covs_fig1 = covs_all_fig1[end]
         prim_arcs_fig1 = arcs_all_fig1[end]
-        dijk_prim_len_fig1 = prim_arcs_fig1[end]
-        dijk_goal_unc_fig1 = unc_radius(prim_covs_fig1[end])
+        astar_prim_len_fig1 = prim_arcs_fig1[end]
+        astar_goal_unc_fig1 = unc_radius(prim_covs_fig1[end])
 
-        println("Discrete evaluation: prim_len=$(round(dijk_prim_len_fig1, digits=3)), unc=$(round(dijk_goal_unc_fig1, digits=4))")
+        println("Discrete evaluation: prim_len=$(round(astar_prim_len_fig1, digits=3)), unc=$(round(astar_goal_unc_fig1, digits=4))")
 
         # Draw primary covariance ellipses
         px_fig1 = [graph.landmarks[j].x for j in paths[end]]
@@ -2391,7 +2419,7 @@ let
             draw_covariance_ellipse!(plt1, px_fig1[k], py_fig1[k], prim_covs_fig1[k];
                                       nstd=2, color=:blue, alpha=0.10)
         end
-        title!(plt1,"Fig 1: Discrete [len=$(round(dijk_prim_len_fig1,digits=2)), unc=$(round(dijk_goal_unc_fig1,digits=3))]")
+        title!(plt1,"Fig 1: Discrete [len=$(round(astar_prim_len_fig1,digits=2)), unc=$(round(astar_goal_unc_fig1,digits=3))]")
     else
         title!(plt1,"Fig 1: No feasible path")
     end
@@ -2420,8 +2448,10 @@ const CONT_OPT_H      = 1e-4       # Finite-difference step for gradient
 const CONT_ADAM_B1    = 0.9        # Adam exponential decay rates
 const CONT_ADAM_B2    = 0.999
 const CONT_ADAM_EPS   = 1e-8
-const CONT_CONV_TOL   = 1e-3       # Convergence: change in length < this
-const CONT_UNC_USE_WAYPOINTS = true # keeps straight-line continuous uncertainty consistent with discrete evaluation
+const CONT_CONV_TOL            = 1e-3   # Convergence: change in length < this
+const CONT_UNC_USE_WAYPOINTS   = true   # keeps straight-line continuous uncertainty consistent with discrete evaluation
+const CONT_SMOOTH_PENALTY      = 1e3    # quadratic penalty weight during smoothing phase (uncertainty, curvature, support-length)
+const CONT_BARRIER_HARD_PENALTY = 1e4   # quadratic penalty weight for hard constraint violations in barrier phase
 
 function optimize_continuous(paths::Vector{Vector{Int}}, graph::LandmarkGraph, landmarks::Vector{Landmark}, num_agents::Int; cont_threshold::Float64=UNC_RADIUS_THRESHOLD, fig_prefix::String="")
     println("\n=== Continuous Spline Optimization (threshold=$(round(cont_threshold, digits=4))) ===")
@@ -2578,17 +2608,17 @@ function optimize_continuous(paths::Vector{Vector{Int}}, graph::LandmarkGraph, l
             plen, unc, _, _, curvatures, max_curvs, _, support_lens = eval_continuous(f)
             unc_penalty = 0.0
             if unc_exceeds_threshold(unc, cont_threshold)
-                unc_penalty = 1e3 * (unc - cont_threshold)^2
+                unc_penalty = CONT_SMOOTH_PENALTY * (unc - cont_threshold)^2
             end
             curv_penalty = 0.0
             for curvset in curvatures
                 for κ in curvset
                     if κ > MAX_CURVATURE
-                        curv_penalty += 1e3 * (κ - MAX_CURVATURE)^2
+                        curv_penalty += CONT_SMOOTH_PENALTY * (κ - MAX_CURVATURE)^2
                     end
                 end
             end
-            support_len_penalty = 1e3 * support_length_violation(plen, support_lens)
+            support_len_penalty = CONT_SMOOTH_PENALTY * support_length_violation(plen, support_lens)
             return plen + unc_penalty + curv_penalty + support_len_penalty
         end
 
@@ -2645,7 +2675,7 @@ function optimize_continuous(paths::Vector{Vector{Int}}, graph::LandmarkGraph, l
         unc_slack = cont_threshold - goal_unc
         penalty = 0.0
         if unc_slack <= 1e-9
-            penalty += 1e4 * (1e-9 - unc_slack)^2
+            penalty += CONT_BARRIER_HARD_PENALTY * (1e-9 - unc_slack)^2
         else
             penalty -= barrier_mu * log(unc_slack)
         end
@@ -2653,7 +2683,7 @@ function optimize_continuous(paths::Vector{Vector{Int}}, graph::LandmarkGraph, l
             for κ in curvset
                 slack = MAX_CURVATURE - κ
                 if slack <= 1e-9
-                    penalty += 1e4 * (1e-9 - slack)^2
+                    penalty += CONT_BARRIER_HARD_PENALTY * (1e-9 - slack)^2
                 else
                     penalty -= barrier_mu * log(slack)
                 end
@@ -2662,7 +2692,7 @@ function optimize_continuous(paths::Vector{Vector{Int}}, graph::LandmarkGraph, l
         for sl in support_lens
             slack = prim_len - sl
             if slack <= 1e-9
-                penalty += 1e4 * (1e-9 - slack)^2
+                penalty += CONT_BARRIER_HARD_PENALTY * (1e-9 - slack)^2
             else
                 penalty -= barrier_mu * log(slack)
             end
