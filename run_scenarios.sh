@@ -7,7 +7,7 @@ TMPFILE=$(mktemp /tmp/planner_XXXX.jl)
 trap 'rm -f "$TMPFILE"' EXIT
 
 for scenario in single dual clustered shoreline; do
-    outdir="$(cd "$(dirname "$0")" && pwd)/results_${scenario}"
+    outdir="$(cd "$(dirname "$0")" && pwd)/results/sigma_50/${scenario}"
     mkdir -p "$outdir"
     echo ""
     echo "=========================================="

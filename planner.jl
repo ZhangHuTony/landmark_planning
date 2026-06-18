@@ -14,7 +14,7 @@ const NUM_AGENTS                 = 2
 const PIPELINE_MODE              = :discrete_then_continuous
 const PRIMARY_EPSILON            = 0.0
 
-const UNC_RADIUS_THRESHOLD       = 3.75
+const UNC_RADIUS_THRESHOLD       = 2.0
 const UNC_FEAS_TOL               = 1e-6
 
 const ENABLE_RELAXED_DISCRETE_FOR_CONTINUOUS = false
@@ -589,6 +589,33 @@ end
 # Input: positions (x,y) at waypoints
 # Outputs: covariance at each waypoint after dead-reckoning + landmark fusion
 
+# Propagate covariance over waypoints from_idx+1 .. to_idx, starting from init_cov.
+# Writes results into covs[from_idx+1 .. to_idx] and returns the covariance at to_idx.
+function propagate_segment!(covs::Vector{Matrix{Float64}},
+                             positions::Vector{Tuple{Float64,Float64}},
+                             lms::Vector{Landmark},
+                             from_idx::Int,
+                             to_idx::Int,
+                             init_cov::Matrix{Float64})
+    cov = init_cov
+    for i in (from_idx + 1):to_idx
+        x_prev, y_prev = positions[i-1]
+        x_curr, y_curr = positions[i]
+        seg     = hypot(x_curr - x_prev, y_curr - y_prev)
+        heading = atan(y_curr - y_prev, x_curr - x_prev)
+        cov = cov + growth_covariance(seg, heading)
+        I11, I12, I22 = accumulate_landmark_info(x_curr, y_curr, lms)
+        if I11 > 0.0 || I22 > 0.0
+            updated = kalman_info_update(cov, I11, I12, I22)
+            if updated !== nothing
+                cov = updated
+            end
+        end
+        covs[i] = copy(cov)
+    end
+    return cov
+end
+
 function propagate_cov_discrete(positions::Vector{Tuple{Float64,Float64}},
                                  lms::Vector{Landmark},
                                  init_cov::Matrix{Float64};
@@ -596,37 +623,8 @@ function propagate_cov_discrete(positions::Vector{Tuple{Float64,Float64}},
                                  debug_agent_id::Union{Int, Nothing} = nothing)
     n    = length(positions)
     covs = Vector{Matrix{Float64}}(undef, n)
-    cov  = copy(init_cov)
-    covs[1] = copy(cov)
-    
-    fusion_count = 0  # Track number of Kalman fusion events
-
-    for i in 2:n
-        x_prev, y_prev = positions[i-1]
-        x_curr, y_curr = positions[i]
-        
-        # Segment distance and heading
-        seg = hypot(x_curr - x_prev, y_curr - y_prev)
-        heading = atan(y_curr - y_prev, x_curr - x_prev)
-        
-        # 1. Dead-reckoning growth
-        cov = cov + growth_covariance(seg, heading)
-        
-        # Store pre-fusion covariance for debugging if at goal
-        cov_before_fusion = copy(cov)
-        
-        # 2. Landmark fusion at current position (Kalman update via information filter)
-        I11, I12, I22 = accumulate_landmark_info(x_curr, y_curr, lms)
-        if I11 > 0.0 || I22 > 0.0
-            # Information filter (Joseph form) Kalman update: combine prior covariance with landmark info
-            updated = kalman_info_update(cov, I11, I12, I22)
-            if updated !== nothing
-                cov = updated
-                fusion_count += 1
-            end
-        end
-        covs[i] = copy(cov)
-    end
+    covs[1] = copy(init_cov)
+    propagate_segment!(covs, positions, lms, 1, n, copy(init_cov))
     return covs
 end
 
@@ -729,33 +727,32 @@ function apply_synchronized_propagation!(agent_positions::Vector{Vector{Tuple{Fl
                                         lms::Vector{Landmark},
                                         na::Int;
                                         debug_goal_pos::Union{Tuple{Float64,Float64}, Nothing} = nothing)
-    # Propagate each agent independently, then apply synchronized Kalman fusion
-    # at fixed communication checkpoints
-    
-    # First: independent propagation for each agent
+    # Interleaved propagation + comm fusion: propagate each agent up to the next
+    # comm checkpoint, fuse, then continue from the post-fusion covariance.
+    # This ensures a reduced covariance after comm event k seeds propagation
+    # toward event k+1, matching real cooperative-localization behaviour.
+
     all_covs = Vector{Vector{Matrix{Float64}}}(undef, na)
-    
     for a in 1:na
         if isempty(agent_positions[a])
             all_covs[a] = [copy(lms[1].cov)]
         else
-            covs = propagate_cov_discrete(agent_positions[a], lms, lms[1].cov;
-                                         debug_goal_pos=debug_goal_pos, debug_agent_id=a)
-            all_covs[a] = covs
+            all_covs[a] = Vector{Matrix{Float64}}(undef, length(agent_positions[a]))
+            all_covs[a][1] = copy(lms[1].cov)
         end
     end
-    
-    # Second: apply synchronized Kalman fusion at communication checkpoints
-    max_arc = maximum(arcs[end] for arcs in all_arcs)
+
+    # Cursors: current waypoint index and running covariance per agent
+    cur_idx = ones(Int, na)
+    cur_cov = [copy(lms[1].cov) for _ in 1:na]
+
+    max_arc   = maximum(arcs[end] for arcs in all_arcs)
     comm_times = 0.0:COMM_INTERVAL:max_arc
-    
+
     for comm_time in comm_times
-        # Get indices of waypoints nearest to this communication time
+        # --- Step 1: advance each agent to its nearest waypoint for this checkpoint ---
         agent_indices = Vector{Int}(undef, na)
-        agent_positions_at_time = Vector{Union{Tuple{Float64,Float64}, Nothing}}(undef, na)
-        
         for a in 1:na
-            # Find waypoint nearest to comm_time
             nearest_idx = 1
             min_diff = abs(all_arcs[a][1] - comm_time)
             for i in 2:length(all_arcs[a])
@@ -765,47 +762,53 @@ function apply_synchronized_propagation!(agent_positions::Vector{Vector{Tuple{Fl
                     nearest_idx = i
                 end
             end
+            # Propagate the segment (cur_idx[a], nearest_idx] starting from cur_cov[a]
+            if nearest_idx > cur_idx[a]
+                cur_cov[a] = propagate_segment!(all_covs[a], agent_positions[a], lms,
+                                                cur_idx[a], nearest_idx, cur_cov[a])
+                cur_idx[a] = nearest_idx
+            end
             agent_indices[a] = nearest_idx
-            agent_positions_at_time[a] = agent_positions[a][nearest_idx]
         end
-        
-        # Apply pairwise synchronized Kalman fusion with tapered Gaussian
+
+        # --- Step 2: pairwise Kalman fusion at this checkpoint (unchanged algebra) ---
         for sender in 1:na
-            pos_s = agent_positions_at_time[sender]
             idx_s = agent_indices[sender]
-            
+            pos_s = agent_positions[sender][idx_s]
             for receiver in sender+1:na
-                pos_r = agent_positions_at_time[receiver]
                 idx_r = agent_indices[receiver]
-                
+                pos_r = agent_positions[receiver][idx_r]
                 dx = pos_s[1] - pos_r[1]
                 dy = pos_s[2] - pos_r[2]
-                dist = hypot(dx, dy)
-                
-                # Tapered Gaussian weight: exp(-dist² / (2σ²))
-                weight = exp(-dist^2 / (2 * COMM_SIGMA^2))
-                
+                weight = exp(-(dx*dx + dy*dy) / (2 * COMM_SIGMA^2))
                 if weight > COMM_WEIGHT_MIN
-                    # Bidirectional Kalman fusion via information filter
                     S_s = all_covs[sender][idx_s] + SENSOR_NOISE^2 * I(2)
                     S_r = all_covs[receiver][idx_r] + SENSOR_NOISE^2 * I(2)
-                    
-                    # Receiver fuses sender
                     inv_P_r = inv(all_covs[receiver][idx_r])
-                    inv_S_s = inv(S_s)
-                    new_inv_P_r = inv_P_r + weight * inv_S_s
+                    new_inv_P_r = inv_P_r + weight * inv(S_s)
                     all_covs[receiver][idx_r] = inv(new_inv_P_r)
-                    
-                    # Sender fuses receiver (bidirectional)
                     inv_P_s = inv(all_covs[sender][idx_s])
-                    inv_S_r = inv(S_r)
-                    new_inv_P_s = inv_P_s + weight * inv_S_r
+                    new_inv_P_s = inv_P_s + weight * inv(S_r)
                     all_covs[sender][idx_s] = inv(new_inv_P_s)
                 end
             end
         end
+
+        # Refresh running covariances to post-fusion values so next segment starts there
+        for a in 1:na
+            cur_cov[a] = all_covs[a][cur_idx[a]]
+        end
     end
-    
+
+    # Propagate any remaining waypoints beyond the last comm checkpoint
+    for a in 1:na
+        n_a = length(agent_positions[a])
+        if cur_idx[a] < n_a
+            propagate_segment!(all_covs[a], agent_positions[a], lms,
+                               cur_idx[a], n_a, cur_cov[a])
+        end
+    end
+
     return all_covs
 end
 
@@ -2780,6 +2783,28 @@ function optimize_continuous(paths::Vector{Vector{Int}}, graph::LandmarkGraph, l
     plt_comb = plot(plt1, plt2, layout=(1,2), size=(1200,500))
     savefig(plt_comb, string(fig_prefix, "fig_compare_discrete_continuous", (fig_prefix == "" ? "" : "_"), string(round(opt_len,digits=2)), ".png"))
     println("Fig combined (", fig_prefix, ") saved: Discrete Len=$(round(init_len,digits=2)) → Continuous Len=$(round(opt_len,digits=2))")
+
+    # Uncertainty-vs-distance profile: discrete (dashed) and continuous (solid) per agent
+    d_covs, d_arcs = evaluate_joint_discrete(all_agent_wpts, landmarks, num_agents)
+    cont_eval_paths = CONT_UNC_USE_WAYPOINTS ? opt_ctrls : opt_wpts
+    c_covs, c_arcs = evaluate_joint_discrete(cont_eval_paths, landmarks, num_agents)
+    plt_unc = plot(xlabel="distance traveled (m)", ylabel="uncertainty  det(Σ)^0.25",
+                   title=string(fig_prefix == "" ? "main" : fig_prefix, " — uncertainty profile (", LANDMARK_SCENARIO, ")"),
+                   size=(900, 400), legend=:topright)
+    hline!(plt_unc, [cont_threshold], color=:red, linestyle=:dot, linewidth=1.5, label="threshold")
+    for a in 1:num_agents
+        is_prim = is_primary_mask[a]
+        clr = is_prim ? :blue : get(agent_colors, a, :gray)
+        agent_lbl = is_prim ? "primary" : "support $a"
+        d_uncs = unc_radius.(d_covs[a])
+        c_uncs = unc_radius.(c_covs[a])
+        plot!(plt_unc, d_arcs[a], d_uncs, color=clr, linestyle=:dash, linewidth=1.2, label="$agent_lbl discrete")
+        plot!(plt_unc, c_arcs[a], c_uncs, color=clr, linestyle=:solid, linewidth=is_prim ? 2.0 : 1.3, label="$agent_lbl continuous")
+    end
+    unc_profile_fname = string(fig_prefix == "" ? "main" : fig_prefix, "_unc_profile.png")
+    savefig(plt_unc, unc_profile_fname)
+    println("Fig uncertainty profile (", fig_prefix == "" ? "main" : fig_prefix, ") saved: ", unc_profile_fname)
+
     return opt_len, opt_unc, opt_wpts, opt_covs, opt_ctrls
 end
 
