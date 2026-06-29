@@ -1,0 +1,79 @@
+# Landmark Planning Config — all parameters for planner.jl
+
+# Mission setup
+landmark_scenario: dual
+num_agents: 3
+pipeline_mode: discrete_then_continuous
+astar_mode: threshold
+primary_epsilon: 0.0
+
+# Mission geometry (meters)
+start_x: 0.0
+start_y: 0.0
+goal_x: 1000.0
+goal_y: 0.0
+
+# Uncertainty thresholds
+unc_radius_threshold: 2.0
+unc_feas_tol: 1.0e-6
+
+# Relaxed discrete search
+enable_relaxed_discrete: false
+relaxed_discrete_delta_mode: relative
+relaxed_discrete_delta_abs: 0.20
+relaxed_discrete_delta_rel: 0.2
+continue_astar_on_infeasible: true
+
+# Pruning flags
+prune_by_comm_radius_joint: false
+prune_by_primary_uncertainty: false
+prune_by_support_uncertainty: false
+
+# A* parameters
+astar_iteration_limit: 200000
+straight_cont_primary_wpts: 11
+
+# Continuous optimizer
+cont_opt_iters: 1000
+cont_opt_lr: 0.5
+cont_opt_h: 1.0e-4
+cont_adam_b1: 0.9
+cont_adam_b2: 0.999
+cont_adam_eps: 1.0e-8
+cont_conv_tol: 1.0e-3
+cont_unc_use_waypoints: true
+cont_barrier_start: 20.0
+cont_barrier_decay: 0.35
+cont_barrier_stages: 4
+cont_linesearch_shrink: 0.5
+cont_min_improvement: 1.0e-6
+cont_smooth_penalty: 1.0e3
+cont_barrier_hard_penalty: 1.0e4
+
+# Physical / sensor model
+dir_uncertainty_per_meter: 0.05
+maj_min_unc_ratio: 3
+marker_proportion: 5.0
+sensor_noise: 0.038
+bearing_noise_ratio: 2.2
+comm_radius: 200.0
+visibility_sigma: 50.0
+comm_interval: 100.0
+comm_sigma: 100.0
+comm_weight_min: 1.0e-4
+comm_interval_dist: 5.0
+
+# Graph / hex grid
+hex_width_m: 100.0
+hex_padding: 2
+support_plot_offset_m: 3.0
+support_idle_penalty: 30.0
+
+# Spline parameters
+spline_degree: 3
+spline_samples_per_seg: 5
+spline_curvature_samples_per_seg: 8
+min_turn_radius_m: 40.0
+
+# Output
+track_comm_events: true

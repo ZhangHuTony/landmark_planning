@@ -3,40 +3,73 @@ using DataStructures
 using LinearAlgebra
 using Statistics
 using Random
+using Dates
 
 Random.seed!(42)  # Reproducible jittered grid sampling
+
+# ----------------------
+# Config loading
+# ----------------------
+function load_yaml(path::String)
+    cfg = Dict{String, Any}()
+    for line in eachline(path)
+        line = strip(line)
+        (isempty(line) || startswith(line, '#')) && continue
+        idx = findfirst(':', line)
+        idx === nothing && continue
+        k = strip(line[1:prevind(line, idx)])
+        v = strip(line[nextind(line, idx):end])
+        isempty(v) && continue
+        if v == "true"; cfg[k] = true
+        elseif v == "false"; cfg[k] = false
+        else
+            ni = tryparse(Int, v)
+            if ni !== nothing; cfg[k] = ni
+            else
+                nf = tryparse(Float64, v)
+                cfg[k] = nf !== nothing ? nf : v
+            end
+        end
+    end
+    return cfg
+end
+
+const _CONFIG_PATH = isempty(ARGS) ? joinpath(@__DIR__, "config.yaml") : ARGS[1]
+const CFG = load_yaml(_CONFIG_PATH)
 
 # ----------------------
 # Constants & Parameters
 # ----------------------
 # Run knobs (change these most often between experiments)
-const NUM_AGENTS                 = 2
-const PIPELINE_MODE              = :discrete_then_continuous
-const PRIMARY_EPSILON            = 0.0
+const NUM_AGENTS                 = Int(CFG["num_agents"])
+const PIPELINE_MODE              = Symbol(CFG["pipeline_mode"])
+const PRIMARY_EPSILON            = Float64(CFG["primary_epsilon"])
 
-const UNC_RADIUS_THRESHOLD       = 2.0
-const UNC_FEAS_TOL               = 1e-6
+const UNC_RADIUS_THRESHOLD       = Float64(CFG["unc_radius_threshold"])
+const UNC_FEAS_TOL               = Float64(CFG["unc_feas_tol"])
 
-const ENABLE_RELAXED_DISCRETE_FOR_CONTINUOUS = false
-const RELAXED_DISCRETE_DELTA_MODE = :relative
-const RELAXED_DISCRETE_DELTA_ABS  = 0.20
-const RELAXED_DISCRETE_DELTA_REL  = 0.2
-const CONTINUE_ASTAR_ON_INFEASIBLE = true
+const ENABLE_RELAXED_DISCRETE_FOR_CONTINUOUS = Bool(CFG["enable_relaxed_discrete"])
+const RELAXED_DISCRETE_DELTA_MODE = Symbol(CFG["relaxed_discrete_delta_mode"])
+const RELAXED_DISCRETE_DELTA_ABS  = Float64(CFG["relaxed_discrete_delta_abs"])
+const RELAXED_DISCRETE_DELTA_REL  = Float64(CFG["relaxed_discrete_delta_rel"])
+const CONTINUE_ASTAR_ON_INFEASIBLE = Bool(CFG["continue_astar_on_infeasible"])
 
-const PRUNE_BY_COMM_RADIUS_JOINT = false
-const PRUNE_BY_PRIMARY_UNCERTAINTY = false
-const PRUNE_BY_SUPPORT_UNCERTAINTY = false
+const PRUNE_BY_COMM_RADIUS_JOINT = Bool(CFG["prune_by_comm_radius_joint"])
+const PRUNE_BY_PRIMARY_UNCERTAINTY = Bool(CFG["prune_by_primary_uncertainty"])
+const PRUNE_BY_SUPPORT_UNCERTAINTY = Bool(CFG["prune_by_support_uncertainty"])
 
-const STRAIGHT_CONT_PRIMARY_WPTS = 11
-const ASTAR_ITERATION_LIMIT = 200000   # default max A* iterations for collector (Inf for unlimited)
+const STRAIGHT_CONT_PRIMARY_WPTS = Int(CFG["straight_cont_primary_wpts"])
+const ASTAR_ITERATION_LIMIT = Int(CFG["astar_iteration_limit"])
+const CONT_OPT_ITERS  = Int(CFG["cont_opt_iters"])
+const CONT_OPT_LR     = Float64(CFG["cont_opt_lr"])
 
 # ASTAR mode: choose how discrete A* returns results
 #  :limit     => always run the collector until `ASTAR_ITERATION_LIMIT` and return multiple paths
 #  :threshold => stop when the first feasible path under the uncertainty threshold is found (single path)
-const ASTAR_MODE = :limit
+const ASTAR_MODE = Symbol(CFG["astar_mode"])
 
 # Landmark scenario toggle: :single, :dual, :clustered, :shoreline
-const LANDMARK_SCENARIO = :single
+const LANDMARK_SCENARIO = Symbol(CFG["landmark_scenario"])
 
 # Global holder for pareto seeds collected by A* (populated by run_discrete_seed_search)
 PARETO_COLLECTED = Vector{Tuple{Vector{Vector{Int}}, Float64, Float64, Int}}()
@@ -49,22 +82,25 @@ PARETO_COLLECTED = Vector{Tuple{Vector{Vector{Int}}, Float64, Float64, Int}}()
 # COMM_RADIUS               : acoustic modem range (meters)
 # UNC_RADIUS_THRESHOLD      : max acceptable det-based uncertainty radius at goal (meters)
 
-const DIR_UNCERTAINTY_PER_METER  = 0.05    # LOWERED from 0.30 to make path length more impactful on final uncertainty
-const MAJ_MIN_UNC_RATIO          = 3
+const DIR_UNCERTAINTY_PER_METER  = Float64(CFG["dir_uncertainty_per_meter"])
+const MAJ_MIN_UNC_RATIO          = Int(CFG["maj_min_unc_ratio"])
 const PERP_UNCERTAINTY_PER_METER = DIR_UNCERTAINTY_PER_METER / MAJ_MIN_UNC_RATIO
-const MARKER_PROPORTION          = 5.0
-const SENSOR_NOISE               = 0.038   # High-precision bearing-based landmark acoustic fixes
-const COMM_RADIUS                = 300.0    # conservative acoustic modem range (~3 units)
-const VISIBILITY_SIGMA           = 75.0     # 1σ detection range for landmark observations
-const COMM_INTERVAL              = 100.0    # synchronous communication checkpoint every 100m of travel
-const COMM_SIGMA                 = 50.0    # Gaussian taper for comm weighting; soft falloff over ~1-3σ
-const COMM_WEIGHT_MIN            = 1e-4    # skip fusion when Gaussian comm weight falls below this floor
-const HEX_WIDTH_M                = 100.0
-const HEX_RADIUS_M               = HEX_WIDTH_M / sqrt(3.0)  # pointy-top hex: width = sqrt(3)*radius
-const SUPPORT_PLOT_OFFSET_M      = 3.0  # visualization-only offset so support paths stay visible
+const MARKER_PROPORTION          = Float64(CFG["marker_proportion"])
+const SENSOR_NOISE               = Float64(CFG["sensor_noise"])
+const COMM_RADIUS                = Float64(CFG["comm_radius"])
+const VISIBILITY_SIGMA           = Float64(CFG["visibility_sigma"])
+const COMM_INTERVAL              = Float64(CFG["comm_interval"])
+const COMM_SIGMA                 = Float64(CFG["comm_sigma"])
+const COMM_WEIGHT_MIN            = Float64(CFG["comm_weight_min"])
+const HEX_WIDTH_M                = Float64(CFG["hex_width_m"])
+const COMM_MIN_SEPARATION_M      = HEX_WIDTH_M / 2
+const HEX_RADIUS_M               = HEX_WIDTH_M / sqrt(3.0)
+const SUPPORT_PLOT_OFFSET_M      = Float64(CFG["support_plot_offset_m"])
+const TRACK_COMM_EVENTS          = Bool(CFG["track_comm_events"])
+const OUTPUT_DIR                 = joinpath("results", Dates.format(now(), "yyyy-mm-dd_HH-MM-SS"))
 
 # Support idling preference used only as a lower-priority tie-break key.
-const SUPPORT_IDLE_PENALTY  = 30.0
+const SUPPORT_IDLE_PENALTY  = Float64(CFG["support_idle_penalty"])
 
 # Relaxed discrete acceptance for discrete->continuous pipeline.
 # When enabled, discrete search may return seeds with goal uncertainty up to
@@ -266,16 +302,16 @@ end
 # --------------------------------------------------------------------------
 # Clamped cubic B-spline helpers for continuous refinement
 # --------------------------------------------------------------------------
-const SPLINE_DEGREE                    = 3
-const SPLINE_SAMPLES_PER_SEG           = 5
-const SPLINE_CURVATURE_SAMPLES_PER_SEG = 8
-const MIN_TURN_RADIUS_M                = 40.0
+const SPLINE_DEGREE                    = Int(CFG["spline_degree"])
+const SPLINE_SAMPLES_PER_SEG           = Int(CFG["spline_samples_per_seg"])
+const SPLINE_CURVATURE_SAMPLES_PER_SEG = Int(CFG["spline_curvature_samples_per_seg"])
+const MIN_TURN_RADIUS_M                = Float64(CFG["min_turn_radius_m"])
 const MAX_CURVATURE                    = 1.0 / MIN_TURN_RADIUS_M
-const CONT_BARRIER_START               = 20.0
-const CONT_BARRIER_DECAY               = 0.35
-const CONT_BARRIER_STAGES              = 4
-const CONT_LINESEARCH_SHRINK           = 0.5
-const CONT_MIN_IMPROVEMENT             = 1e-6
+const CONT_BARRIER_START               = Float64(CFG["cont_barrier_start"])
+const CONT_BARRIER_DECAY               = Float64(CFG["cont_barrier_decay"])
+const CONT_BARRIER_STAGES              = Int(CFG["cont_barrier_stages"])
+const CONT_LINESEARCH_SHRINK           = Float64(CFG["cont_linesearch_shrink"])
+const CONT_MIN_IMPROVEMENT             = Float64(CFG["cont_min_improvement"])
 
 @inline function pt_sub(a::Tuple{Float64,Float64}, b::Tuple{Float64,Float64})
     return (a[1] - b[1], a[2] - b[2])
@@ -497,8 +533,8 @@ end
 # COMM_INTERVAL_DIST   : arc-distance sync window used inside A* — two agents must be
 #                        within this many meters of the same cumulative arc distance to
 #                        trigger pairwise_comm during graph expansion.
-const BEARING_NOISE_RATIO = 2.2               # cross-range noise 2.2× along-range—tighter sensor
-const COMM_INTERVAL_DIST  = 5.0               # 5m arc-distance sync window for in-search comm
+const BEARING_NOISE_RATIO = Float64(CFG["bearing_noise_ratio"])
+const COMM_INTERVAL_DIST  = Float64(CFG["comm_interval_dist"])
 
 
 # ==========================================================================
@@ -716,10 +752,10 @@ function evaluate_joint_discrete(agent_positions::Vector{Vector{Tuple{Float64,Fl
     end
     
     # Propagate covariances with synchronized Kalman fusion
-    all_covs = apply_synchronized_propagation!(agent_positions, all_arcs, lms, na; 
-                                               debug_goal_pos=debug_goal_pos)
-    
-    return all_covs, all_arcs
+    all_covs, comm_events = apply_synchronized_propagation!(agent_positions, all_arcs, lms, na;
+                                                            debug_goal_pos=debug_goal_pos)
+
+    return all_covs, all_arcs, comm_events
 end
 
 function apply_synchronized_propagation!(agent_positions::Vector{Vector{Tuple{Float64,Float64}}},
@@ -748,6 +784,7 @@ function apply_synchronized_propagation!(agent_positions::Vector{Vector{Tuple{Fl
 
     max_arc   = maximum(arcs[end] for arcs in all_arcs)
     comm_times = 0.0:COMM_INTERVAL:max_arc
+    comm_events = Tuple{Float64,Int,Int,Float64,Tuple{Float64,Float64},Tuple{Float64,Float64}}[]
 
     for comm_time in comm_times
         # --- Step 1: advance each agent to its nearest waypoint for this checkpoint ---
@@ -780,7 +817,8 @@ function apply_synchronized_propagation!(agent_positions::Vector{Vector{Tuple{Fl
                 pos_r = agent_positions[receiver][idx_r]
                 dx = pos_s[1] - pos_r[1]
                 dy = pos_s[2] - pos_r[2]
-                weight = exp(-(dx*dx + dy*dy) / (2 * COMM_SIGMA^2))
+                d2_comm = dx*dx + dy*dy
+                weight = d2_comm < COMM_MIN_SEPARATION_M^2 ? 0.0 : exp(-d2_comm / (2 * COMM_SIGMA^2))
                 if weight > COMM_WEIGHT_MIN
                     S_s = all_covs[sender][idx_s] + SENSOR_NOISE^2 * I(2)
                     S_r = all_covs[receiver][idx_r] + SENSOR_NOISE^2 * I(2)
@@ -790,6 +828,7 @@ function apply_synchronized_propagation!(agent_positions::Vector{Vector{Tuple{Fl
                     inv_P_s = inv(all_covs[sender][idx_s])
                     new_inv_P_s = inv_P_s + weight * inv(S_r)
                     all_covs[sender][idx_s] = inv(new_inv_P_s)
+                    push!(comm_events, (comm_time, sender, receiver, weight, pos_s, pos_r))
                 end
             end
         end
@@ -809,7 +848,7 @@ function apply_synchronized_propagation!(agent_positions::Vector{Vector{Tuple{Fl
         end
     end
 
-    return all_covs
+    return all_covs, comm_events
 end
 
 # ----------------------
@@ -961,8 +1000,9 @@ end
                                 xa::Float64, ya::Float64,
                                 xb::Float64, yb::Float64)
     d2 = (xa-xb)^2 + (ya-yb)^2
-    w  = exp(-d2 / (2*COMM_RADIUS^2))
-    w < 1e-3 && return cov_a, cov_b
+    d2 < COMM_MIN_SEPARATION_M^2 && return cov_a, cov_b  # skip: co-located estimates are correlated, not independent
+    w  = exp(-d2 / (2*COMM_SIGMA^2))
+    w < COMM_WEIGHT_MIN && return cov_a, cov_b
     # Information-filter fusion weighted by range
     noise = SENSOR_NOISE^2
     # a receives from b
@@ -1093,7 +1133,7 @@ function evaluate_full_paths(agent_paths::Vector{Vector{Int}},
     
     # Evaluate joint covariance via evaluate_joint_discrete (includes inter-agent communication)
     agent_positions = xs_ys_to_positions(all_xs, all_ys)
-    all_covs, _ = evaluate_joint_discrete(agent_positions, lms, na)
+    all_covs, _, _ = evaluate_joint_discrete(agent_positions, lms, na)
     
     # Extract final covariances and distances
     final_covs = [all_covs[a][end] for a in 1:na]
@@ -1131,16 +1171,20 @@ function joint_astar(graph::LandmarkGraph,
                      num_agents::Int;
                      seed_paths::Union{Nothing, Vector{Vector{Int}}}=nothing,
                      seed_dists::Union{Nothing, Vector{Float64}}=nothing,
-                     debug_animate::Bool=false,
-                     debug_animate_start_iter::Int=1,
-                     debug_animate_iters::Int=1000,
-                     debug_animate_sample_period::Int=1,
-                     debug_stop_after_animate::Bool=true,
+                     debug_animate::Bool=true,
+                     debug_animate_start_iter::Int=0,
+                     debug_animate_iters::Int=100000,
+                     debug_animate_sample_period::Int=100,
+                     debug_stop_after_animate::Bool=false,
                      debug_gif_path::String="fig_astar_partial.gif")
     n         = graph.n
     goal      = n                     # last node is goal
     na        = num_agents
     primary   = na                    # index of primary agent (last)
+    # Nodes that have a direct in-edge to the terminal goal node — termination fires here.
+    # ponytail: assumes stub ≈ 0m (goal on cell centre); heuristic shortest_paths[v,goal] stays valid.
+    is_goal_cell = falses(n)
+    for v in 1:(n-1); goal in graph.neighbors[v] && (is_goal_cell[v] = true); end
 
     # Fast path: single-agent weighted A* with incremental covariance updates.
     # Avoids rebuilding/evaluating full trajectories on every expansion.
@@ -1164,7 +1208,7 @@ function joint_astar(graph::LandmarkGraph,
         frontier_at_node = Dict{Int, Vector{Tuple{Float64, Matrix{Float64}}}}()
         frontier_at_node[1] = [(0.0, copy(states_sa[1].cov))]
 
-        while !isempty(pq_sa)
+        while !isempty(pq_sa) && iter_count_sa < ASTAR_ITERATION_LIMIT
             si = dequeue!(pq_sa)
             S = states_sa[si]
             iter_count_sa += 1
@@ -1176,7 +1220,7 @@ function joint_astar(graph::LandmarkGraph,
             end
 
             h = graph.shortest_paths[S.node, goal]
-            if S.node == goal
+            if is_goal_cell[S.node]
                 path = Int[]
                 psi = si
                 while psi != -1
@@ -1189,7 +1233,7 @@ function joint_astar(graph::LandmarkGraph,
                 if unc_within_threshold(exact_unc, unc_threshold)
                     println("  ✓ FEASIBLE SOLUTION at iter $iter_count_sa: dist=$(round(exact_dists[1], digits=3)), unc=$(round(exact_unc, digits=4))")
                     println("  [Constraint A*] Single-agent complete: $(iter_count_sa) iterations, final_dist=$(round(exact_dists[1], digits=3))")
-                    return [path], [exact_dists[1]], exact_unc
+                    return [path], [exact_dists[1]], exact_unc, iter_count_sa
                 end
 
                 println("  [Constraint A*] Goal popped but infeasible under exact eval: unc=$(round(exact_unc, digits=4))")
@@ -1240,7 +1284,7 @@ function joint_astar(graph::LandmarkGraph,
         end
 
         println("  [Constraint A*] No feasible single-agent solution found")
-        return [Int[]], [0.0], Inf
+        return [Int[]], [0.0], Inf, iter_count_sa
     end
 
     # ── Initial state: all agents at node 1 (start) ──────────────────────────
@@ -1334,7 +1378,7 @@ function joint_astar(graph::LandmarkGraph,
         return plt
     end
 
-    while !isempty(pq)
+    while !isempty(pq) && iter_count < ASTAR_ITERATION_LIMIT
         si  = dequeue!(pq)
         S   = states[si]
         iter_count += 1
@@ -1370,22 +1414,23 @@ function joint_astar(graph::LandmarkGraph,
         if iter_count <= 5 || mod(iter_count, progress_every) == 0
             prim_node = isempty(S.paths[primary]) ? 0 : S.paths[primary][end]
             prim_h = isinf(graph.shortest_paths[prim_node, goal]) ? "∞" : "$(round(graph.shortest_paths[prim_node, goal], digits=1))"
-            println("  [Constraint A*] Iter $iter_count, prim_node=$prim_node, h=$prim_h, queue_size=$(length(pq))")
+            #println("  [Constraint A*] Iter $iter_count, prim_node=$prim_node, h=$prim_h, queue_size=$(length(pq))")
         end
 
         # Standard A* ordering uses f only for priority; no incumbent pruning.
         h = joint_heuristic(S.paths, goal, graph)
         f = S.g + w_astar * h
 
-        # Check if primary reached goal
-        if S.paths[primary][end] == goal
+
+        # Check if primary reached goal cell
+        if is_goal_cell[S.paths[primary][end]]
             agent_paths = [copy(S.paths[a]) for a in 1:na]
             exact_covs, exact_dists = evaluate_full_paths(agent_paths, graph, lms, na)
             exact_unc = unc_radius(exact_covs[primary])
             if unc_within_threshold(exact_unc, unc_threshold)
                 println("  ✓ FEASIBLE SOLUTION at iter $iter_count: dist=$(round(exact_dists[primary], digits=3)), unc=$(round(exact_unc, digits=4))")
                 println("  [Constraint A*] Complete: $(iter_count) iterations, final_dist=$(round(exact_dists[primary], digits=3))")
-                return agent_paths, exact_dists, exact_unc
+                return agent_paths, exact_dists, exact_unc, iter_count
             else
                 println("  [Constraint A*] Goal popped but infeasible under exact eval: unc=$(round(exact_unc, digits=4)) > $(round(unc_threshold, digits=4))")
             end
@@ -1435,13 +1480,16 @@ function joint_astar(graph::LandmarkGraph,
                 new_g = new_dists[primary]
 
                 # Support agents must also remain under the uncertainty threshold.
-                for a in 1:(primary - 1)
-                    sup_unc = unc_radius(new_covs[a])
-                    if PRUNE_BY_SUPPORT_UNCERTAINTY && unc_exceeds_threshold(sup_unc, unc_threshold)
-                        # println("  [Constraint A*] Pruned expansion: support $a unc=$(round(sup_unc, digits=4)) > threshold=$(round(unc_threshold, digits=4))")
-                        return
+                if PRUNE_BY_SUPPORT_UNCERTAINTY
+                    for a in 1:(primary - 1)
+                        sup_unc = unc_radius(new_covs[a])
+                        if unc_exceeds_threshold(sup_unc, unc_threshold)
+                            # println("  [Constraint A*] Pruned expansion: support $a unc=$(round(sup_unc, digits=4)) > threshold=$(round(unc_threshold, digits=4))")
+                            return
+                        end
                     end
                 end
+                
 
                 prim_unc = unc_radius(new_covs[primary])
                 if PRUNE_BY_PRIMARY_UNCERTAINTY && unc_exceeds_threshold(prim_unc, unc_threshold)
@@ -1509,7 +1557,7 @@ function joint_astar(graph::LandmarkGraph,
 
     # ── No feasible goal reached ──────────────────────────────────────────────
     println("  [Constraint A*] No feasible solution found")
-    return [Int[] for _ in 1:na], zeros(na), Inf
+    return [Int[] for _ in 1:na], zeros(na), Inf, iter_count
 end
 
 
@@ -1528,6 +1576,8 @@ function joint_astar_collect(graph::LandmarkGraph,
     goal      = n
     na        = num_agents
     primary   = na
+    is_goal_cell = falses(n)
+    for v in 1:(n-1); goal in graph.neighbors[v] && (is_goal_cell[v] = true); end
 
     # Use single-agent fast path for na==1
     if na == 1
@@ -1550,7 +1600,7 @@ function joint_astar_collect(graph::LandmarkGraph,
             S = states_sa[si]
             iter_count_sa += 1
 
-            if S.node == goal
+            if is_goal_cell[S.node]
                 path = Int[]; psi = si
                 while psi != -1
                     pushfirst!(path, states_sa[psi].node)
@@ -1621,7 +1671,7 @@ function joint_astar_collect(graph::LandmarkGraph,
     while !isempty(pq) && iter_count < max_iters
         si = dequeue!(pq); S = states[si]; iter_count += 1
 
-        if S.paths[primary][end] == goal
+        if is_goal_cell[S.paths[primary][end]]
             agent_paths = [copy(S.paths[a]) for a in 1:na]
             exact_covs, exact_dists = evaluate_full_paths(agent_paths, graph, lms, na)
             exact_unc = unc_radius(exact_covs[primary])
@@ -1771,7 +1821,7 @@ end
 # Each graph node is (hex_cell, heading), so support/primary trajectories are
 # constrained by vehicle heading, not just geometric adjacency.
 
-const HEX_PADDING  = 2      # extra cells around bounding box
+const HEX_PADDING  = Int(CFG["hex_padding"])
 const HEX_HEADINGS = 6
 
 const HEX_EVEN_ROW_DELTAS = [
@@ -2096,11 +2146,13 @@ end
 
 # Start and goal are plain routing waypoints — not landmarks, no covariance meaning.
 # Start is node 1 (first entry in graph), goal is appended after all landmarks+samples.
-const START_POS = (0.0, 0.0)
-const GOAL_POS  = (1000.0, 0.0)
+const START_POS = (Float64(CFG["start_x"]), Float64(CFG["start_y"]))
+const GOAL_POS  = (Float64(CFG["goal_x"]),  Float64(CFG["goal_y"]))
 
 # Select landmark configuration based on scenario toggle
-landmarks = make_scattered_landmarks(LANDMARK_SCENARIO)
+mkpath(OUTPUT_DIR)
+cp(_CONFIG_PATH, joinpath(OUTPUT_DIR, "config.yaml"); force=true)
+landmarks = make_scattered_landmarks(Symbol(get(ENV, "SCENARIO", string(LANDMARK_SCENARIO))))
 println("Landmark scenario: $(LANDMARK_SCENARIO) — $(length(landmarks)) landmarks")
 
 graph = build_hex_graph(landmarks, START_POS, GOAL_POS; hex_r=HEX_RADIUS_M)
@@ -2126,6 +2178,113 @@ function draw_covariance_ellipse!(plt, x, y, cov; npts=50, nstd=2, color=:red, a
     R = [cos(angle) -sin(angle); sin(angle) cos(angle)]
     pts = R * vcat((a.*cos.(θ))', (b.*sin.(θ))')
     plot!(plt, x.+pts[1,:], y.+pts[2,:], seriestype=:shape, color=color, alpha=alpha, label=false)
+end
+
+agent_colors = [:purple, :teal, :darkorange, :crimson, :magenta,
+                :brown, :lime, :navy, :coral, :olive]
+
+function make_base_plot(landmarks, graph)
+    _, sensor_mask = node_role_masks(graph)
+    p = plot(legend=:outerright, aspect_ratio=:equal)
+    draw_hex_tiles!(p, graph; fill_color=:aliceblue, line_color=:cadetblue,
+                    fill_alpha=0.98, line_alpha=1.0)
+
+    sensor_idx = findall(sensor_mask)
+    if !isempty(sensor_idx)
+        lx = [graph.landmarks[i].x for i in sensor_idx]
+        ly = [graph.landmarks[i].y for i in sensor_idx]
+        scatter!(p, lx, ly, label="Landmarks", color=:black, markersize=4,
+                 markerstrokewidth=0)
+        for i in sensor_idx
+            draw_covariance_ellipse!(p, graph.landmarks[i].x, graph.landmarks[i].y,
+                                     graph.landmarks[i].cov, color=:red, alpha=0.25,
+                                     display_scale=400.0)
+        end
+    end
+
+    scatter!(p, [graph.landmarks[1].x], [graph.landmarks[1].y],
+             color=:green, markersize=8, markerstrokewidth=0, label="Start")
+    scatter!(p, [graph.landmarks[graph.n].x], [graph.landmarks[graph.n].y],
+             color=:orange, marker=:star5, markersize=10, markerstrokewidth=0,
+             label="Goal")
+    set_hex_world_limits!(p, graph)
+    return p
+end
+
+function overlay_comm_events!(plt, events)
+    isempty(events) && return
+    max_t = maximum(t for (t,_,_,_,_,_) in events)
+    cmap  = cgrad(:plasma)
+    for (t, _, _, w, pa, pb) in events
+        clr = cmap[max_t > 0 ? t / max_t : 0.0]
+        plot!(plt, [pa[1], pb[1]], [pa[2], pb[2]], color=clr, alpha=w, linewidth=1, label=false)
+        scatter!(plt, [pa[1], pb[1]], [pa[2], pb[2]], markershape=:diamond, markersize=5,
+                 color=clr, markerstrokewidth=0, label=false)
+    end
+end
+
+function run_path_eval(csv_path::String, landmarks::Vector{Landmark}, graph::LandmarkGraph)
+    println("\n── PATH EVAL MODE ($(csv_path)) ──")
+    # Parse CSV: agent,ctrl_index,x,y
+    rows = Dict{Int, Vector{Tuple{Int, Float64, Float64}}}()
+    open(csv_path) do io
+        readline(io)  # skip header
+        for line in eachline(io)
+            isempty(strip(line)) && continue
+            parts = split(line, ',')
+            ai = parse(Int, parts[1])
+            ci = parse(Int, parts[2])
+            x  = parse(Float64, parts[3])
+            y  = parse(Float64, parts[4])
+            push!(get!(rows, ai, Tuple{Int, Float64, Float64}[]), (ci, x, y))
+        end
+    end
+    na = maximum(keys(rows))
+    @assert na >= 1 && all(haskey(rows, a) for a in 1:na) "CSV must have rows for agents 1..$(na)"
+    positions = [[(x, y) for (_, x, y) in sort(rows[a], by=first)] for a in 1:na]
+
+    covs, arcs, comm = evaluate_joint_discrete(positions, landmarks, na)
+    primary = na
+    is_primary_mask = [a == primary for a in 1:na]
+
+    # Trajectory plot
+    plt_traj = make_base_plot(landmarks, graph)
+    for a in 1:na
+        xs = [p[1] for p in positions[a]]
+        ys = [p[2] for p in positions[a]]
+        is_prim = is_primary_mask[a]
+        clr = is_prim ? :blue : get(agent_colors, a, :gray)
+        plot!(plt_traj, xs, ys, label=(is_prim ? "primary" : "support $a"),
+              color=clr, linewidth=is_prim ? 2.2 : 1.3,
+              linestyle=is_prim ? :solid : :dash)
+        scatter!(plt_traj, xs, ys, label=false, color=clr, markersize=3, markerstrokewidth=0)
+    end
+    if TRACK_COMM_EVENTS; overlay_comm_events!(plt_traj, comm); end
+    out_traj = joinpath(OUTPUT_DIR, "eval_paths_trajectory.png")
+    savefig(plt_traj, out_traj)
+    println("  → Saved trajectory: $out_traj")
+
+    # Uncertainty profile
+    plt_unc = plot(xlabel="distance traveled (m)", ylabel="uncertainty  det(Σ)^0.25",
+                   title="eval paths — uncertainty profile ($(LANDMARK_SCENARIO))",
+                   size=(900, 400), legend=:topleft)
+    hline!(plt_unc, [UNC_RADIUS_THRESHOLD], color=:red, linestyle=:dot, linewidth=1.5, label="threshold")
+    for a in 1:na
+        is_prim = is_primary_mask[a]
+        clr = is_prim ? :blue : get(agent_colors, a, :gray)
+        lbl = is_prim ? "primary" : "support $a"
+        plot!(plt_unc, arcs[a], unc_radius.(covs[a]), color=clr,
+              linewidth=is_prim ? 2.0 : 1.3, label=lbl)
+    end
+    out_unc = joinpath(OUTPUT_DIR, "eval_paths_unc_profile.png")
+    savefig(plt_unc, out_unc)
+    println("  → Saved uncertainty profile: $out_unc")
+end
+
+# ponytail: eval-only mode — replay user paths, skip the planner pipeline
+if haskey(ENV, "EVAL_PATHS_CSV")
+    run_path_eval(ENV["EVAL_PATHS_CSV"], landmarks, graph)
+    exit()
 end
 
 # ==========================================================================
@@ -2157,13 +2316,12 @@ function run_discrete_seed_search(search_unc_threshold::Float64)
         end
     elseif ASTAR_MODE == :threshold
         println("  Running threshold-stop A* (stops on first feasible under threshold)...")
-        ppaths, pdists, punc = joint_astar(graph, landmarks, search_unc_threshold, NUM_AGENTS)
+        ppaths, pdists, punc, disc_iter = joint_astar(graph, landmarks, search_unc_threshold, NUM_AGENTS)
         if length(ppaths) != NUM_AGENTS || any(isempty, ppaths)
             println("  ✗ No feasible path found by threshold-stop A*")
             return [Int[] for _ in 1:(NUM_AGENTS - 1)], Int[], Inf
         end
-        # Wrap single result into collected-format: (paths, dist, unc, iter=0)
-        collected = [ (ppaths, pdists[NUM_AGENTS], punc, 0) ]
+        collected = [ (ppaths, pdists[NUM_AGENTS], punc, disc_iter) ]
     else
         error("Unsupported ASTAR_MODE=$(ASTAR_MODE). Use :limit or :threshold")
     end
@@ -2203,7 +2361,7 @@ function run_discrete_seed_search(search_unc_threshold::Float64)
     for (i, (pp, pd, pu, it)) in enumerate(pareto)
         annotate!(pltp, pd, pu, text("$i", :black, 8))
     end
-    savefig(pltp, "fig_pareto_discrete.png"); println("Fig Pareto (discrete) saved: $(length(pareto)) points")
+    savefig(pltp, joinpath(OUTPUT_DIR, "fig_pareto_discrete.png")); println("Fig Pareto (discrete) saved: $(length(pareto)) points")
 
     # Store pareto set for later continuous refinement (optimizer defined below)
     global PARETO_COLLECTED
@@ -2282,7 +2440,7 @@ end
 
 shortest_path = primary_path
 shortest_dist = primary_dist
-converged_iter = 0
+converged_iter = isempty(PARETO_COLLECTED) ? 0 : PARETO_COLLECTED[1][4]
 
 println("\n--- Final Results ---")
 if isempty(paths)
@@ -2319,39 +2477,8 @@ end
 println("Converged at iteration : ", converged_iter)
 
 # ==========================================================================
-# Plotting helpers (shared across all three figures)
+# Plotting helpers (CSV writers)
 # ==========================================================================
-
-agent_colors = [:purple, :teal, :darkorange, :crimson, :magenta,
-                :brown, :lime, :navy, :coral, :olive]
-
-function make_base_plot(landmarks, graph)
-    _, sensor_mask = node_role_masks(graph)
-    p = plot(legend=:outerright, aspect_ratio=:equal)
-    draw_hex_tiles!(p, graph; fill_color=:aliceblue, line_color=:cadetblue,
-                    fill_alpha=0.98, line_alpha=1.0)
-
-    sensor_idx = findall(sensor_mask)
-    if !isempty(sensor_idx)
-        lx = [graph.landmarks[i].x for i in sensor_idx]
-        ly = [graph.landmarks[i].y for i in sensor_idx]
-        scatter!(p, lx, ly, label="Landmarks", color=:black, markersize=4,
-                 markerstrokewidth=0)
-        for i in sensor_idx
-            draw_covariance_ellipse!(p, graph.landmarks[i].x, graph.landmarks[i].y,
-                                     graph.landmarks[i].cov, color=:red, alpha=0.25,
-                                     display_scale=400.0)
-        end
-    end
-
-    scatter!(p, [graph.landmarks[1].x], [graph.landmarks[1].y],
-             color=:green, markersize=8, markerstrokewidth=0, label="Start")
-    scatter!(p, [graph.landmarks[graph.n].x], [graph.landmarks[graph.n].y],
-             color=:orange, marker=:star5, markersize=10, markerstrokewidth=0,
-             label="Goal")
-    set_hex_world_limits!(p, graph)
-    return p
-end
 
 # Save control points (CSV): each row = agent, ctrl_index, x, y
 function write_ctrls_csv(filename::String, ctrls::Vector{Vector{Tuple{Float64,Float64}}})
@@ -2364,6 +2491,16 @@ function write_ctrls_csv(filename::String, ctrls::Vector{Vector{Tuple{Float64,Fl
         end
     end
     println("  → Saved control points to $filename ($(sum(length.(ctrls))) points)")
+end
+
+function write_comm_csv(filename::String, events)
+    open(filename, "w") do io
+        println(io, "arc_dist,agent_a,agent_b,weight,xa,ya,xb,yb")
+        for (t, a, b, w, pa, pb) in events
+            println(io, "$t,$a,$b,$w,$(pa[1]),$(pa[2]),$(pb[1]),$(pb[2])")
+        end
+    end
+    println("  → Saved $(length(events)) comm events to $filename")
 end
 
 # ==========================================================================
@@ -2405,7 +2542,7 @@ let
             end
         end
         
-        covs_all_fig1, arcs_all_fig1 = evaluate_joint_discrete(agent_positions_fig1, landmarks, length(paths); debug_goal_pos=GOAL_POS)
+        covs_all_fig1, arcs_all_fig1, comm_events_fig1 = evaluate_joint_discrete(agent_positions_fig1, landmarks, length(paths); debug_goal_pos=GOAL_POS)
 
         # Primary is last agent
         prim_covs_fig1 = covs_all_fig1[end]
@@ -2427,7 +2564,11 @@ let
         title!(plt1,"Fig 1: No feasible path")
     end
     xlabel!(plt1,"x (m)"); ylabel!(plt1,"y (m)")
-    savefig(plt1,"fig1_joint_discrete_astar.png"); println("Fig 1 saved.")
+    if TRACK_COMM_EVENTS && @isdefined(comm_events_fig1)
+        overlay_comm_events!(plt1, comm_events_fig1)
+        write_comm_csv(joinpath(OUTPUT_DIR, "comm_events.csv"), comm_events_fig1)
+    end
+    savefig(plt1, joinpath(OUTPUT_DIR, "fig1_joint_discrete_astar.png")); println("Fig 1 saved.")
 end
 
 # ==========================================================================
@@ -2445,16 +2586,14 @@ end
 #              support length ≤ primary length,
 #              and curvature bounds
 
-const CONT_OPT_ITERS  = 1000        # Adam iteration budget (safety limit)
-const CONT_OPT_LR     = 5e-1       # Adam learning rate for waypoint positions
-const CONT_OPT_H      = 1e-4       # Finite-difference step for gradient
-const CONT_ADAM_B1    = 0.9        # Adam exponential decay rates
-const CONT_ADAM_B2    = 0.999
-const CONT_ADAM_EPS   = 1e-8
-const CONT_CONV_TOL            = 1e-3   # Convergence: change in length < this
-const CONT_UNC_USE_WAYPOINTS   = true   # keeps straight-line continuous uncertainty consistent with discrete evaluation
-const CONT_SMOOTH_PENALTY      = 1e3    # quadratic penalty weight during smoothing phase (uncertainty, curvature, support-length)
-const CONT_BARRIER_HARD_PENALTY = 1e4   # quadratic penalty weight for hard constraint violations in barrier phase
+const CONT_OPT_H             = Float64(CFG["cont_opt_h"])
+const CONT_ADAM_B1           = Float64(CFG["cont_adam_b1"])
+const CONT_ADAM_B2           = Float64(CFG["cont_adam_b2"])
+const CONT_ADAM_EPS          = Float64(CFG["cont_adam_eps"])
+const CONT_CONV_TOL          = Float64(CFG["cont_conv_tol"])
+const CONT_UNC_USE_WAYPOINTS = Bool(CFG["cont_unc_use_waypoints"])
+const CONT_SMOOTH_PENALTY      = Float64(CFG["cont_smooth_penalty"])
+const CONT_BARRIER_HARD_PENALTY = Float64(CFG["cont_barrier_hard_penalty"])
 
 function optimize_continuous(paths::Vector{Vector{Int}}, graph::LandmarkGraph, landmarks::Vector{Landmark}, num_agents::Int; cont_threshold::Float64=UNC_RADIUS_THRESHOLD, fig_prefix::String="")
     println("\n=== Continuous Spline Optimization (threshold=$(round(cont_threshold, digits=4))) ===")
@@ -2486,6 +2625,12 @@ function optimize_continuous(paths::Vector{Vector{Int}}, graph::LandmarkGraph, l
             all_agent_wpts[ai] = [(graph.landmarks[i].x, graph.landmarks[i].y) for i in path]
             is_primary_mask[ai] = (ai == length(paths))
         end
+        # Primary now terminates at the goal cell (not the terminal node), so its last
+        # waypoint is the cell centre.  Override to exact goal_pos so the B-spline is
+        # pinned to the true goal regardless of cell-centre drift.
+        # ponytail: no-op when goal sits on a cell centre (all current scenarios).
+        prim = length(paths)
+        all_agent_wpts[prim][end] = (graph.landmarks[graph.n].x, graph.landmarks[graph.n].y)
     end
 
     # Count free variables
@@ -2581,7 +2726,7 @@ function optimize_continuous(paths::Vector{Vector{Int}}, graph::LandmarkGraph, l
             return Inf, Inf, sampled_paths, empty_covs, curvatures, max_curvatures, ctrl_list, support_lens
         end
         unc_eval_paths = CONT_UNC_USE_WAYPOINTS ? ctrl_list : sampled_paths
-        covs_all, _ = evaluate_joint_discrete(unc_eval_paths, landmarks, num_agents)
+        covs_all, _, _ = evaluate_joint_discrete(unc_eval_paths, landmarks, num_agents)
         if isempty(covs_all) || isempty(covs_all[end]) || any(!isfinite, covs_all[end][end])
             support_lens = fill(Inf, max(0, num_agents - 1))
             return Inf, Inf, sampled_paths, covs_all, curvatures, max_curvatures, ctrl_list, support_lens
@@ -2778,19 +2923,24 @@ function optimize_continuous(paths::Vector{Vector{Int}}, graph::LandmarkGraph, l
     end
     annotate!(plt2, 950.0, 400.0, text("Continuous (Refined)\nLen: $(round(opt_len, digits=2))\nUnc: $(round(opt_unc, digits=4))", 10, :left), annotationhalign=:left)
     # (Do not save individual continuous figure; only save combined comparison)
-    
-    # Combined side-by-side figure: discrete (left) vs continuous (right)
-    plt_comb = plot(plt1, plt2, layout=(1,2), size=(1200,500))
-    savefig(plt_comb, string(fig_prefix, "fig_compare_discrete_continuous", (fig_prefix == "" ? "" : "_"), string(round(opt_len,digits=2)), ".png"))
-    println("Fig combined (", fig_prefix, ") saved: Discrete Len=$(round(init_len,digits=2)) → Continuous Len=$(round(opt_len,digits=2))")
 
     # Uncertainty-vs-distance profile: discrete (dashed) and continuous (solid) per agent
-    d_covs, d_arcs = evaluate_joint_discrete(all_agent_wpts, landmarks, num_agents)
+    d_covs, d_arcs, d_comm = evaluate_joint_discrete(all_agent_wpts, landmarks, num_agents)
     cont_eval_paths = CONT_UNC_USE_WAYPOINTS ? opt_ctrls : opt_wpts
-    c_covs, c_arcs = evaluate_joint_discrete(cont_eval_paths, landmarks, num_agents)
+    c_covs, c_arcs, c_comm = evaluate_joint_discrete(cont_eval_paths, landmarks, num_agents)
+
+    if TRACK_COMM_EVENTS
+        overlay_comm_events!(plt1, d_comm)
+        overlay_comm_events!(plt2, c_comm)
+    end
+
+    # Combined side-by-side figure: discrete (left) vs continuous (right)
+    plt_comb = plot(plt1, plt2, layout=(1,2), size=(1200,500))
+    savefig(plt_comb, joinpath(OUTPUT_DIR, string(fig_prefix, "fig_compare_discrete_continuous", (fig_prefix == "" ? "" : "_"), string(round(opt_len,digits=2)), ".png")))
+    println("Fig combined (", fig_prefix, ") saved: Discrete Len=$(round(init_len,digits=2)) → Continuous Len=$(round(opt_len,digits=2))")
     plt_unc = plot(xlabel="distance traveled (m)", ylabel="uncertainty  det(Σ)^0.25",
                    title=string(fig_prefix == "" ? "main" : fig_prefix, " — uncertainty profile (", LANDMARK_SCENARIO, ")"),
-                   size=(900, 400), legend=:topright)
+                   size=(900, 400), legend=:topleft)
     hline!(plt_unc, [cont_threshold], color=:red, linestyle=:dot, linewidth=1.5, label="threshold")
     for a in 1:num_agents
         is_prim = is_primary_mask[a]
@@ -2801,29 +2951,36 @@ function optimize_continuous(paths::Vector{Vector{Int}}, graph::LandmarkGraph, l
         plot!(plt_unc, d_arcs[a], d_uncs, color=clr, linestyle=:dash, linewidth=1.2, label="$agent_lbl discrete")
         plot!(plt_unc, c_arcs[a], c_uncs, color=clr, linestyle=:solid, linewidth=is_prim ? 2.0 : 1.3, label="$agent_lbl continuous")
     end
-    unc_profile_fname = string(fig_prefix == "" ? "main" : fig_prefix, "_unc_profile.png")
+    unc_profile_fname = joinpath(OUTPUT_DIR, string(fig_prefix == "" ? "main" : fig_prefix, "_unc_profile.png"))
     savefig(plt_unc, unc_profile_fname)
     println("Fig uncertainty profile (", fig_prefix == "" ? "main" : fig_prefix, ") saved: ", unc_profile_fname)
 
     return opt_len, opt_unc, opt_wpts, opt_covs, opt_ctrls
 end
 
+main_cont_uncs = Float64[]
+main_cont_len  = NaN
+
 if !isempty(paths) && all(length.(paths) .> 0)  # Continuous optimization only if all agents have paths
     opt_len, opt_unc, opt_wpts, opt_covs, opt_ctrls = optimize_continuous(paths, graph, landmarks, NUM_AGENTS; cont_threshold=UNC_RADIUS_THRESHOLD, fig_prefix="main")
-    write_ctrls_csv("main_ctrls.csv", opt_ctrls)
+    write_ctrls_csv(joinpath(OUTPUT_DIR, "main_ctrls.csv"), opt_ctrls)
+    main_cont_len = opt_len
+    if !isempty(opt_covs) && all(a -> !isempty(opt_covs[a]), 1:NUM_AGENTS)
+        main_cont_uncs = [unc_radius(opt_covs[a][end]) for a in 1:NUM_AGENTS]
+    end
 end
 
 # If Pareto seeds were collected earlier, run continuous optimizer for each now
+optimized_results = Tuple[]
 if length(PARETO_COLLECTED) > 0
     println("\nRunning continuous refinement for $(length(PARETO_COLLECTED)) Pareto seeds...")
-    optimized_results = []
     for (i, (ppaths, pdist, punc, it)) in enumerate(PARETO_COLLECTED)
         println("  Refining Pareto seed $i (dist=$(round(pdist,digits=3)), unc=$(round(punc,digits=4)))")
         support_paths = pad_support_paths_to_primary(ppaths[1:NUM_AGENTS-1], ppaths[NUM_AGENTS])
         primary_path = ppaths[NUM_AGENTS]
         all_paths = vcat(support_paths, [primary_path])
         opt_len, opt_unc, opt_wpts, opt_covs, opt_ctrls = optimize_continuous(all_paths, graph, landmarks, NUM_AGENTS; cont_threshold=punc, fig_prefix="pareto_$(i)")
-        write_ctrls_csv("pareto_$(i)_ctrls.csv", opt_ctrls)
+        write_ctrls_csv(joinpath(OUTPUT_DIR, "pareto_$(i)_ctrls.csv"), opt_ctrls)
         push!(optimized_results, (i, pdist, punc, opt_len, opt_unc, opt_wpts, opt_covs, opt_ctrls))
     end
 
@@ -2834,5 +2991,38 @@ if length(PARETO_COLLECTED) > 0
         xs = [w[1] for w in prim]; ys = [w[2] for w in prim]
         plot!(plt_overlay, xs, ys, label="pareto_$i (len=$(round(opt_len,digits=2)), unc=$(round(opt_unc,digits=4)))")
     end
-    savefig(plt_overlay, "fig_pareto_continuous_overlay.png"); println("Fig Pareto continuous overlay saved.")
+    savefig(plt_overlay, joinpath(OUTPUT_DIR, "fig_pareto_continuous_overlay.png")); println("Fig Pareto continuous overlay saved.")
 end
+
+# ==========================================================================
+# Write results.yaml
+# ==========================================================================
+open(joinpath(OUTPUT_DIR, "results.yaml"), "w") do io
+    fmt4(x) = isfinite(x) ? string(round(x, digits=4)) : "null"
+    fmt3(x) = isfinite(x) ? string(round(x, digits=3)) : "null"
+    fmtlist(v) = isempty(v) ? "[]" : "[" * join(fmt4.(v), ", ") * "]"
+
+    write(io, "astar_mode: $(ASTAR_MODE)\n")
+    write(io, "main:\n")
+    write(io, "  astar_iterations: $(converged_iter)\n")
+    write(io, "  discrete_uncertainties: $(fmtlist(isempty(paths) ? Float64[] : uncs))\n")
+    write(io, "  continuous_primary_length: $(fmt3(main_cont_len))\n")
+    write(io, "  continuous_uncertainties: $(fmtlist(main_cont_uncs))\n")
+    if !isempty(PARETO_COLLECTED)
+        write(io, "pareto_seeds:\n")
+        for (idx, (pp, pd, pu, it)) in enumerate(PARETO_COLLECTED)
+            write(io, "  - rank: $(idx)\n")
+            write(io, "    astar_iterations: $(it)\n")
+            write(io, "    discrete_primary_unc: $(fmt4(pu))\n")
+            r = findfirst(x -> x[1] == idx, optimized_results)
+            if !isnothing(r)
+                _, _, _, clen, _, _, ccovs, _ = optimized_results[r]
+                cont_uncs = (!isempty(ccovs) && all(a -> !isempty(ccovs[a]), 1:NUM_AGENTS)) ?
+                    [unc_radius(ccovs[a][end]) for a in 1:NUM_AGENTS] : Float64[]
+                write(io, "    continuous_primary_length: $(fmt3(clen))\n")
+                write(io, "    continuous_uncertainties: $(fmtlist(cont_uncs))\n")
+            end
+        end
+    end
+end
+println("Results saved: ", joinpath(OUTPUT_DIR, "results.yaml"))

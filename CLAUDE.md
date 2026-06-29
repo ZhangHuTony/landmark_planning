@@ -8,8 +8,6 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 # Run a single scenario (outputs PNGs and CSVs to the current directory)
 cd results_single && julia ../planner.jl
 
-# Run all four scenarios into their respective results_* directories
-bash run_scenarios.sh
 ```
 
 Julia 1.12+ is required (installed at `~/.juliaup/bin/julia`). Required packages (`Plots`, `DataStructures`) are pre-installed in the default environment. The script has no `Project.toml`; it relies on the global depot.
