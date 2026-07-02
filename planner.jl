@@ -88,12 +88,14 @@ const PERP_UNCERTAINTY_PER_METER = DIR_UNCERTAINTY_PER_METER / MAJ_MIN_UNC_RATIO
 const MARKER_PROPORTION          = Float64(CFG["marker_proportion"])
 const SENSOR_NOISE               = Float64(CFG["sensor_noise"])
 const COMM_RADIUS                = Float64(CFG["comm_radius"])
-const VISIBILITY_SIGMA           = Float64(CFG["visibility_sigma"])
+const VISIBILITY_RANGE           = Float64(CFG["visibility_range"])
+const VISIBILITY_WIDTH           = Float64(CFG["visibility_width"])
 const COMM_INTERVAL              = Float64(CFG["comm_interval"])
-const COMM_SIGMA                 = Float64(CFG["comm_sigma"])
+const COMM_RANGE                 = Float64(CFG["comm_range"])
+const COMM_WIDTH                 = Float64(CFG["comm_width"])
 const COMM_WEIGHT_MIN            = Float64(CFG["comm_weight_min"])
 const HEX_WIDTH_M                = Float64(CFG["hex_width_m"])
-const COMM_MIN_SEPARATION_M      = HEX_WIDTH_M / 2
+const COMM_MIN_RADIUS_M          = Float64(CFG["comm_min_radius"])
 const HEX_RADIUS_M               = HEX_WIDTH_M / sqrt(3.0)
 const SUPPORT_PLOT_OFFSET_M      = Float64(CFG["support_plot_offset_m"])
 const TRACK_COMM_EVENTS          = Bool(CFG["track_comm_events"])
@@ -128,14 +130,16 @@ const SUPPORT_IDLE_PENALTY  = Float64(CFG["support_idle_penalty"])
 #    - At each waypoint, fuse all visible landmarks using information filter
 #    - Information matrix I = inv(S_total) where:
 #      * S_sensor = rotated bearing-angle measurement covariance matrix
-#      * S_total = S_sensor + landmark_uncertainty, scaled by detection probability
+#      * S_total = S_sensor + landmark_uncertainty, scaled by sensing quality (logistic
+#        sigmoid on distance: plateaus near VISIBILITY_RANGE, rolls off over VISIBILITY_WIDTH)
 #    - Joseph-form update: J_new = I_landmark + inv(P_prior)
 #    - Posterior: P = inv(J_new)
 #    - Maintains numerical stability via information form (Joseph equations)
 #
 # 3. INTER-AGENT COMMUNICATION FUSION:
 #    - When agents within COMM_RADIUS, receiver fuses sender's covariance via Kalman update
-#    - Weight = exp(-distance² / (2×COMM_RADIUS²)), applied to information matrix
+#    - Weight = comm_weight(distance): logistic sigmoid taper, half-weight at COMM_RANGE,
+#      transition softness COMM_WIDTH, applied to information matrix
 #    - Both primary and support agents participate in full Kalman filtering
 #
 # 4. DISCRETE EVALUATION:
@@ -549,7 +553,7 @@ const COMM_INTERVAL_DIST  = Float64(CFG["comm_interval_dist"])
 #     σ_range   = SENSOR_NOISE  (along line-of-sight)
 #     σ_bearing = SENSOR_NOISE * BEARING_NOISE_RATIO  (perpendicular to LOS)
 #   These are rotated into world frame by the bearing angle to the landmark.
-#   The covariance is then INFLATED by 1/P_detect so that a low-probability
+#   The covariance is then INFLATED by 1/q so that a low-quality
 #   observation contributes less to the fusion — a barely-visible landmark
 #   effectively has much higher noise.
 
@@ -560,9 +564,11 @@ const COMM_INTERVAL_DIST  = Float64(CFG["comm_interval_dist"])
     dx = lm.x - ax; dy = lm.y - ay
     d2 = dx*dx + dy*dy
 
-    # Detection probability (soft range gate)
-    p_detect = exp(-d2 / (2 * VISIBILITY_SIGMA^2))
-    p_detect < 1e-6 && return nothing
+    # Sensing quality: logistic sigmoid, plateaus at ~1 within VISIBILITY_RANGE,
+    # smoothly rolls off over VISIBILITY_WIDTH (no hard cutoff -> clean gradients).
+    d = sqrt(d2)
+    q = 1.0 / (1.0 + exp((d - VISIBILITY_RANGE) / VISIBILITY_WIDTH))
+    q < 1e-6 && return nothing  # far-tail early-out; contribution already negligible
 
     # Bearing angle to landmark (world frame) — R*D*R' expanded inline
     bearing = atan(dy, dx)
@@ -575,8 +581,8 @@ const COMM_INTERVAL_DIST  = Float64(CFG["comm_interval_dist"])
     s12 = cb*sb*diff
     s22 = sb*sb*σ_r2 + cb*cb*σ_b2
 
-    # S_total = S_sensor + lm.cov, inflated by 1/p_detect
-    inv_p = 1.0 / p_detect
+    # S_total = S_sensor + lm.cov, inflated by 1/q
+    inv_p = 1.0 / q
     t11 = (s11 + lm.cov[1,1]) * inv_p
     t12 = (s12 + lm.cov[1,2]) * inv_p
     t22 = (s22 + lm.cov[2,2]) * inv_p
@@ -818,7 +824,7 @@ function apply_synchronized_propagation!(agent_positions::Vector{Vector{Tuple{Fl
                 dx = pos_s[1] - pos_r[1]
                 dy = pos_s[2] - pos_r[2]
                 d2_comm = dx*dx + dy*dy
-                weight = d2_comm < COMM_MIN_SEPARATION_M^2 ? 0.0 : exp(-d2_comm / (2 * COMM_SIGMA^2))
+                weight = comm_weight(d2_comm)
                 if weight > COMM_WEIGHT_MIN
                     S_s = all_covs[sender][idx_s] + SENSOR_NOISE^2 * I(2)
                     S_r = all_covs[receiver][idx_r] + SENSOR_NOISE^2 * I(2)
@@ -990,6 +996,17 @@ struct JointState
     visited :: Vector{BitVector}    # per-agent visited sets (cycle detection)
 end
 
+# Inter-agent comm quality: logistic sigmoid on distance, half-weight at
+# COMM_RANGE, transition softness COMM_WIDTH (no hard upper cutoff -> clean
+# gradients). COMM_MIN_RADIUS_M is kept as an explicit hard floor below which
+# co-located agents are not fused (see COMM_MIN_RADIUS_M usage note at its
+# const definition).
+@inline function comm_weight(d2::Float64)
+    d2 < COMM_MIN_RADIUS_M^2 && return 0.0
+    d = sqrt(d2)
+    return 1.0 / (1.0 + exp((d - COMM_RANGE) / COMM_WIDTH))
+end
+
 # ------------------------------------------------------------------
 # Lightweight single-step comm: fuse agent a's cov into agent b's cov
 # (and vice-versa) if they are within COMM_RADIUS and a comm event
@@ -1000,8 +1017,7 @@ end
                                 xa::Float64, ya::Float64,
                                 xb::Float64, yb::Float64)
     d2 = (xa-xb)^2 + (ya-yb)^2
-    d2 < COMM_MIN_SEPARATION_M^2 && return cov_a, cov_b  # skip: co-located estimates are correlated, not independent
-    w  = exp(-d2 / (2*COMM_SIGMA^2))
+    w  = comm_weight(d2)
     w < COMM_WEIGHT_MIN && return cov_a, cov_b
     # Information-filter fusion weighted by range
     noise = SENSOR_NOISE^2
@@ -1171,7 +1187,7 @@ function joint_astar(graph::LandmarkGraph,
                      num_agents::Int;
                      seed_paths::Union{Nothing, Vector{Vector{Int}}}=nothing,
                      seed_dists::Union{Nothing, Vector{Float64}}=nothing,
-                     debug_animate::Bool=true,
+                     debug_animate::Bool=false,
                      debug_animate_start_iter::Int=0,
                      debug_animate_iters::Int=100000,
                      debug_animate_sample_period::Int=100,
@@ -2410,7 +2426,7 @@ else
     end
     primary_final_node = isempty(primary_path) ? 0 : primary_path[end]
     println("  Primary agent: node=$(primary_final_node), dist=$(round(dists[end], digits=1))m, goal_unc=$(round(uncs[end], digits=4))m")
-    println("  ├─ Communication: every $(COMM_INTERVAL)m, Gaussian taper σ=$(COMM_SIGMA)m")
+    println("  ├─ Communication: every $(COMM_INTERVAL)m, sigmoid taper range=$(COMM_RANGE)m width=$(COMM_WIDTH)m")
     println("  └─ All agents' uncertainties benefit from synchronized Kalman fusion at checkpoints")
 
     if PIPELINE_MODE == :discrete_then_continuous && CONTINUE_ASTAR_ON_INFEASIBLE && ASTAR_MODE != :limit && unc_exceeds_threshold(primary_goal_unc, disc_unc_threshold)
@@ -2468,7 +2484,7 @@ else
     println("  • Dead-reckoning propagation: DIR=$(DIR_UNCERTAINTY_PER_METER)/m, PERP=$(PERP_UNCERTAINTY_PER_METER)/m")
     println("  • Landmark fusion: Information filter (Joseph form) at every waypoint")
     println("  • SYNCHRONIZED inter-agent communication: every $(COMM_INTERVAL)m of travel")
-    println("  • Tapered Gaussian weighting: σ=$(COMM_SIGMA)m (soft falloff over ~1-3σ)")
+    println("  • Tapered sigmoid weighting: range=$(COMM_RANGE)m, width=$(COMM_WIDTH)m (soft plateau + rolloff)")
     println("  • Bidirectional Kalman fusion: all agent pairs within range at each checkpoint")
     println("  • Measurement model: bearing-angle sensor with noise=$(SENSOR_NOISE), ratio=$(BEARING_NOISE_RATIO)")
     println("  └─ Support agents: goal_unc=$(round(uncs[1], digits=4))m (improved by inter-agent fusion)")

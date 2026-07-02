@@ -1,10 +1,10 @@
 # Landmark Planning Config — all parameters for planner.jl
 
 # Mission setup
-landmark_scenario: dual
-num_agents: 3
+landmark_scenario: shoreline
+num_agents: 2
 pipeline_mode: discrete_then_continuous
-astar_mode: threshold
+astar_mode: limit 
 primary_epsilon: 0.0
 
 # Mission geometry (meters)
@@ -57,9 +57,13 @@ marker_proportion: 5.0
 sensor_noise: 0.038
 bearing_noise_ratio: 2.2
 comm_radius: 200.0
-visibility_sigma: 50.0
+# not sure why a min separation was added in the first place
+comm_min_radius: 0.0
+visibility_range: 100.0
+visibility_width: 10.0
 comm_interval: 100.0
-comm_sigma: 100.0
+comm_range: 200.0
+comm_width: 5.0
 comm_weight_min: 1.0e-4
 comm_interval_dist: 5.0
 
