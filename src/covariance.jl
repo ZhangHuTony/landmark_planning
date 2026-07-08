@@ -102,20 +102,27 @@ end
     det = t11*t22 - t12*t12
     det < 1e-14 && return nothing
     inv_det = 1.0 / det
-    return (t22*inv_det, -t12*inv_det, t11*inv_det)  # (I11, I12, I22) of information matrix
+    return (t22*inv_det, -t12*inv_det, t11*inv_det, q)  # (I11, I12, I22, quality) of information matrix
 end
 
 # Accumulate information matrix contributions from all visible landmarks at (ax, ay).
 # Returns (I11, I12, I22) — the summed information matrix to add to the prior.
 # Returns (0, 0, 0) when no landmark is close enough to contribute.
 # Shared by propagate_cov_discrete and propagate_cov_continuous.
-@inline function accumulate_landmark_info(ax::Float64, ay::Float64, lms::Vector{Landmark})
+# `landmark_events`, if given, gets one (arc, agent, landmark_id, quality,
+# agent_pos, landmark_pos) entry pushed per contributing landmark — the
+# landmark-fusion analog of apply_synchronized_propagation!'s comm_events.
+@inline function accumulate_landmark_info(ax::Float64, ay::Float64, lms::Vector{Landmark};
+                                           landmark_events=nothing, agent::Int=0, arc::Float64=0.0)
     I11 = 0.0; I12 = 0.0; I22 = 0.0
-    for lm in lms
+    for (li, lm) in enumerate(lms)
         unc_radius(lm.cov) < 1e-8 && continue
         info = landmark_info(ax, ay, lm)
         info === nothing && continue
         I11 += info[1]; I12 += info[2]; I22 += info[3]
+        if landmark_events !== nothing
+            push!(landmark_events, (arc, agent, li, info[4], (ax, ay), (lm.x, lm.y)))
+        end
     end
     return I11, I12, I22
 end
@@ -149,7 +156,9 @@ function propagate_segment!(covs::Vector{Matrix{Float64}},
                              lms::Vector{Landmark},
                              from_idx::Int,
                              to_idx::Int,
-                             init_cov::Matrix{Float64})
+                             init_cov::Matrix{Float64};
+                             landmark_events=nothing, agent::Int=0,
+                             arcs::Union{Vector{Float64},Nothing}=nothing)
     cov = init_cov
     for i in (from_idx + 1):to_idx
         x_prev, y_prev = positions[i-1]
@@ -157,7 +166,9 @@ function propagate_segment!(covs::Vector{Matrix{Float64}},
         seg     = hypot(x_curr - x_prev, y_curr - y_prev)
         heading = atan(y_curr - y_prev, x_curr - x_prev)
         cov = cov + growth_covariance(seg, heading)
-        I11, I12, I22 = accumulate_landmark_info(x_curr, y_curr, lms)
+        arc_i = arcs === nothing ? 0.0 : arcs[i]
+        I11, I12, I22 = accumulate_landmark_info(x_curr, y_curr, lms;
+                                                  landmark_events=landmark_events, agent=agent, arc=arc_i)
         if I11 > 0.0 || I22 > 0.0
             updated = kalman_info_update(cov, I11, I12, I22)
             if updated !== nothing
@@ -269,10 +280,10 @@ function evaluate_joint_discrete(agent_positions::Vector{Vector{Tuple{Float64,Fl
     end
     
     # Propagate covariances with synchronized Kalman fusion
-    all_covs, comm_events = apply_synchronized_propagation!(agent_positions, all_arcs, lms, na;
+    all_covs, comm_events, landmark_events = apply_synchronized_propagation!(agent_positions, all_arcs, lms, na;
                                                             debug_goal_pos=debug_goal_pos)
 
-    return all_covs, all_arcs, comm_events
+    return all_covs, all_arcs, comm_events, landmark_events
 end
 
 function apply_synchronized_propagation!(agent_positions::Vector{Vector{Tuple{Float64,Float64}}},
@@ -302,6 +313,7 @@ function apply_synchronized_propagation!(agent_positions::Vector{Vector{Tuple{Fl
     max_arc   = maximum(arcs[end] for arcs in all_arcs)
     comm_times = 0.0:COMM_INTERVAL:max_arc
     comm_events = Tuple{Float64,Int,Int,Float64,Tuple{Float64,Float64},Tuple{Float64,Float64}}[]
+    landmark_events = Tuple{Float64,Int,Int,Float64,Tuple{Float64,Float64},Tuple{Float64,Float64}}[]
 
     for comm_time in comm_times
         # --- Step 1: advance each agent to its nearest waypoint for this checkpoint ---
@@ -319,7 +331,8 @@ function apply_synchronized_propagation!(agent_positions::Vector{Vector{Tuple{Fl
             # Propagate the segment (cur_idx[a], nearest_idx] starting from cur_cov[a]
             if nearest_idx > cur_idx[a]
                 cur_cov[a] = propagate_segment!(all_covs[a], agent_positions[a], lms,
-                                                cur_idx[a], nearest_idx, cur_cov[a])
+                                                cur_idx[a], nearest_idx, cur_cov[a];
+                                                landmark_events=landmark_events, agent=a, arcs=all_arcs[a])
                 cur_idx[a] = nearest_idx
             end
             agent_indices[a] = nearest_idx
@@ -361,11 +374,12 @@ function apply_synchronized_propagation!(agent_positions::Vector{Vector{Tuple{Fl
         n_a = length(agent_positions[a])
         if cur_idx[a] < n_a
             propagate_segment!(all_covs[a], agent_positions[a], lms,
-                               cur_idx[a], n_a, cur_cov[a])
+                               cur_idx[a], n_a, cur_cov[a];
+                               landmark_events=landmark_events, agent=a, arcs=all_arcs[a])
         end
     end
 
-    return all_covs, comm_events
+    return all_covs, comm_events, landmark_events
 end
 
 function edge_cov_continuous(v::Int, u::Int,
@@ -453,7 +467,7 @@ function evaluate_full_paths(agent_paths::Vector{Vector{Int}},
     
     # Evaluate joint covariance via evaluate_joint_discrete (includes inter-agent communication)
     agent_positions = xs_ys_to_positions(all_xs, all_ys)
-    all_covs, _, _ = evaluate_joint_discrete(agent_positions, lms, na)
+    all_covs, _, _, _ = evaluate_joint_discrete(agent_positions, lms, na)
     
     # Extract final covariances and distances
     final_covs = [all_covs[a][end] for a in 1:na]

@@ -1205,7 +1205,7 @@ function optimize_continuous(paths::Vector{Vector{Int}}, graph::LandmarkGraph, l
             return Inf, Inf, sampled_paths, empty_covs, curvatures, max_curvatures, ctrl_list, support_lens
         end
         unc_eval_paths = CONT_UNC_USE_WAYPOINTS ? ctrl_list : sampled_paths
-        covs_all, _, _ = evaluate_joint_discrete(unc_eval_paths, landmarks, num_agents)
+        covs_all, _, _, _ = evaluate_joint_discrete(unc_eval_paths, landmarks, num_agents)
         if isempty(covs_all) || isempty(covs_all[end]) || any(!isfinite, covs_all[end][end])
             support_lens = fill(Inf, max(0, num_agents - 1))
             return Inf, Inf, sampled_paths, covs_all, curvatures, max_curvatures, ctrl_list, support_lens
@@ -1404,33 +1404,21 @@ function optimize_continuous(paths::Vector{Vector{Int}}, graph::LandmarkGraph, l
     # (Do not save individual continuous figure; only save combined comparison)
 
     # Uncertainty-vs-distance profile: discrete (dashed) and continuous (solid) per agent
-    d_covs, d_arcs, d_comm = evaluate_joint_discrete(all_agent_wpts, landmarks, num_agents)
+    d_covs, d_arcs, d_comm, d_landmark_events = evaluate_joint_discrete(all_agent_wpts, landmarks, num_agents)
     cont_eval_paths = CONT_UNC_USE_WAYPOINTS ? opt_ctrls : opt_wpts
-    c_covs, c_arcs, c_comm = evaluate_joint_discrete(cont_eval_paths, landmarks, num_agents)
-
-    if TRACK_COMM_EVENTS
-        overlay_comm_events!(plt1, d_comm)
-        overlay_comm_events!(plt2, c_comm)
-    end
+    c_covs, c_arcs, c_comm, c_landmark_events = evaluate_joint_discrete(cont_eval_paths, landmarks, num_agents)
 
     # Combined side-by-side figure: discrete (left) vs continuous (right)
-    plt_comb = plot(plt1, plt2, layout=(1,2), size=(1200,500))
-    savefig(plt_comb, joinpath(output_dir, string(fig_prefix, "fig_compare_discrete_continuous", (fig_prefix == "" ? "" : "_"), string(round(opt_len,digits=2)), ".png")))
+    save_path_figures_pair(plt1, plt2,
+        fig_path(output_dir, string(fig_prefix, "fig_compare_discrete_continuous", (fig_prefix == "" ? "" : "_"), string(round(opt_len,digits=2)), ".png")),
+        d_comm, c_comm, d_landmark_events, c_landmark_events)
     println("Fig combined (", fig_prefix, ") saved: Discrete Len=$(round(init_len,digits=2)) → Continuous Len=$(round(opt_len,digits=2))")
-    plt_unc = plot(xlabel="distance traveled (m)", ylabel="uncertainty  det(Σ)^0.25",
-                   title=string(fig_prefix == "" ? "main" : fig_prefix, " — uncertainty profile (", LANDMARK_SCENARIO, ")"),
-                   size=(900, 400), legend=:topleft)
-    hline!(plt_unc, [cont_threshold], color=:red, linestyle=:dot, linewidth=1.5, label="threshold")
-    for a in 1:num_agents
-        is_prim = is_primary_mask[a]
-        clr = is_prim ? :blue : get(agent_colors, a, :gray)
-        agent_lbl = is_prim ? "primary" : "support $a"
-        d_uncs = unc_radius.(d_covs[a])
-        c_uncs = unc_radius.(c_covs[a])
-        plot!(plt_unc, d_arcs[a], d_uncs, color=clr, linestyle=:dash, linewidth=1.2, label="$agent_lbl discrete")
-        plot!(plt_unc, c_arcs[a], c_uncs, color=clr, linestyle=:solid, linewidth=is_prim ? 2.0 : 1.3, label="$agent_lbl continuous")
-    end
-    unc_profile_fname = joinpath(output_dir, string(fig_prefix == "" ? "main" : fig_prefix, "_unc_profile.png"))
+    plt_unc = plot_unc_profile(
+        [("discrete", d_arcs, d_covs, :dash, 1.2, 1.2),
+         ("continuous", c_arcs, c_covs, :solid, 2.0, 1.3)],
+        num_agents; threshold=cont_threshold,
+        title=string(fig_prefix == "" ? "main" : fig_prefix, " — uncertainty profile (", LANDMARK_SCENARIO, ")"))
+    unc_profile_fname = fig_path(output_dir, string(fig_prefix == "" ? "main" : fig_prefix, "_unc_profile.png"))
     savefig(plt_unc, unc_profile_fname)
     println("Fig uncertainty profile (", fig_prefix == "" ? "main" : fig_prefix, ") saved: ", unc_profile_fname)
 
@@ -1472,17 +1460,72 @@ function plan_hexspline_cl(scenario, graph::LandmarkGraph, output_dir::String)
     end
 
     pareto_collected = Vector{Tuple{Vector{Vector{Int}}, Float64, Float64, Int}}()
+    discrete_iter = 0
 
     function run_discrete_seed_search(search_unc_threshold::Float64)
         println("\n  Running joint discrete A* collector (threshold=$(round(search_unc_threshold, digits=4)))... (max_iters=$(ASTAR_ITERATION_LIMIT))")
-        # Choose collection mode: either collect until iteration limit (multiple paths)
-        # or stop on first feasible solution under the uncertainty threshold (single path).
+        # :limit collects every non-dominated discrete candidate up to the
+        # iteration budget and builds a genuine Pareto front (multiple seeds
+        # go on to their own continuous refinement). :threshold always stops
+        # at the first feasible candidate, so there is only ever one seed —
+        # no front to prune/collect/plot, so that machinery is skipped
+        # entirely rather than run trivially over a 1-element list.
         if ASTAR_MODE == :limit
             collected = joint_astar_collect(graph, landmarks, search_unc_threshold, NUM_AGENTS; max_iters=ASTAR_ITERATION_LIMIT)
             if isempty(collected)
                 println("  ✗ No goal candidates found by A* collector")
                 return [Int[] for _ in 1:(NUM_AGENTS - 1)], Int[], Inf
             end
+
+            # Each entry: (agent_paths, dist, unc, iter)
+            # Compute Pareto front (minimize dist and unc)
+            tol = 1e-9
+            pareto = Vector{Tuple{Vector{Vector{Int}}, Float64, Float64, Int}}()
+            for (paths_c, d_c, u_c, it) in collected
+                dominated = false
+                for (p_paths, p_d, p_u, _) in pareto
+                    if p_d <= d_c + tol && p_u <= u_c + tol
+                        dominated = true; break
+                    end
+                end
+                if dominated; continue; end
+                # remove any existing pareto points dominated by this one
+                keep = Vector{Tuple{Vector{Vector{Int}}, Float64, Float64, Int}}()
+                for item in pareto
+                    p_paths, p_d, p_u, p_it = item
+                    if d_c <= p_d + tol && u_c <= p_u + tol
+                        continue
+                    end
+                    push!(keep, item)
+                end
+                push!(keep, (paths_c, d_c, u_c, it))
+                pareto = keep
+            end
+
+            # Sort pareto by increasing distance
+            sort!(pareto, by = x -> x[2])
+
+            # Plot Pareto front
+            ds = [x[2] for x in pareto]
+            us = [x[3] for x in pareto]
+            pltp = plot(ds, us, seriestype=:scatter, xlabel="Primary distance", ylabel="Primary uncertainty", title="Pareto (distance vs uncertainty)", legend=false)
+            for (i, (pp, pd, pu, it)) in enumerate(pareto)
+                annotate!(pltp, pd, pu, text("$i", :black, 8))
+            end
+            savefig(pltp, fig_path(output_dir, "fig_pareto_discrete.png")); println("Fig Pareto (discrete) saved: $(length(pareto)) points")
+
+            # Store pareto set for later continuous refinement
+            pareto_collected = pareto
+            discrete_iter = pareto[1][4]
+            println("  Pareto seeds collected: $(length(pareto)). Continuous refinement deferred until optimizer is available.")
+
+            # Return first Pareto entry as a representative seed (for compatibility)
+            first_paths, first_d, first_u, _ = pareto[1]
+            support_paths = pad_support_paths_to_primary(first_paths[1:NUM_AGENTS-1], first_paths[NUM_AGENTS])
+            primary_path = first_paths[NUM_AGENTS]
+            primary_dist = first_d
+            return support_paths, primary_path, primary_dist
+
         elseif ASTAR_MODE == :threshold
             println("  Running threshold-stop A* (stops on first feasible under threshold)...")
             ppaths, pdists, punc, disc_iter = joint_astar(graph, landmarks, search_unc_threshold, NUM_AGENTS)
@@ -1490,58 +1533,15 @@ function plan_hexspline_cl(scenario, graph::LandmarkGraph, output_dir::String)
                 println("  ✗ No feasible path found by threshold-stop A*")
                 return [Int[] for _ in 1:(NUM_AGENTS - 1)], Int[], Inf
             end
-            collected = [ (ppaths, pdists[NUM_AGENTS], punc, disc_iter) ]
+            discrete_iter = disc_iter
+
+            support_paths = pad_support_paths_to_primary(ppaths[1:NUM_AGENTS-1], ppaths[NUM_AGENTS])
+            primary_path = ppaths[NUM_AGENTS]
+            primary_dist = pdists[NUM_AGENTS]
+            return support_paths, primary_path, primary_dist
         else
             error("Unsupported ASTAR_MODE=$(ASTAR_MODE). Use :limit or :threshold")
         end
-
-        # Each entry: (agent_paths, dist, unc, iter)
-        # Compute Pareto front (minimize dist and unc)
-        tol = 1e-9
-        pareto = Vector{Tuple{Vector{Vector{Int}}, Float64, Float64, Int}}()
-        for (paths_c, d_c, u_c, it) in collected
-            dominated = false
-            for (p_paths, p_d, p_u, _) in pareto
-                if p_d <= d_c + tol && p_u <= u_c + tol
-                    dominated = true; break
-                end
-            end
-            if dominated; continue; end
-            # remove any existing pareto points dominated by this one
-            keep = Vector{Tuple{Vector{Vector{Int}}, Float64, Float64, Int}}()
-            for item in pareto
-                p_paths, p_d, p_u, p_it = item
-                if d_c <= p_d + tol && u_c <= p_u + tol
-                    continue
-                end
-                push!(keep, item)
-            end
-            push!(keep, (paths_c, d_c, u_c, it))
-            pareto = keep
-        end
-
-        # Sort pareto by increasing distance
-        sort!(pareto, by = x -> x[2])
-
-        # Plot Pareto front
-        ds = [x[2] for x in pareto]
-        us = [x[3] for x in pareto]
-        pltp = plot(ds, us, seriestype=:scatter, xlabel="Primary distance", ylabel="Primary uncertainty", title="Pareto (distance vs uncertainty)", legend=false)
-        for (i, (pp, pd, pu, it)) in enumerate(pareto)
-            annotate!(pltp, pd, pu, text("$i", :black, 8))
-        end
-        savefig(pltp, joinpath(output_dir, "fig_pareto_discrete.png")); println("Fig Pareto (discrete) saved: $(length(pareto)) points")
-
-        # Store pareto set for later continuous refinement
-        pareto_collected = pareto
-        println("  Pareto seeds collected: $(length(pareto)). Continuous refinement deferred until optimizer is available.")
-
-        # Return first Pareto entry as a representative seed (for compatibility)
-        first_paths, first_d, first_u, _ = pareto[1]
-        support_paths = pad_support_paths_to_primary(first_paths[1:NUM_AGENTS-1], first_paths[NUM_AGENTS])
-        primary_path = first_paths[NUM_AGENTS]
-        primary_dist = first_d
-        return support_paths, primary_path, primary_dist
     end
 
     if PIPELINE_MODE == :straight_continuous
@@ -1608,7 +1608,7 @@ function plan_hexspline_cl(scenario, graph::LandmarkGraph, output_dir::String)
 
     shortest_path = primary_path
     shortest_dist = primary_dist
-    converged_iter = isempty(pareto_collected) ? 0 : pareto_collected[1][4]
+    converged_iter = discrete_iter
 
     println("\n--- Final Results ---")
     if isempty(paths)
@@ -1649,6 +1649,8 @@ function plan_hexspline_cl(scenario, graph::LandmarkGraph, output_dir::String)
     # ==========================================================================
     let
         plt1 = make_base_plot(landmarks, graph)
+        comm_events_fig1 = Tuple{Float64,Int,Int,Float64,Tuple{Float64,Float64},Tuple{Float64,Float64}}[]
+        landmark_events_fig1 = Tuple{Float64,Int,Int,Float64,Tuple{Float64,Float64},Tuple{Float64,Float64}}[]
         if !isempty(paths)
             println("Figure path-role mapping: supports = paths[1:$(max(length(paths)-1,0))], primary = paths[$(length(paths))]")
             # Plot waypoints and paths
@@ -1683,7 +1685,7 @@ function plan_hexspline_cl(scenario, graph::LandmarkGraph, output_dir::String)
                 end
             end
 
-            covs_all_fig1, arcs_all_fig1, comm_events_fig1 = evaluate_joint_discrete(agent_positions_fig1, landmarks, length(paths); debug_goal_pos=scenario.goal)
+            covs_all_fig1, arcs_all_fig1, comm_events_fig1, landmark_events_fig1 = evaluate_joint_discrete(agent_positions_fig1, landmarks, length(paths); debug_goal_pos=scenario.goal)
 
             # Primary is last agent
             prim_covs_fig1 = covs_all_fig1[end]
@@ -1705,11 +1707,15 @@ function plan_hexspline_cl(scenario, graph::LandmarkGraph, output_dir::String)
             title!(plt1,"Fig 1: No feasible path")
         end
         xlabel!(plt1,"x (m)"); ylabel!(plt1,"y (m)")
-        if TRACK_COMM_EVENTS && @isdefined(comm_events_fig1)
-            overlay_comm_events!(plt1, comm_events_fig1)
-            write_comm_csv(joinpath(output_dir, "comm_events.csv"), comm_events_fig1)
+        save_path_figures(plt1, fig_path(output_dir, "fig1_joint_discrete_astar.png"),
+                           comm_events_fig1, landmark_events_fig1)
+        println("Fig 1 saved.")
+        if TRACK_COMM_EVENTS
+            write_comm_csv(csv_path(output_dir, "comm_events.csv"), comm_events_fig1)
         end
-        savefig(plt1, joinpath(output_dir, "fig1_joint_discrete_astar.png")); println("Fig 1 saved.")
+        if TRACK_LANDMARK_EVENTS
+            write_landmark_csv(csv_path(output_dir, "landmark_events.csv"), landmark_events_fig1)
+        end
     end
 
 
@@ -1719,7 +1725,7 @@ function plan_hexspline_cl(scenario, graph::LandmarkGraph, output_dir::String)
 
     if !isempty(paths) && all(length.(paths) .> 0)  # Continuous optimization only if all agents have paths
         opt_len, opt_unc, opt_wpts, opt_covs, opt_ctrls = optimize_continuous(paths, graph, landmarks, NUM_AGENTS, output_dir; cont_threshold=UNC_RADIUS_THRESHOLD, fig_prefix="main")
-        write_ctrls_csv(joinpath(output_dir, "main_ctrls.csv"), opt_ctrls)
+        write_ctrls_csv(csv_path(output_dir, "main_ctrls.csv"), opt_ctrls)
         main_cont_len = opt_len
         if !isempty(opt_covs) && all(a -> !isempty(opt_covs[a]), 1:NUM_AGENTS)
             main_cont_uncs = [unc_radius(opt_covs[a][end]) for a in 1:NUM_AGENTS]
@@ -1737,7 +1743,7 @@ function plan_hexspline_cl(scenario, graph::LandmarkGraph, output_dir::String)
             primary_path = ppaths[NUM_AGENTS]
             all_paths = vcat(support_paths, [primary_path])
             opt_len, opt_unc, opt_wpts, opt_covs, opt_ctrls = optimize_continuous(all_paths, graph, landmarks, NUM_AGENTS, output_dir; cont_threshold=punc, fig_prefix="pareto_$(i)")
-            write_ctrls_csv(joinpath(output_dir, "pareto_$(i)_ctrls.csv"), opt_ctrls)
+            write_ctrls_csv(csv_path(output_dir, "pareto_$(i)_ctrls.csv"), opt_ctrls)
             push!(optimized_results, (i, pdist, punc, opt_len, opt_unc, opt_wpts, opt_covs, opt_ctrls))
             push!(solutions, (id=i, ctrls=opt_ctrls, primary_length=opt_len, primary_unc=opt_unc))
         end
@@ -1749,7 +1755,7 @@ function plan_hexspline_cl(scenario, graph::LandmarkGraph, output_dir::String)
             xs = [w[1] for w in prim]; ys = [w[2] for w in prim]
             plot!(plt_overlay, xs, ys, label="pareto_$i (len=$(round(opt_len,digits=2)), unc=$(round(opt_unc,digits=4)))")
         end
-        savefig(plt_overlay, joinpath(output_dir, "fig_pareto_continuous_overlay.png")); println("Fig Pareto continuous overlay saved.")
+        savefig(plt_overlay, fig_path(output_dir, "fig_pareto_continuous_overlay.png")); println("Fig Pareto continuous overlay saved.")
     end
 
     # ==========================================================================

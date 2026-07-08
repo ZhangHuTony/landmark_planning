@@ -2,6 +2,21 @@
 # Plotting + path CSV I/O — shared by every planner
 # ==========================================================================
 
+# Raw-data CSVs and diagnostic figures live in their own subfolders under a
+# run's output_dir (results.yaml stays at the top level as the run's
+# manifest) so the two kinds of output are easy to tell apart at a glance.
+function csv_path(output_dir::String, filename::String)
+    dir = joinpath(output_dir, "csv")
+    mkpath(dir)
+    return joinpath(dir, filename)
+end
+
+function fig_path(output_dir::String, filename::String)
+    dir = joinpath(output_dir, "figures")
+    mkpath(dir)
+    return joinpath(dir, filename)
+end
+
 function draw_covariance_ellipse!(plt, x, y, cov; npts=50, nstd=2, color=:red, alpha=0.3, display_scale=1.0)
     # display_scale is visualization-only (does not change estimation math)
     cov_vis = display_scale .* cov
@@ -44,6 +59,31 @@ function make_base_plot(landmarks, graph)
     return p
 end
 
+# Plot uncertainty vs. arc-distance per agent, shared by every planner.
+# `series` lets a planner overlay multiple stages on one figure (e.g.
+# hexspline_cl's discrete seed vs. continuous refinement); a single-stage
+# planner just passes one. Each entry is
+# (label_suffix, arcs, covs, linestyle, linewidth_primary, linewidth_support).
+function plot_unc_profile(series, num_agents::Int; threshold::Union{Float64,Nothing}=nothing,
+                           title::String="uncertainty profile")
+    plt = plot(xlabel="distance traveled (m)", ylabel="uncertainty  det(Σ)^0.25",
+               title=title, size=(900, 400), legend=:topleft)
+    if threshold !== nothing
+        hline!(plt, [threshold], color=:red, linestyle=:dot, linewidth=1.5, label="threshold")
+    end
+    for a in 1:num_agents
+        is_prim = a == num_agents
+        clr = is_prim ? :blue : get(agent_colors, a, :gray)
+        agent_lbl = is_prim ? "primary" : "support $a"
+        for (suffix, arcs, covs, ls, lw_primary, lw_support) in series
+            lbl = isempty(suffix) ? agent_lbl : "$agent_lbl $suffix"
+            plot!(plt, arcs[a], unc_radius.(covs[a]), color=clr, linestyle=ls,
+                  linewidth=(is_prim ? lw_primary : lw_support), label=lbl)
+        end
+    end
+    return plt
+end
+
 function overlay_comm_events!(plt, events)
     isempty(events) && return
     max_t = maximum(t for (t,_,_,_,_,_) in events)
@@ -53,6 +93,60 @@ function overlay_comm_events!(plt, events)
         plot!(plt, [pa[1], pb[1]], [pa[2], pb[2]], color=clr, alpha=w, linewidth=1, label=false)
         scatter!(plt, [pa[1], pb[1]], [pa[2], pb[2]], markershape=:diamond, markersize=5,
                  color=clr, markerstrokewidth=0, label=false)
+    end
+end
+
+# Landmark-fusion analog of overlay_comm_events! — one entry per (agent,
+# landmark) observation used in the Kalman update, colored by when in the
+# route it happened.
+function overlay_landmark_events!(plt, events)
+    isempty(events) && return
+    max_t = maximum(t for (t,_,_,_,_,_) in events)
+    cmap  = cgrad(:viridis)
+    for (t, _, _, q, apos, lpos) in events
+        clr = cmap[max_t > 0 ? t / max_t : 0.0]
+        plot!(plt, [apos[1], lpos[1]], [apos[2], lpos[2]], color=clr, alpha=q, linewidth=1, label=false)
+        scatter!(plt, [apos[1]], [apos[2]], markershape=:utriangle, markersize=5,
+                 color=clr, markerstrokewidth=0, label=false)
+    end
+end
+
+# Saves a base path figure with no event overlay, plus one extra figure per
+# enabled event flag (track_comm_events / track_landmark_events) — so each
+# kind of event gets its own figure instead of stacking onto one. With both
+# flags on this produces 3 files total; both off, just the base. Variant
+# files get a "_comm"/"_landmarks" suffix inserted before the extension.
+function save_path_figures(plt, base_path::String, comm_events, landmark_events)
+    savefig(plt, base_path)
+    stem, ext = splitext(base_path)
+    if TRACK_COMM_EVENTS
+        plt_comm = deepcopy(plt)
+        overlay_comm_events!(plt_comm, comm_events)
+        savefig(plt_comm, "$(stem)_comm$(ext)")
+    end
+    if TRACK_LANDMARK_EVENTS
+        plt_lm = deepcopy(plt)
+        overlay_landmark_events!(plt_lm, landmark_events)
+        savefig(plt_lm, "$(stem)_landmarks$(ext)")
+    end
+end
+
+# Two-panel variant of save_path_figures, for figures that combine a pair
+# of plots side-by-side (e.g. hexspline_cl's discrete-vs-continuous compare).
+function save_path_figures_pair(plt_left, plt_right, base_path::String,
+                                 comm_left, comm_right, landmark_left, landmark_right)
+    combine(l, r) = plot(l, r, layout=(1, 2), size=(1200, 500))
+    savefig(combine(plt_left, plt_right), base_path)
+    stem, ext = splitext(base_path)
+    if TRACK_COMM_EVENTS
+        l = deepcopy(plt_left); r = deepcopy(plt_right)
+        overlay_comm_events!(l, comm_left); overlay_comm_events!(r, comm_right)
+        savefig(combine(l, r), "$(stem)_comm$(ext)")
+    end
+    if TRACK_LANDMARK_EVENTS
+        l = deepcopy(plt_left); r = deepcopy(plt_right)
+        overlay_landmark_events!(l, landmark_left); overlay_landmark_events!(r, landmark_right)
+        savefig(combine(l, r), "$(stem)_landmarks$(ext)")
     end
 end
 
@@ -99,4 +193,14 @@ function write_comm_csv(filename::String, events)
         end
     end
     println("  → Saved $(length(events)) comm events to $filename")
+end
+
+function write_landmark_csv(filename::String, events)
+    open(filename, "w") do io
+        println(io, "arc_dist,agent,landmark_id,quality,xa,ya,xl,yl")
+        for (t, agent, lm_id, q, apos, lpos) in events
+            println(io, "$t,$agent,$lm_id,$q,$(apos[1]),$(apos[2]),$(lpos[1]),$(lpos[2])")
+        end
+    end
+    println("  → Saved $(length(events)) landmark events to $filename")
 end

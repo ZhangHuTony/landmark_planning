@@ -1,7 +1,8 @@
 # ==========================================================================
-# straight_line: naive baseline — direct start->goal line, no uncertainty-
-# aware optimization. Supports idle at start. Gives Monte Carlo/analysis a
-# comparison point against hexspline_cl.
+# straight_line: naive baseline — every agent (support and primary alike)
+# travels the same direct start->goal line together, so they stay co-located
+# and communicate/fuse the whole route. No uncertainty-aware optimization.
+# Gives Monte Carlo/analysis a comparison point against hexspline_cl.
 # ==========================================================================
 const STRAIGHT_LINE_PRIMARY_WPTS = Int(CFG["straight_line_primary_wpts"])
 
@@ -20,13 +21,11 @@ function plan_straight_line(scenario, graph::LandmarkGraph, output_dir::String)
     primary_ctrls = Tuple{Float64,Float64}[((1 - t) * sx + t * gx, (1 - t) * sy + t * gy)
                                             for t in range(0.0, 1.0; length=n_wpts)]
 
-    ctrls = Vector{Vector{Tuple{Float64,Float64}}}(undef, NUM_AGENTS)
-    for a in 1:(NUM_AGENTS - 1)
-        ctrls[a] = [(sx, sy), (sx, sy)]  # supports idle at start
-    end
-    ctrls[NUM_AGENTS] = primary_ctrls
+    # Every agent travels the identical line, so all stay co-located and
+    # communicate at (near) full weight the entire route.
+    ctrls = [primary_ctrls for _ in 1:NUM_AGENTS]
 
-    covs, arcs, comm_events = evaluate_joint_discrete(ctrls, landmarks, NUM_AGENTS)
+    covs, arcs, comm_events, landmark_events = evaluate_joint_discrete(ctrls, landmarks, NUM_AGENTS)
     primary_len = arcs[end][end]
     primary_unc = unc_radius(covs[end][end])
 
@@ -42,14 +41,23 @@ function plan_straight_line(scenario, graph::LandmarkGraph, output_dir::String)
               color=is_prim ? :blue : get(agent_colors, a, :gray),
               linewidth=is_prim ? 2.2 : 1.3, linestyle=is_prim ? :solid : :dash)
     end
-    if TRACK_COMM_EVENTS
-        overlay_comm_events!(plt, comm_events)
-        write_comm_csv(joinpath(output_dir, "comm_events.csv"), comm_events)
-    end
     title!(plt, "straight_line: len=$(round(primary_len,digits=2)), unc=$(round(primary_unc,digits=3))")
-    savefig(plt, joinpath(output_dir, "fig_straight_line.png"))
+    save_path_figures(plt, fig_path(output_dir, "fig_straight_line.png"), comm_events, landmark_events)
 
-    write_ctrls_csv(joinpath(output_dir, "main_ctrls.csv"), ctrls)
+    if TRACK_COMM_EVENTS
+        write_comm_csv(csv_path(output_dir, "comm_events.csv"), comm_events)
+    end
+    if TRACK_LANDMARK_EVENTS
+        write_landmark_csv(csv_path(output_dir, "landmark_events.csv"), landmark_events)
+    end
+
+    plt_unc = plot_unc_profile([("", arcs, covs, :solid, 2.0, 1.3)], NUM_AGENTS;
+                               title="straight_line — uncertainty profile ($(LANDMARK_SCENARIO))")
+    unc_profile_fname = fig_path(output_dir, "main_unc_profile.png")
+    savefig(plt_unc, unc_profile_fname)
+    println("  → Saved uncertainty profile: $unc_profile_fname")
+
+    write_ctrls_csv(csv_path(output_dir, "main_ctrls.csv"), ctrls)
 
     open(joinpath(output_dir, "results.yaml"), "w") do io
         fmt4(x) = isfinite(x) ? string(round(x, digits=4)) : "null"

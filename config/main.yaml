@@ -6,7 +6,7 @@
 # Mission setup
 landmark_scenario: single
 num_agents: 2
-algorithms: hexspline_cl
+algorithms: hexspline_cl, straight_line
 
 # Physical / sensor model
 dir_uncertainty_per_meter: 0.05
@@ -29,3 +29,4 @@ hex_padding: 2
 
 # Output
 track_comm_events: true
+track_landmark_events: true
