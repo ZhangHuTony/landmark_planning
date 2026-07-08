@@ -1,0 +1,31 @@
+# Shared config — mission setup, physical/sensor model, graph, output.
+# Values here are visible to every planner (algorithm-specific tuning lives
+# in config/<algorithm>.yaml). All files in config/ are merged into one CFG
+# dict at load time (flat key:value only — see src/config.jl).
+
+# Mission setup
+landmark_scenario: single
+num_agents: 2
+algorithms: hexspline_cl
+
+# Physical / sensor model
+dir_uncertainty_per_meter: 0.05
+maj_min_unc_ratio: 3
+marker_proportion: 5.0
+sensor_noise: 0.038
+bearing_noise_ratio: 2.2
+comm_radius: 300.0
+visibility_range: 100.0
+visibility_width: 2.5
+comm_interval: 100.0
+comm_range: 200.0
+comm_width: 2.5
+comm_weight_min: 1.0e-4
+comm_interval_dist: 5.0
+
+# Graph / hex grid
+hex_width_m: 100.0
+hex_padding: 2
+
+# Output
+track_comm_events: true
