@@ -5,17 +5,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Running the planner
 
 ```bash
-# Run a single scenario (outputs PNGs and CSVs to the current directory)
-cd results_single && julia ../planner.jl
+# Uses config.yaml at the repo root; outputs land in results/<timestamp>/
+julia planner.jl
 
+# Or with an explicit config file
+julia planner.jl path/to/other_config.yaml
 ```
 
-Julia 1.12+ is required (installed at `~/.juliaup/bin/julia`). Required packages (`Plots`, `DataStructures`) are pre-installed in the default environment. The script has no `Project.toml`; it relies on the global depot.
+Julia 1.12+ is required (installed at `~/.juliaup/bin/julia`). Required packages (`Plots`, `DataStructures`) are pre-installed in the default environment. The script has no `Project.toml`; it relies on the global depot. Config parsing is a hand-rolled line parser (no YAML package dependency).
 
-To switch scenario without the shell script, edit line 39 of `planner.jl`:
-```julia
-const LANDMARK_SCENARIO = :single   # :single | :dual | :clustered | :shoreline
-```
+Scenario is chosen via `landmark_scenario` in `config.yaml`, overridable with the `SCENARIO` env var: `single | dual | clustered | shoreline`. See `README.md` for the full config reference.
 
 ## Architecture
 
@@ -42,30 +41,43 @@ Takes discrete node-sequence seeds and refines them as **clamped cubic B-splines
 ### Kalman / uncertainty model
 - **State**: 2×2 position covariance matrix per agent.
 - **Propagation**: dead-reckoning growth along direction of travel, anisotropic (`DIR_UNCERTAINTY_PER_METER` along-track, `PERP_UNCERTAINTY_PER_METER = DIR/3` cross-track), heading-rotated.
-- **Landmark fusion**: information-filter (Joseph form) Kalman update. Detection probability falls off as `exp(-d²/(2·VISIBILITY_SIGMA²))`; low-probability observations are up-weighted in noise to reduce their influence.
-- **Inter-agent fusion**: bidirectional Kalman fusion at fixed `COMM_INTERVAL` arc-distance checkpoints, weighted by `exp(-d²/(2·COMM_SIGMA²))`.
+- **Landmark fusion**: information-filter (Joseph form) Kalman update. Detection probability is a logistic sigmoid on distance (plateaus near 1 within `VISIBILITY_RANGE`, rolls off over `VISIBILITY_WIDTH`, no hard cutoff); low-probability observations are up-weighted in noise to reduce their influence.
+- **Inter-agent fusion**: bidirectional Kalman fusion at fixed `COMM_INTERVAL` arc-distance checkpoints, weighted by `comm_weight` — a logistic sigmoid taper, half-weight at `COMM_RANGE`, transition softness `COMM_WIDTH`.
 - **Scalar metric**: `unc_radius(cov) = det(cov)^0.25` — equal to `σ` for isotropic covariance.
 
-## Key tuning knobs (top of `planner.jl`)
+## Key tuning knobs (`config.yaml`)
 
-| Constant | Effect |
+All parameters live in `config.yaml`; `planner.jl` just reads `CFG[...]` into `const`s at the top of the file. Full reference in `README.md`; most commonly changed:
+
+| Key | Effect |
 |---|---|
-| `UNC_RADIUS_THRESHOLD` | Feasibility bound on primary goal uncertainty |
-| `ASTAR_ITERATION_LIMIT` | Max A* expansions before stopping collection |
-| `ASTAR_MODE` | `:limit` (Pareto collection) vs `:threshold` (first feasible) |
-| `PRIMARY_EPSILON` | Weighted A* suboptimality factor (0 = exact) |
-| `NUM_AGENTS` | Total agents including primary (last index) |
-| `ENABLE_RELAXED_DISCRETE_FOR_CONTINUOUS` | Allow discrete seeds above strict threshold |
-| `CONT_OPT_ITERS`, `CONT_OPT_LR` | Continuous optimizer budget and learning rate |
-| `HEX_WIDTH_M` | Hex cell size; controls graph resolution |
+| `unc_radius_threshold` | Feasibility bound on primary goal uncertainty |
+| `astar_iteration_limit` | Max A* expansions before stopping collection |
+| `astar_mode` | `limit` (Pareto collection) vs `threshold` (first feasible) |
+| `primary_epsilon` | Weighted A* suboptimality factor (0 = exact) |
+| `num_agents` | Total agents including primary (last index) |
+| `enable_relaxed_discrete` | Allow discrete seeds above strict threshold |
+| `cont_opt_iters`, `cont_opt_lr` | Continuous optimizer budget and learning rate |
+| `hex_width_m` | Hex cell size; controls graph resolution |
+
+Start/goal positions are baked into `scenario_endpoints` in `planner.jl` per scenario, not config.
 
 ## Outputs
 
-Each run (from the working directory) produces:
+Each run writes to a fresh timestamped directory `results/<yyyy-mm-dd_HH-MM-SS>/`, including a copy of the `config.yaml` used:
 - `fig1_joint_discrete_astar.png` — discrete A* solution
 - `main_ctrls.csv` / `pareto_N_ctrls.csv` — B-spline control points (CSV)
 - `mainfig_compare_discrete_continuous_*.png` — side-by-side discrete vs. continuous comparison
 - `fig_pareto_discrete.png` — Pareto front plot (`:limit` mode only)
 - `fig_pareto_continuous_overlay.png` — all refined Pareto paths overlaid
+- `results.yaml` — summary of iteration counts, discrete/continuous uncertainties, and Pareto seed stats
+- `comm_events.csv` — inter-agent fusion events, when `track_comm_events: true`
 
-The `run_scenarios.sh` script sets the working directory to `results_<scenario>/` before running, so each scenario's outputs land in the correct folder.
+## Workflow
+- Ask clarifying questions before starting any complex or ambiguous task
+- Unless told otherwise look at the files in `notes/` to get the context of the task.
+- look at `notes/PLAN.md` to get a high level overview of what tasks we want to implement as well as how we plan to implement them.
+- look at `notes/LOGS.md` to see where we are currently in the plan as well as what things worked and didn't work.
+- make minimal changes - do not refactor unrelated code use ponytail
+- create seperate commits per logical change, not one giant commit and after every commit update the files in `notes/`. 
+- Never edit any code that has to do with any mathematical calculations without explicit approval.
