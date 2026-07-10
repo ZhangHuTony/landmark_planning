@@ -350,14 +350,21 @@ function apply_synchronized_propagation!(agent_positions::Vector{Vector{Tuple{Fl
                 d2_comm = dx*dx + dy*dy
                 weight = comm_weight(d2_comm)
                 if weight > COMM_WEIGHT_MIN
-                    S_s = all_covs[sender][idx_s] + SENSOR_NOISE^2 * I(2)
-                    S_r = all_covs[receiver][idx_r] + SENSOR_NOISE^2 * I(2)
-                    inv_P_r = inv(all_covs[receiver][idx_r])
-                    new_inv_P_r = inv_P_r + weight * inv(S_s)
-                    all_covs[receiver][idx_r] = inv(new_inv_P_r)
-                    inv_P_s = inv(all_covs[sender][idx_s])
-                    new_inv_P_s = inv_P_s + weight * inv(S_r)
-                    all_covs[sender][idx_s] = inv(new_inv_P_s)
+                    if COMM_FUSION === :ci
+                        new_s, new_r = ci_comm(all_covs[sender][idx_s], all_covs[receiver][idx_r], weight)
+                        all_covs[sender][idx_s]   = new_s
+                        all_covs[receiver][idx_r] = new_r
+                    else
+                        # legacy weighted information-filter add (overconfident)
+                        S_s = all_covs[sender][idx_s] + SENSOR_NOISE^2 * I(2)
+                        S_r = all_covs[receiver][idx_r] + SENSOR_NOISE^2 * I(2)
+                        inv_P_r = inv(all_covs[receiver][idx_r])
+                        new_inv_P_r = inv_P_r + weight * inv(S_s)
+                        all_covs[receiver][idx_r] = inv(new_inv_P_r)
+                        inv_P_s = inv(all_covs[sender][idx_s])
+                        new_inv_P_s = inv_P_s + weight * inv(S_r)
+                        all_covs[sender][idx_s] = inv(new_inv_P_s)
+                    end
                     push!(comm_events, (comm_time, sender, receiver, weight, pos_s, pos_r))
                 end
             end
@@ -407,13 +414,42 @@ end
     return 1.0 / (1.0 + exp((d - COMM_RANGE) / COMM_WIDTH))
 end
 
+# Determinant-optimal Covariance-Intersection weight ω∈[0,1]:
+# maximizes det(ω·Ia + (1−ω)·Ib) ⇔ minimizes det of the fused covariance
+# (ω·Ia + (1−ω)·Ib)⁻¹. Det (not trace) keeps ω consistent with the det-based
+# metric unc_radius and cov_dominates, and coordinate-invariant. For 2×2 the
+# determinant is quadratic in ω, so the optimum is a vertex or an endpoint.
+@inline function ci_omega_det(Ia::Matrix{Float64}, Ib::Matrix{Float64})
+    D11 = Ia[1,1]-Ib[1,1]; D12 = Ia[1,2]-Ib[1,2]; D22 = Ia[2,2]-Ib[2,2]
+    a2 = D11*D22 - D12*D12                            # ω² coeff = det(D)
+    a1 = Ib[1,1]*D22 + Ib[2,2]*D11 - 2.0*Ib[1,2]*D12 # ω  coeff
+    a2 < -1e-18 && return clamp(-a1/(2.0*a2), 0.0, 1.0)  # concave: interior vertex
+    return (a2 + a1) >= 0.0 ? 1.0 : 0.0                  # convex/linear: better endpoint
+end
+
+# Covariance Intersection fusion, H = I, bidirectional (mirrors pairwise_comm).
+# Each agent fuses the other's transferred estimate P_t = (Σ_other + σ²I)/w — the
+# paper's P_transferred = H̃ P_helper H̃ᵀ + Γ R Γᵀ with H̃=Γ=I, tapered by 1/w so
+# fusion vanishes as w→0. Convex CI weights sum to 1, so shared information is
+# never double-counted (sound for unknown cross-correlation, unlike the KF add).
+@inline function ci_comm(cov_a::Matrix{Float64}, cov_b::Matrix{Float64}, w::Float64)
+    R   = SENSOR_NOISE^2 .* [1.0 0.0; 0.0 1.0]
+    Ia  = inv2(cov_a); Ib = inv2(cov_b)
+    Ita = inv2((cov_a .+ R) ./ w)          # = w·(Σ_a+R)⁻¹, tapered transferred info
+    Itb = inv2((cov_b .+ R) ./ w)
+    ωa = ci_omega_det(Ia, Itb); new_a = inv2(ωa .* Ia .+ (1.0-ωa) .* Itb)  # a ← b
+    ωb = ci_omega_det(Ib, Ita); new_b = inv2(ωb .* Ib .+ (1.0-ωb) .* Ita)  # b ← a
+    return new_a, new_b
+end
+
 @inline function pairwise_comm(cov_a::Matrix{Float64}, cov_b::Matrix{Float64},
                                 xa::Float64, ya::Float64,
                                 xb::Float64, yb::Float64)
     d2 = (xa-xb)^2 + (ya-yb)^2
     w  = comm_weight(d2)
     w < COMM_WEIGHT_MIN && return cov_a, cov_b
-    # Information-filter fusion weighted by range
+    COMM_FUSION === :ci && return ci_comm(cov_a, cov_b, w)
+    # Information-filter fusion weighted by range (legacy KF; overconfident)
     noise = SENSOR_NOISE^2
     # a receives from b
     Ib = inv2(cov_b .+ noise .* [1.0 0.0; 0.0 1.0])

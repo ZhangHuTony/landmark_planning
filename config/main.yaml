@@ -22,6 +22,7 @@ comm_range: 200.0
 comm_width: 2.5
 comm_weight_min: 1.0e-4
 comm_interval_dist: 5.0
+comm_fusion: ci   # inter-agent fusion rule: ci (Covariance Intersection, sound) | kf (legacy, overconfident)
 
 # Graph / hex grid
 hex_width_m: 100.0
