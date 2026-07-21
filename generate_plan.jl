@@ -9,6 +9,7 @@ Random.seed!(42)  # Reproducible jittered grid sampling
 
 const _ROOT = @__DIR__
 include(joinpath(_ROOT, "src", "config.jl"))
+include(joinpath(_ROOT, "src", "obstacles.jl"))
 include(joinpath(_ROOT, "src", "graph.jl"))
 include(joinpath(_ROOT, "src", "covariance.jl"))
 include(joinpath(_ROOT, "src", "viz.jl"))
@@ -38,6 +39,10 @@ landmarks = make_scattered_landmarks(RUN_SCENARIO)
 START_POS, GOAL_POS = scenario_endpoints(RUN_SCENARIO)
 scenario = (landmarks=landmarks, start=START_POS, goal=GOAL_POS)
 println("Landmark scenario: $(RUN_SCENARIO) — $(length(landmarks)) landmarks")
+
+# Serialize the exact landmark field (positions + covariances) so the Monte
+# Carlo consistency stage reproduces it without re-seeding the RNG generator.
+write_landmarks_csv(joinpath(OUTPUT_DIR, "scenario_landmarks.csv"), landmarks)
 
 graph = build_hex_graph(landmarks, START_POS, GOAL_POS; hex_r=HEX_RADIUS_M)
 

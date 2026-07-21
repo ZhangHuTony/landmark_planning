@@ -31,6 +31,17 @@ end
 agent_colors = [:purple, :teal, :darkorange, :crimson, :magenta,
                 :brown, :lime, :navy, :coral, :olive]
 
+# Draw static no-go obstacles as filled convex polygons (no-op if none).
+function overlay_obstacles!(plt)
+    isempty(OBSTACLES) && return
+    for (k, obs) in enumerate(OBSTACLES)
+        xs = [v[1] for v in obs.verts]; ys = [v[2] for v in obs.verts]
+        push!(xs, xs[1]); push!(ys, ys[1])   # close the ring
+        plot!(plt, xs, ys, seriestype=:shape, color=:gray35, fillalpha=0.55,
+              linecolor=:black, linewidth=1.5, label=(k == 1 ? "Obstacle" : false))
+    end
+end
+
 function make_base_plot(landmarks, graph)
     _, sensor_mask = node_role_masks(graph)
     p = plot(legend=:outerright, aspect_ratio=:equal)
@@ -56,6 +67,7 @@ function make_base_plot(landmarks, graph)
              color=:orange, marker=:star5, markersize=10, markerstrokewidth=0,
              label="Goal")
     set_hex_world_limits!(p, graph)
+    overlay_obstacles!(p)
     return p
 end
 
@@ -183,6 +195,37 @@ function write_ctrls_csv(filename::String, ctrls::Vector{Vector{Tuple{Float64,Fl
         end
     end
     println("  → Saved control points to $filename ($(sum(length.(ctrls))) points)")
+end
+
+# Serialize the scenario landmark field (position + 2×2 covariance) so a
+# downstream stage — the Monte Carlo consistency simulator, or an external
+# non-Julia tool — can reproduce the EXACT landmarks the planner saw without
+# re-running the RNG-seeded scenario generator. Σ₀ (initial agent covariance)
+# is lms[1].cov, so this also pins the initial uncertainty.
+function write_landmarks_csv(filename::String, landmarks::Vector{Landmark})
+    open(filename, "w") do io
+        println(io, "landmark_id,x,y,c11,c12,c21,c22")
+        for (i, lm) in enumerate(landmarks)
+            println(io, "$(i),$(lm.x),$(lm.y),$(lm.cov[1,1]),$(lm.cov[1,2]),$(lm.cov[2,1]),$(lm.cov[2,2])")
+        end
+    end
+    println("  → Saved $(length(landmarks)) landmarks to $filename")
+end
+
+function read_landmarks_csv(filename::String)
+    lms = Landmark[]
+    open(filename) do io
+        readline(io)  # skip header
+        for line in eachline(io)
+            isempty(strip(line)) && continue
+            p = split(line, ',')
+            x = parse(Float64, p[2]); y = parse(Float64, p[3])
+            cov = [parse(Float64, p[4]) parse(Float64, p[5]);
+                   parse(Float64, p[6]) parse(Float64, p[7])]
+            push!(lms, Landmark(x, y, cov))
+        end
+    end
+    return lms
 end
 
 function write_comm_csv(filename::String, events)

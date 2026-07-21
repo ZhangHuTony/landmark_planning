@@ -4,21 +4,22 @@
 # dict at load time (flat key:value only — see src/config.jl).
 
 # Mission setup
-landmark_scenario: single
+landmark_scenario: dual
 num_agents: 2
-algorithms: hexspline_cl, straight_line
+algorithms: hexspline_cl
 
 # Physical / sensor model
 dir_uncertainty_per_meter: 0.05
 maj_min_unc_ratio: 3
 marker_proportion: 5.0
-sensor_noise: 0.038
+landmark_sensor_noise: 0.038
+comm_sensor_noise: 0.038
 bearing_noise_ratio: 2.2
 comm_radius: 300.0
 visibility_range: 100.0
 visibility_width: 2.5
 comm_interval: 100.0
-comm_range: 200.0
+comm_range: 100.0
 comm_width: 2.5
 comm_weight_min: 1.0e-4
 comm_interval_dist: 5.0
@@ -27,6 +28,22 @@ comm_fusion: ci   # inter-agent fusion rule: ci (Covariance Intersection, sound)
 # Graph / hex grid
 hex_width_m: 100.0
 hex_padding: 2
+
+# Static obstacles — chance-constrained no-go regions (discrete A* feasibility
+# filter only; obstacles never touch the covariance/measurement model).
+#   obstacle_delta: risk bound per (agent, obstacle) pair. Union bound:
+#     P(any collision) ≤ Σδ over all P·M pairs, so set δ = Δ/(P·M) for a total
+#     budget Δ. z = Φ⁻¹(1−δ) inflates each face by z·√(aⱼᵀ(Σ+Σₒ)aⱼ).
+#   agent_radius: vehicle radius r_a, inflates every obstacle face outward.
+#   obstacle_edge_samples: samples along each hex edge (1 = destination node
+#     only; 2 = both endpoints; ≥3 adds interior points).
+#   obstacles: CONVEX polygons only. Encoding — vertices "x,y" sep by ';',
+#     polygons by '|', optional per-polygon location cov after '@' as
+#     "sxx,sxy,syx,syy" (default zero). Absent/empty ⇒ no obstacles.
+obstacle_delta: 0.05
+agent_radius: 0.0
+obstacle_edge_samples: 2
+obstacles: 200,-400; 260,-400; 260,300; 200,300 | 400,10; 460,10; 430,70 @ 4,0,0,4
 
 # Output
 track_comm_events: true

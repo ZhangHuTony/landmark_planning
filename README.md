@@ -85,12 +85,41 @@ Practical guidance: start with relaxed disabled. Enable with a small δ if searc
 |---|---|---|
 | `dir_uncertainty_per_meter` | `0.05` | Along-track dead-reckoning drift (DVL+IMU) |
 | `maj_min_unc_ratio` | `3` | Anisotropy ratio: along-track drift ÷ cross-track drift |
-| `sensor_noise` | `0.038` | USBL/LBL fix accuracy in meters |
+| `landmark_sensor_noise` | `0.038` | USBL/LBL fix accuracy in meters (landmark fusion) |
+| `comm_sensor_noise` | `0.038` | USBL/LBL fix accuracy in meters (inter-agent comm fusion) |
 | `bearing_noise_ratio` | `2.2` | Cross-range noise relative to along-range |
 | `visibility_sigma` | `50.0` | 1σ detection range for landmark observations (meters) |
 | `comm_radius` | `200.0` | Acoustic modem range for in-search approximation (meters) |
 | `comm_sigma` | `100.0` | Gaussian taper scale for exact comm weighting (meters) |
 | `comm_interval` | `100.0` | Arc-distance between synchronized comm checkpoints (meters) |
+| `comm_fusion` | `ci` | Inter-agent fusion rule: `ci` (Covariance Intersection — sound, consistent under unknown cross-correlation) or `kf` (legacy weighted information-filter add — overconfident) |
+
+### Static obstacles
+
+Hard no-go **convex-polygon** regions (set in `config/main.yaml`), enforced as a **chance-constrained feasibility filter inside the discrete joint A\***: a joint search state is rejected if any agent's belief has too high a collision probability. This is a pure feasibility check — obstacles never enter the measurement model and never modify covariance propagation. (Continuous B-spline refinement is currently obstacle-unaware.)
+
+Per agent *i* and obstacle *m*, at the state's mean μᵢ and covariance Σᵢ, the agent is **safe** iff it clears at least one polygon face *j*:
+
+```
+aⱼ·μᵢ ≥ bⱼ + r_a + z·√(aⱼᵀ(Σᵢ + Σₒ)aⱼ),   z = Φ⁻¹(1 − δ)
+```
+
+where the aⱼ are **unit** outward face normals, r_a the agent radius, and Σₒ the obstacle's optional location covariance (default zero). A joint state is infeasible if any agent collides with any obstacle. By the union bound, `P(any collision) ≤ Σδ` over all (agent, obstacle) pairs, so set `δ = Δ/(P·M)` for a total risk budget Δ across P agents and M obstacles.
+
+| Key | Default | Effect |
+|---|---|---|
+| `obstacles` | *(none)* | Convex polygons (see encoding below). Absent/empty ⇒ no obstacles, filter is a no-op. |
+| `obstacle_delta` | `0.05` | Collision-risk bound δ per (agent, obstacle) pair |
+| `agent_radius` | `0.0` | Vehicle radius r_a; inflates every obstacle face outward |
+| `obstacle_edge_samples` | `2` | Samples along each hex edge: `1` = destination node only, `2` = both endpoints, `≥3` adds interior points |
+
+**Encoding** — a flat one-line string (the parser stores it verbatim; the planner parses it): vertices `x,y` separated by `;`, polygons by `|`, with an optional per-polygon location covariance after `@` as `sxx,sxy,syx,syy` (row-major). Polygons must be **convex** — a non-convex polygon errors out (convex decomposition is out of scope). Φ⁻¹ is computed in-repo (Acklam's rational approximation), since `Distributions`/`StatsFuns` are not installed.
+
+```yaml
+obstacles: 200,-40; 260,-40; 260,40; 200,40 | 400,10; 460,10; 430,70 @ 4,0,0,4
+```
+
+Obstacles are drawn as filled gray polygons on every planner figure. See `test_obstacles.jl` for the predicate's validation checks.
 
 ### Landmark scenarios
 
@@ -139,6 +168,7 @@ When `astar_mode: limit`, additional Pareto-seed files per seed `N`:
 - Strict feasibility is always evaluated against `unc_radius_threshold` (with `unc_feas_tol`).
 - Relaxed discrete mode is a seed-generation speed mechanism; the final solution is always checked against the strict threshold.
 - Dominance pruning uses the PSD partial order on 2×2 covariance matrices (stronger than scalar det criterion).
+- Static-obstacle feasibility is chance-constrained per (agent, obstacle) pair. PSD dominance pruning stays sound under it: since frontier labels share the same node (same mean), a covariance-dominating state clears every obstacle face the dominated one clears.
 
 ## Further reading
 

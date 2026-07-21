@@ -61,8 +61,8 @@ end
 #   `agent_pos` while heading in direction `heading`.
 #
 #   Model:
-#     σ_range   = SENSOR_NOISE  (along line-of-sight)
-#     σ_bearing = SENSOR_NOISE * BEARING_NOISE_RATIO  (perpendicular to LOS)
+#     σ_range   = LANDMARK_SENSOR_NOISE  (along line-of-sight)
+#     σ_bearing = LANDMARK_SENSOR_NOISE * BEARING_NOISE_RATIO  (perpendicular to LOS)
 #   These are rotated into world frame by the bearing angle to the landmark.
 #   The covariance is then INFLATED by 1/q so that a low-quality
 #   observation contributes less to the fusion — a barely-visible landmark
@@ -84,8 +84,8 @@ end
     # Bearing angle to landmark (world frame) — R*D*R' expanded inline
     bearing = atan(dy, dx)
     cb = cos(bearing); sb = sin(bearing)
-    σ_r2 = SENSOR_NOISE^2
-    σ_b2 = (SENSOR_NOISE * BEARING_NOISE_RATIO)^2
+    σ_r2 = LANDMARK_SENSOR_NOISE^2
+    σ_b2 = (LANDMARK_SENSOR_NOISE * BEARING_NOISE_RATIO)^2
     diff = σ_r2 - σ_b2
     # S_sensor = R*diag(σ_r2,σ_b2)*R' inline
     s11 = cb*cb*σ_r2 + sb*sb*σ_b2
@@ -356,8 +356,8 @@ function apply_synchronized_propagation!(agent_positions::Vector{Vector{Tuple{Fl
                         all_covs[receiver][idx_r] = new_r
                     else
                         # legacy weighted information-filter add (overconfident)
-                        S_s = all_covs[sender][idx_s] + SENSOR_NOISE^2 * I(2)
-                        S_r = all_covs[receiver][idx_r] + SENSOR_NOISE^2 * I(2)
+                        S_s = all_covs[sender][idx_s] + COMM_SENSOR_NOISE^2 * I(2)
+                        S_r = all_covs[receiver][idx_r] + COMM_SENSOR_NOISE^2 * I(2)
                         inv_P_r = inv(all_covs[receiver][idx_r])
                         new_inv_P_r = inv_P_r + weight * inv(S_s)
                         all_covs[receiver][idx_r] = inv(new_inv_P_r)
@@ -433,12 +433,12 @@ end
 # fusion vanishes as w→0. Convex CI weights sum to 1, so shared information is
 # never double-counted (sound for unknown cross-correlation, unlike the KF add).
 @inline function ci_comm(cov_a::Matrix{Float64}, cov_b::Matrix{Float64}, w::Float64)
-    R   = SENSOR_NOISE^2 .* [1.0 0.0; 0.0 1.0]
+    R   = COMM_SENSOR_NOISE^2 .* [1.0 0.0; 0.0 1.0]
     Ia  = inv2(cov_a); Ib = inv2(cov_b)
     Ita = inv2((cov_a .+ R) ./ w)          # = w·(Σ_a+R)⁻¹, tapered transferred info
     Itb = inv2((cov_b .+ R) ./ w)
-    ωa = ci_omega_det(Ia, Itb); new_a = inv2(ωa .* Ia .+ (1.0-ωa) .* Itb)  # a ← b
-    ωb = ci_omega_det(Ib, Ita); new_b = inv2(ωb .* Ib .+ (1.0-ωb) .* Ita)  # b ← a
+    omega_a = ci_omega_det(Ia, Itb); new_a = inv2(omega_a .* Ia .+ (1.0-omega_a) .* Itb)  # a ← b
+    omega_b = ci_omega_det(Ib, Ita); new_b = inv2(omega_b .* Ib .+ (1.0-omega_b) .* Ita)  # b ← a
     return new_a, new_b
 end
 
@@ -450,7 +450,7 @@ end
     w < COMM_WEIGHT_MIN && return cov_a, cov_b
     COMM_FUSION === :ci && return ci_comm(cov_a, cov_b, w)
     # Information-filter fusion weighted by range (legacy KF; overconfident)
-    noise = SENSOR_NOISE^2
+    noise = COMM_SENSOR_NOISE^2
     # a receives from b
     Ib = inv2(cov_b .+ noise .* [1.0 0.0; 0.0 1.0])
     new_a = inv2(inv2(cov_a) .+ w .* Ib)

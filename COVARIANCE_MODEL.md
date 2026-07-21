@@ -20,7 +20,7 @@ All line numbers refer to `planner.jl`.
 | $F(\theta_i[k])$ | motion Jacobian | identity here — rotation folded into $Q$ (see §2) |
 | $Q_i[k]$ | process (dead-reckoning) noise | `growth_covariance(seg, heading)` — L244 |
 | $H$ | measurement Jacobian | identity (position-domain measurement) |
-| $R$ | measurement noise | per-landmark $S_\text{total}$ in `landmark_info`; `SENSOR_NOISE²·I` for comms |
+| $R$ | measurement noise | per-landmark $S_\text{total}$ in `landmark_info` (`LANDMARK_SENSOR_NOISE²`); `COMM_SENSOR_NOISE²·I` for comms |
 | $K_i[k]$ | Kalman gain | implicit — update done in **information form** (§3) |
 | $w_{ij}(k)$ | tapered Gaussian sensing weight | `p_detect` (L528) and comm `weight` (L786, L961) |
 | $\sigma_c$ | taper length scale | `VISIBILITY_SIGMA` (landmarks), `COMM_SIGMA`/`COMM_RADIUS` (comms) |
@@ -113,8 +113,8 @@ exactly this, in three pieces:
 
 **(a) Per-landmark information $R_j^{-1}$** — `landmark_info`, **L523–553**:
 ```julia
-σ_r2 = SENSOR_NOISE^2                          # along line-of-sight (range)
-σ_b2 = (SENSOR_NOISE * BEARING_NOISE_RATIO)^2  # perpendicular (bearing)
+σ_r2 = LANDMARK_SENSOR_NOISE^2                          # along line-of-sight (range)
+σ_b2 = (LANDMARK_SENSOR_NOISE * BEARING_NOISE_RATIO)^2  # perpendicular (bearing)
 # S_sensor = R(bearing)·diag(σ_r2, σ_b2)·R(bearing)ᵀ   (rotated into world frame)
 ...
 inv_p = 1.0 / p_detect                         # tapered-Gaussian inflation (see §4)
@@ -190,13 +190,36 @@ gets large $R_j$, so it contributes little information. This is the code's reali
 ## 5. Inter-agent cooperative fusion
 
 Supports reduce the primary's uncertainty by sharing localization information when nearby —
-the cooperative-localization mechanism (paper §II / §III, refs [2], [7]). Implemented as a
-**Gaussian-weighted information-filter fusion**:
+the cooperative-localization mechanism (paper §II / §III, refs [2], [7]). The fusion rule is
+selected by `comm_fusion` in `config/main.yaml` (`COMM_FUSION` in `src/config.jl`).
 
-$$\Sigma_a^{+} = \Big(\Sigma_a^{-1} + w_{ab}\,(\Sigma_b + R)^{-1}\Big)^{-1}, \qquad R = \texttt{SENSOR\_NOISE}^2 I$$
+**`ci` — Covariance Intersection (default, sound).** Fuses by a determinant-optimal convex
+combination in information space (Carrillo-Arce et al., IROS 2013):
 
-applied bidirectionally (each agent fuses the other). There are **two implementations** that must
-stay consistent:
+$$\Sigma_a^{+} = \Big(\omega\,\Sigma_a^{-1} + (1-\omega)\,P_t^{-1}\Big)^{-1}, \qquad
+  P_t = \tfrac{1}{w_{ab}}\big(\Sigma_b + R\big), \quad \omega\in[0,1], \ R=\texttt{SENSOR\_NOISE}^2 I$$
+
+where $\omega$ minimizes $\det(\Sigma_a^{+})$ (closed form for 2×2 — a quadratic in $\omega$).
+Because the two weights sum to 1, CI can never double-count the information the primary and
+helper already share through common history, so it is **consistent for any unknown
+cross-correlation** and the terminal certificate $\det(\Sigma_i[N])\le\bar d$ is a sound upper
+bound. The transferred estimate $P_t=\Sigma_b+R$ is the paper's
+$\tilde H P_b \tilde H^\top + \Gamma R \Gamma^\top$ (with $\tilde H=\Gamma=I$); the range taper
+$w_{ab}$ enters by inflating $P_t$ by $1/w_{ab}$, so fusion vanishes as $w_{ab}\to0$. Helpers:
+`ci_comm` / `ci_omega_det` (`src/covariance.jl`).
+
+**`kf` — legacy weighted information-filter add (overconfident, not sound).**
+
+$$\Sigma_a^{+} = \Big(\Sigma_a^{-1} + w_{ab}\,(\Sigma_b + R)^{-1}\Big)^{-1}$$
+
+*Adds* information, valid only when the two estimates are independent. In cooperative
+localization they share history, so the add double-counts shared information → overconfidence
+(NEES above state dim) → the terminal certificate can be silently violated. Kept only for A/B
+comparison. (Empirically, two agents flying an identical path in lockstep collapse under `kf`
+from ~9.2 to ~2.9 uncertainty — a spurious 3× reduction that `ci` correctly refuses.)
+
+Both rules are applied bidirectionally (each agent fuses the other). There are **two
+implementations** (both dispatch on `COMM_FUSION`) that must stay consistent:
 
 ### (a) Exact evaluator — `apply_synchronized_propagation!`
 
@@ -213,16 +236,18 @@ This means the reduced covariance after comm event *k* correctly seeds
 propagation toward event *k+1*, exactly as real cooperative localization behaves.
 
 ```julia
-weight = exp(-dist^2 / (2 * COMM_SIGMA^2))              # tapered Gaussian
-if weight > COMM_WEIGHT_MIN                              # floor = 1e-4 (L61)
-    S_s = all_covs[sender][idx_s] + SENSOR_NOISE^2 * I(2)   # Σ_b + R
-    S_r = all_covs[receiver][idx_r] + SENSOR_NOISE^2 * I(2)
-    # Receiver fuses sender:
-    new_inv_P_r = inv(all_covs[receiver][idx_r]) + weight * inv(S_s)
-    all_covs[receiver][idx_r] = inv(new_inv_P_r)
-    # Sender fuses receiver (bidirectional):
-    new_inv_P_s = inv(all_covs[sender][idx_s]) + weight * inv(S_r)
-    all_covs[sender][idx_s] = inv(new_inv_P_s)
+weight = comm_weight(d2_comm)                           # logistic taper, half-weight at COMM_RANGE
+if weight > COMM_WEIGHT_MIN                              # floor = 1e-4
+    if COMM_FUSION === :ci
+        new_s, new_r = ci_comm(all_covs[sender][idx_s], all_covs[receiver][idx_r], weight)
+        all_covs[sender][idx_s]   = new_s               # det-optimal CI, bidirectional
+        all_covs[receiver][idx_r] = new_r
+    else                                                # legacy :kf — overconfident add
+        S_s = all_covs[sender][idx_s] + COMM_SENSOR_NOISE^2 * I(2)   # Σ_b + R
+        S_r = all_covs[receiver][idx_r] + COMM_SENSOR_NOISE^2 * I(2)
+        all_covs[receiver][idx_r] = inv(inv(all_covs[receiver][idx_r]) + weight * inv(S_s))
+        all_covs[sender][idx_s]   = inv(inv(all_covs[sender][idx_s])   + weight * inv(S_r))
+    end
 end
 ```
 The per-step propagation math is shared with `propagate_cov_discrete` via the helper
@@ -237,7 +262,7 @@ expansion is fast). Same algebra, different taper scale and a per-step trigger:
 d2 = (xa-xb)^2 + (ya-yb)^2
 w  = exp(-d2 / (2*COMM_RADIUS^2))            # L961  (σ_c = COMM_RADIUS = 300)
 w < 1e-3 && return cov_a, cov_b             # L962  skip negligible fusion
-noise = SENSOR_NOISE^2
+noise = COMM_SENSOR_NOISE^2
 Ib = inv2(cov_b .+ noise .* I)              # (Σ_b + R)⁻¹
 new_a = inv2(inv2(cov_a) .+ w .* Ib)        # Σ_a⁺ = (Σ_a⁻¹ + w·(Σ_b+R)⁻¹)⁻¹
 Ia = inv2(cov_a .+ noise .* I)

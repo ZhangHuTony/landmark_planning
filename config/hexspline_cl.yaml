@@ -6,7 +6,7 @@ astar_mode: threshold
 primary_epsilon: 0.0
 
 # Uncertainty thresholds
-unc_radius_threshold: 2.7
+unc_radius_threshold: 7.0
 unc_feas_tol: 1.0e-6
 
 # Relaxed discrete search

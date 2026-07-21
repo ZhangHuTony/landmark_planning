@@ -75,6 +75,14 @@ end
 # Single-agent A* state: (node, cumulative distance, covariance at node).
 # Dominance is over (dist, covariance) using PSD order: state A dominates B iff
 # A.dist ≤ B.dist AND (B.cov - A.cov) is positive semidefinite (cov_dominates).
+# NOTE (obstacle chance constraint): `cov_dominates` is the Loewner/PSD order and
+# frontier labels are keyed per node-signature (identical μ). At equal μ, PSD order
+# implies aⱼᵀΣₐaⱼ ≤ aⱼᵀΣ_baⱼ for every face, so a dominating state clears every
+# obstacle face the dominated one clears — dominance stays SOUND under the
+# projected-variance obstacle test. The det-based `unc_radius` is used only for
+# priority tie-breaking and the uncertainty-threshold gate, never as obstacle
+# pruning, so no change is needed here. (See report; the det-vs-Loewner concern
+# does not apply to this codebase's pruning.)
 # `visited` is a BitVector per state for cycle detection (supports arbitrary graph sizes).
 struct State
     node::Int
@@ -551,6 +559,11 @@ function joint_astar(graph::LandmarkGraph,
 
                 nd = S.dist + graph.distance[S.node, u]
                 ncov = edge_cov_continuous(S.node, u, graph, lms, S.cov)
+                # Chance-constrained static-obstacle feasibility filter (no-op if none).
+                if !isempty(OBSTACLES)
+                    p0 = graph.landmarks[S.node]; p1 = graph.landmarks[u]
+                    segment_obstacle_free((p0.x, p0.y), (p1.x, p1.y), ncov) || continue
+                end
                 nunc = unc_radius(ncov)
 
                 if !haskey(frontier_at_node, u)
@@ -736,6 +749,12 @@ function joint_astar(graph::LandmarkGraph,
             if unc_within_threshold(exact_unc, unc_threshold, UNC_FEAS_TOL)
                 println("  ✓ FEASIBLE SOLUTION at iter $iter_count: dist=$(round(exact_dists[primary], digits=3)), unc=$(round(exact_unc, digits=4))")
                 println("  [Constraint A*] Complete: $(iter_count) iterations, final_dist=$(round(exact_dists[primary], digits=3))")
+                # Save collected debug frames before this early return (bypasses the end-of-function save below).
+                if animate_enabled && !animation_saved && iter_count > 1
+                    gif(anim_frames, debug_gif_path, fps=20)
+                    animation_saved = true
+                    println("  [Constraint A*] Animation saved to $debug_gif_path (iters $(animate_start_iter)-$(min(iter_count, animate_start_iter + animate_limit - 1)))")
+                end
                 return agent_paths, exact_dists, exact_unc, iter_count
             else
                 println("  [Constraint A*] Goal popped but infeasible under exact eval: unc=$(round(exact_unc, digits=4)) > $(round(unc_threshold, digits=4))")
@@ -783,6 +802,17 @@ function joint_astar(graph::LandmarkGraph,
                 end
 
                 new_covs = apply_joint_step_comms(new_covs, candidate_nodes, new_dists, graph)
+
+                # Chance-constrained static-obstacle feasibility filter: reject if ANY
+                # agent's belief collides with ANY obstacle (no-op if none). Uses the
+                # post-comm-fusion covariance carried on the state.
+                if !isempty(OBSTACLES)
+                    for a in 1:na
+                        p0 = graph.landmarks[S.paths[a][end]]; p1 = graph.landmarks[candidate_nodes[a]]
+                        segment_obstacle_free((p0.x, p0.y), (p1.x, p1.y), new_covs[a]) || return
+                    end
+                end
+
                 new_g = new_dists[primary]
 
                 # Support agents must also remain under the uncertainty threshold.
@@ -922,6 +952,11 @@ function joint_astar_collect(graph::LandmarkGraph,
                 S.visited[u] && continue
                 nd = S.dist + graph.distance[S.node, u]
                 ncov = edge_cov_continuous(S.node, u, graph, lms, S.cov)
+                # Chance-constrained static-obstacle feasibility filter (no-op if none).
+                if !isempty(OBSTACLES)
+                    p0 = graph.landmarks[S.node]; p1 = graph.landmarks[u]
+                    segment_obstacle_free((p0.x, p0.y), (p1.x, p1.y), ncov) || continue
+                end
                 if !haskey(frontier_at_node, u)
                     frontier_at_node[u] = Tuple{Float64, Matrix{Float64}}[]
                 end
@@ -1012,6 +1047,13 @@ function joint_astar_collect(graph::LandmarkGraph,
                 end
                 for a in 1:(primary - 1); new_dists[a] > new_dists[primary] && return; end
                 new_covs = apply_joint_step_comms(new_covs, candidate_nodes, new_dists, graph)
+                # Chance-constrained static-obstacle feasibility filter (no-op if none).
+                if !isempty(OBSTACLES)
+                    for a in 1:na
+                        p0 = graph.landmarks[S.paths[a][end]]; p1 = graph.landmarks[candidate_nodes[a]]
+                        segment_obstacle_free((p0.x, p0.y), (p1.x, p1.y), new_covs[a]) || return
+                    end
+                end
                 new_g = new_dists[primary]
                 sig_key = (joint_node_key(new_paths), joint_visited_key(new_visited))
                 labels = get(frontier_by_signature, sig_key, Tuple{Float64, Matrix{Float64}}[])
@@ -1638,7 +1680,7 @@ function plan_hexspline_cl(scenario, graph::LandmarkGraph, output_dir::String)
         println("  • SYNCHRONIZED inter-agent communication: every $(COMM_INTERVAL)m of travel")
         println("  • Tapered sigmoid weighting: range=$(COMM_RANGE)m, width=$(COMM_WIDTH)m (soft plateau + rolloff)")
         println("  • Bidirectional Kalman fusion: all agent pairs within range at each checkpoint")
-        println("  • Measurement model: bearing-angle sensor with noise=$(SENSOR_NOISE), ratio=$(BEARING_NOISE_RATIO)")
+        println("  • Measurement model: bearing-angle sensor with noise=$(LANDMARK_SENSOR_NOISE), ratio=$(BEARING_NOISE_RATIO)")
         println("  └─ Support agents: goal_unc=$(round(uncs[1], digits=4))m (improved by inter-agent fusion)")
         println("  └─ Primary agent: goal_unc=$(round(uncs[end], digits=4))m (direct path with landmark updates)")
     end
