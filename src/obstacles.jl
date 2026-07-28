@@ -163,5 +163,5 @@ const OBSTACLE_DELTA        = Float64(get(CFG, "obstacle_delta", 0.05))   # risk
 const OBSTACLE_Z            = norminv(1.0 - OBSTACLE_DELTA)                # Φ⁻¹(1−δ), computed once
 const AGENT_RADIUS          = Float64(get(CFG, "agent_radius", 0.0))
 const OBSTACLE_EDGE_SAMPLES = Int(get(CFG, "obstacle_edge_samples", 2))
-const OBSTACLES             = parse_obstacles(String(get(CFG, "obstacles", "")))
+const OBSTACLES             = parse_obstacles(String(get(ENV, "OBSTACLES", get(CFG, "obstacles", ""))))  # ENV override mirrors SCENARIO
 @assert OBSTACLE_EDGE_SAMPLES ≥ 1 "obstacle_edge_samples must be ≥ 1"

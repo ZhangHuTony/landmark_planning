@@ -10,16 +10,19 @@ Random.seed!(42)  # Reproducible jittered grid sampling
 const _ROOT = @__DIR__
 include(joinpath(_ROOT, "src", "config.jl"))
 include(joinpath(_ROOT, "src", "obstacles.jl"))
+include(joinpath(_ROOT, "src", "minvo.jl"))
 include(joinpath(_ROOT, "src", "graph.jl"))
 include(joinpath(_ROOT, "src", "covariance.jl"))
 include(joinpath(_ROOT, "src", "viz.jl"))
 include(joinpath(_ROOT, "src", "scenario_generation.jl"))
 include(joinpath(_ROOT, "src", "analysis.jl"))
-for algo in ALGORITHMS
-    include(joinpath(_ROOT, "planners", "$(algo).jl"))
+# Include each engine source once. Alias planners (straight_cont, discrete_only)
+# resolve to hexspline_cl.jl, which defines their plan_* entry points too.
+for src in unique(engine_of.(ALGORITHMS))
+    include(joinpath(_ROOT, "planners", "$(src).jl"))
 end
 
-const OUTPUT_DIR = joinpath("results", Dates.format(now(), "yyyy-mm-dd_HH-MM-SS"))
+const OUTPUT_DIR = get(ENV, "OUTPUT_DIR", joinpath("results", Dates.format(now(), "yyyy-mm-dd_HH-MM-SS")))
 mkpath(OUTPUT_DIR)
 
 # Snapshot only main.yaml + the selected algorithms' own config files — not
@@ -28,9 +31,9 @@ mkpath(OUTPUT_DIR)
 run_config_dir = joinpath(OUTPUT_DIR, "config")
 mkpath(run_config_dir)
 cp(joinpath(_CONFIG_DIR, "main.yaml"), joinpath(run_config_dir, "main.yaml"); force=true)
-for algo in ALGORITHMS
-    algo_cfg = joinpath(_CONFIG_DIR, "$(algo).yaml")
-    isfile(algo_cfg) && cp(algo_cfg, joinpath(run_config_dir, "$(algo).yaml"); force=true)
+for name in unique(vcat(engine_of.(ALGORITHMS), ALGORITHMS))
+    algo_cfg = joinpath(_CONFIG_DIR, "$(name).yaml")
+    isfile(algo_cfg) && cp(algo_cfg, joinpath(run_config_dir, "$(name).yaml"); force=true)
 end
 
 # ── Scenario + graph (shared across every selected planner) ──

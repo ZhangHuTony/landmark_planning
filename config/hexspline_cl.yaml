@@ -1,8 +1,7 @@
 # Parameters used only by the hexspline_cl planner (joint discrete A* +
 # continuous B-spline refinement). Merged with config/main.yaml at load time.
 
-pipeline_mode: discrete_then_continuous
-astar_mode: threshold
+astar_mode: limit
 primary_epsilon: 0.0
 
 # Uncertainty thresholds
@@ -22,7 +21,7 @@ prune_by_primary_uncertainty: false
 prune_by_support_uncertainty: false
 
 # A* parameters
-astar_iteration_limit: 300000
+astar_iteration_limit: 500000
 straight_cont_primary_wpts: 11
 support_idle_penalty: 30.0
 support_plot_offset_m: 3.0

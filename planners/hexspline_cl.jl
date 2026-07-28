@@ -4,7 +4,6 @@
 # Algorithm-specific tuning. Only materialized when this planner is selected
 # (see src/config.jl / config/hexspline_cl.yaml).
 
-const PIPELINE_MODE   = Symbol(CFG["pipeline_mode"])
 const ASTAR_MODE      = Symbol(CFG["astar_mode"])
 const PRIMARY_EPSILON = Float64(CFG["primary_epsilon"])
 
@@ -1116,14 +1115,15 @@ end
 # Constraint : joint unc_radius(Σ_goal) ≤ cont_threshold,
 #              support length ≤ primary length,
 #              and curvature bounds
-function optimize_continuous(paths::Vector{Vector{Int}}, graph::LandmarkGraph, landmarks::Vector{Landmark}, num_agents::Int, output_dir::String; cont_threshold::Float64=UNC_RADIUS_THRESHOLD, fig_prefix::String="")
+function optimize_continuous(paths::Vector{Vector{Int}}, graph::LandmarkGraph, landmarks::Vector{Landmark}, num_agents::Int, output_dir::String; cont_threshold::Float64=UNC_RADIUS_THRESHOLD, fig_prefix::String="", straight_seed::Bool=false)
     println("\n=== Continuous Spline Optimization (threshold=$(round(cont_threshold, digits=4))) ===")
 
-    # Initialize continuous waypoints either from discrete paths or direct-line seed.
+    # Initialize continuous waypoints either from discrete paths or, when
+    # straight_seed (the straight_cont pipeline), a direct start→goal line.
     all_agent_wpts = Vector{Vector{Tuple{Float64,Float64}}}(undef, length(paths))
     is_primary_mask = Vector{Bool}(undef, length(paths))
 
-    if PIPELINE_MODE == :straight_continuous
+    if straight_seed
         n_agents = length(paths)
         sx = graph.landmarks[1].x
         sy = graph.landmarks[1].y
@@ -1171,6 +1171,17 @@ function optimize_continuous(paths::Vector{Vector{Int}}, graph::LandmarkGraph, l
         println("  (No intermediate waypoints to optimize)")
         return nothing
     end
+
+    # Static-obstacle avoidance (MINVO enclosure, chance-constrained). Commit
+    # each spline segment to the obstacle face the discrete seed cleared; those
+    # committed half-spaces enter the smoothing/barrier objectives below as
+    # linear rows over the MINVO hull vertices, and are re-verified after
+    # refinement. No-op (empty plans) when there are no obstacles.
+    # The straight_cont pipeline (straight_seed) skips the discrete filter, so it
+    # has no committed homotopy — which side of each obstacle to pass — to enforce
+    # continuously; reuse the empty no-obstacle plan (see OBSTACLE_AVOIDANCE.md).
+    obstacle_plans = straight_seed ? [SegFace[] for _ in eachindex(all_agent_wpts)] :
+                     build_obstacle_plan(all_agent_wpts, SPLINE_DEGREE)
 
     # pack/unpack
     function pack_waypoints(wpts_list::Vector{Vector{Tuple{Float64,Float64}}})
@@ -1269,12 +1280,13 @@ function optimize_continuous(paths::Vector{Vector{Int}}, graph::LandmarkGraph, l
 
     init_curvature_ok = all(all(isfinite(κ) ? κ <= MAX_CURVATURE + 1e-9 : true for κ in curvset) for curvset in init_curvs)
     init_support_len_ok = all(sl <= init_len + UNC_FEAS_TOL for sl in init_support_lens)
-    init_feasible = unc_within_threshold(init_unc, cont_threshold, UNC_FEAS_TOL) && init_curvature_ok && init_support_len_ok
+    init_obstacles_ok = obstacles_clear(obstacle_plans, init_ctrls, init_covs)
+    init_feasible = unc_within_threshold(init_unc, cont_threshold, UNC_FEAS_TOL) && init_curvature_ok && init_support_len_ok && init_obstacles_ok
 
     if !init_feasible
         println("  [Smoothing] Initial point is infeasible; smoothing into feasible region...")
         function smoothing_objective(f::Vector{Float64})
-            plen, unc, _, _, curvatures, max_curvs, _, support_lens = eval_continuous(f)
+            plen, unc, _, covs_all, curvatures, max_curvs, ctrl_list, support_lens = eval_continuous(f)
             unc_penalty = 0.0
             if unc_exceeds_threshold(unc, cont_threshold, UNC_FEAS_TOL)
                 unc_penalty = CONT_SMOOTH_PENALTY * (unc - cont_threshold)^2
@@ -1288,7 +1300,8 @@ function optimize_continuous(paths::Vector{Vector{Int}}, graph::LandmarkGraph, l
                 end
             end
             support_len_penalty = CONT_SMOOTH_PENALTY * support_length_violation(plen, support_lens)
-            return plen + unc_penalty + curv_penalty + support_len_penalty
+            obstacle_penalty = obstacle_constraint_value(obstacle_plans, ctrl_list, covs_all; mode=:smooth)
+            return plen + unc_penalty + curv_penalty + support_len_penalty + obstacle_penalty
         end
 
         smooth_adam_m = zeros(total_free_cont)
@@ -1318,9 +1331,9 @@ function optimize_continuous(paths::Vector{Vector{Int}}, graph::LandmarkGraph, l
             end
             if !isfinite(trial_obj) || trial_obj > obj0 - CONT_MIN_IMPROVEMENT; break; end
             smooth_flat .= trial
-            slen, sunc, swpts, _, scurvs, smax_curv, _, ssupport_lens = eval_continuous(smooth_flat)
+            slen, sunc, swpts, scovs, scurvs, smax_curv, sctrls, ssupport_lens = eval_continuous(smooth_flat)
             support_len_ok = all(sl <= slen + UNC_FEAS_TOL for sl in ssupport_lens)
-            sfeas = unc_within_threshold(sunc, cont_threshold, UNC_FEAS_TOL) && all(all(isfinite(κ) ? κ <= MAX_CURVATURE + 1e-9 : true for κ in curvset) for curvset in scurvs) && support_len_ok
+            sfeas = unc_within_threshold(sunc, cont_threshold, UNC_FEAS_TOL) && all(all(isfinite(κ) ? κ <= MAX_CURVATURE + 1e-9 : true for κ in curvset) for curvset in scurvs) && support_len_ok && obstacles_clear(obstacle_plans, sctrls, scovs)
             if mod(smooth_iter, 50) == 0
                 println("    Smooth iter $(lpad(smooth_iter,3)): len=$(round(slen,digits=2)), unc=$(round(sunc,digits=4))")
             end
@@ -1340,7 +1353,7 @@ function optimize_continuous(paths::Vector{Vector{Int}}, graph::LandmarkGraph, l
     prev_len = init_len
 
     function spline_barrier_objective(flat::Vector{Float64}, barrier_mu::Float64)
-        prim_len, goal_unc, _, _, curvatures, _, _, support_lens = eval_continuous(flat)
+        prim_len, goal_unc, _, covs_all, curvatures, _, ctrl_list, support_lens = eval_continuous(flat)
         unc_slack = cont_threshold - goal_unc
         penalty = 0.0
         if unc_slack <= 1e-9
@@ -1366,6 +1379,7 @@ function optimize_continuous(paths::Vector{Vector{Int}}, graph::LandmarkGraph, l
                 penalty -= barrier_mu * log(slack)
             end
         end
+        penalty += obstacle_constraint_value(obstacle_plans, ctrl_list, covs_all; mode=:barrier, barrier_mu=barrier_mu)
         return prim_len + penalty
     end
 
@@ -1398,9 +1412,9 @@ function optimize_continuous(paths::Vector{Vector{Int}}, graph::LandmarkGraph, l
                 break
             end
             flat .= trial
-            len2, unc2, wpts2, covs2, curv2, max_curv2, _, support_lens2 = eval_continuous(flat)
+            len2, unc2, wpts2, covs2, curv2, max_curv2, ctrls2, support_lens2 = eval_continuous(flat)
             support_len_ok = all(sl <= len2 + UNC_FEAS_TOL for sl in support_lens2)
-            feasible = unc_within_threshold(unc2, cont_threshold, UNC_FEAS_TOL) && all(all(isfinite(κ) ? κ <= MAX_CURVATURE + 1e-9 : true for κ in curvset) for curvset in curv2) && support_len_ok
+            feasible = unc_within_threshold(unc2, cont_threshold, UNC_FEAS_TOL) && all(all(isfinite(κ) ? κ <= MAX_CURVATURE + 1e-9 : true for κ in curvset) for curvset in curv2) && support_len_ok && obstacles_clear(obstacle_plans, ctrls2, covs2)
             if feasible && len2 < best_feasible_len
                 best_feasible_len = len2; best_feasible_unc = unc2; best_feasible_flat = copy(flat)
             end
@@ -1419,6 +1433,31 @@ function optimize_continuous(paths::Vector{Vector{Int}}, graph::LandmarkGraph, l
     selected_flat = isnothing(best_feasible_flat) ? best_flat : best_feasible_flat
     opt_len, opt_unc, opt_wpts, opt_covs, opt_curvs, opt_max_curv, opt_ctrls, opt_support_lens = eval_continuous(selected_flat)
     println("  Final: prim_len=$(round(opt_len,digits=3)), unc=$(round(opt_unc,digits=4)), threshold=$(round(cont_threshold,digits=4))")
+
+    # Post-refinement re-verification (spec E), two views of the FINAL solution:
+    #  - real_viols: does the refined MEAN curve actually enter any obstacle?
+    #    (sampled-curve geometric containment — the physically meaningful check).
+    #  - hull_viols: the conservative committed-face MINVO-hull certificate the
+    #    barrier/gate use. A hull breach with a clear curve is not a collision:
+    #    near the clamped spline ends the boundary segment's large hull drapes
+    #    over a nearby obstacle the curve rounds. ponytail: enforcement is soft
+    #    (barrier/penalty, no QP/projection), so a genuine breach (real_viols
+    #    non-empty) is possible under tight-corner pressure — reported, not
+    #    silently shipped; go hard/projected only if guaranteed clearance is needed.
+    real_viols = verify_curve_collisions(opt_ctrls)
+    hull_viols = verify_obstacle_clearance(obstacle_plans, opt_ctrls, opt_covs)
+    if !all(isempty, obstacle_plans)
+        if isempty(real_viols)
+            note = isempty(hull_viols) ? "" :
+                   "  ($(length(hull_viols)) hull row(s) conservatively flagged; mean curve rounds them)"
+            println("  Obstacle re-verification: mean path clears all obstacles ✓$(note)")
+        else
+            println("  ⚠ Obstacle re-verification: $(length(real_viols)) real obstacle collision(s):")
+            for (a, mi, depth) in real_viols
+                println("      agent $a obstacle $mi  depth=$(round(depth, digits=4)) m")
+            end
+        end
+    end
 
     # Evaluate initial discrete solution (waypoints from A* path)
     init_len, init_unc, _, _, _, _, _, _ = eval_continuous(flat)
@@ -1475,7 +1514,13 @@ end
 # in `astar_mode: limit` it is the full Pareto front (main + one per seed) --
 # see notes/PLAN.md "Pareto front handling" for why this is a Vector and not
 # a single path.
-function plan_hexspline_cl(scenario, graph::LandmarkGraph, output_dir::String)
+# Shared engine for the hexspline_cl family of pipelines. `seed_mode` picks the
+# discrete seed source (:discrete = joint A*, :straight = direct start→goal line,
+# no search); `run_continuous` toggles the B-spline refinement stage. The three
+# public entry points below (plan_hexspline_cl / plan_straight_cont /
+# plan_discrete_only) are thin wrappers selecting these two knobs.
+function _plan_hexspline(scenario, graph::LandmarkGraph, output_dir::String;
+                         seed_mode::Symbol, run_continuous::Bool)
     landmarks = scenario.landmarks
 
     # Conditional multiplicative epsilon bound summary.
@@ -1586,15 +1631,15 @@ function plan_hexspline_cl(scenario, graph::LandmarkGraph, output_dir::String)
         end
     end
 
-    if PIPELINE_MODE == :straight_continuous
-        println("\n  Mode=:straight_continuous — skipping discrete search and using direct start→goal seed")
+    if seed_mode == :straight
+        println("\n  seed_mode=:straight — skipping discrete search and using direct start→goal seed")
         primary_path = [1, goal_node]
         primary_dist = graph.distance[1, goal_node]
         support_paths = [Int[1, 1] for _ in 1:(NUM_AGENTS - 1)]
-    elseif PIPELINE_MODE == :discrete_then_continuous
+    elseif seed_mode == :discrete
         support_paths, primary_path, primary_dist = run_discrete_seed_search(disc_unc_threshold)
     else
-        error("Unsupported PIPELINE_MODE=$(PIPELINE_MODE). Use :discrete_then_continuous or :straight_continuous")
+        error("Unsupported seed_mode=$(seed_mode). Use :discrete or :straight")
     end
 
     if isempty(primary_path)
@@ -1623,7 +1668,7 @@ function plan_hexspline_cl(scenario, graph::LandmarkGraph, output_dir::String)
         println("  ├─ Communication: every $(COMM_INTERVAL)m, sigmoid taper range=$(COMM_RANGE)m width=$(COMM_WIDTH)m")
         println("  └─ All agents' uncertainties benefit from synchronized Kalman fusion at checkpoints")
 
-        if PIPELINE_MODE == :discrete_then_continuous && CONTINUE_ASTAR_ON_INFEASIBLE && ASTAR_MODE != :limit && unc_exceeds_threshold(primary_goal_unc, disc_unc_threshold, UNC_FEAS_TOL)
+        if seed_mode == :discrete && CONTINUE_ASTAR_ON_INFEASIBLE && ASTAR_MODE != :limit && unc_exceeds_threshold(primary_goal_unc, disc_unc_threshold, UNC_FEAS_TOL)
             println("\n  Seed exceeded relaxed discrete threshold (goal_unc=$(round(primary_goal_unc, digits=4)) > threshold=$(round(disc_unc_threshold, digits=4))).")
             println("  Continuing A* under relaxed threshold...")
             next_support_paths, next_primary_path, next_primary_dist = run_discrete_seed_search(disc_unc_threshold)
@@ -1765,19 +1810,29 @@ function plan_hexspline_cl(scenario, graph::LandmarkGraph, output_dir::String)
     main_cont_len  = NaN
     solutions = NamedTuple[]
 
-    if !isempty(paths) && all(length.(paths) .> 0)  # Continuous optimization only if all agents have paths
-        opt_len, opt_unc, opt_wpts, opt_covs, opt_ctrls = optimize_continuous(paths, graph, landmarks, NUM_AGENTS, output_dir; cont_threshold=UNC_RADIUS_THRESHOLD, fig_prefix="main")
+    have_paths = !isempty(paths) && all(length.(paths) .> 0)
+    if run_continuous && have_paths  # Continuous optimization only if all agents have paths
+        opt_len, opt_unc, opt_wpts, opt_covs, opt_ctrls = optimize_continuous(paths, graph, landmarks, NUM_AGENTS, output_dir; cont_threshold=UNC_RADIUS_THRESHOLD, fig_prefix="main", straight_seed=(seed_mode == :straight))
         write_ctrls_csv(csv_path(output_dir, "main_ctrls.csv"), opt_ctrls)
         main_cont_len = opt_len
         if !isempty(opt_covs) && all(a -> !isempty(opt_covs[a]), 1:NUM_AGENTS)
             main_cont_uncs = [unc_radius(opt_covs[a][end]) for a in 1:NUM_AGENTS]
         end
         push!(solutions, (id=0, ctrls=opt_ctrls, primary_length=opt_len, primary_unc=opt_unc))
+    elseif !run_continuous && have_paths
+        # discrete_only pipeline: the discrete node polyline IS the deliverable.
+        # Downstream (run_path_eval / mc_nees) reads main_ctrls.csv as waypoints
+        # and evaluates it directly, so write the node coordinates (pin primary's
+        # last point to the exact goal, matching the continuous stage).
+        disc_ctrls = [[(graph.landmarks[i].x, graph.landmarks[i].y) for i in p] for p in paths]
+        disc_ctrls[end][end] = (graph.landmarks[goal_node].x, graph.landmarks[goal_node].y)
+        write_ctrls_csv(csv_path(output_dir, "main_ctrls.csv"), disc_ctrls)
+        push!(solutions, (id=0, ctrls=disc_ctrls, primary_length=dists[end], primary_unc=uncs[end]))
     end
 
     # If Pareto seeds were collected earlier, run continuous optimizer for each now
     optimized_results = Tuple[]
-    if length(pareto_collected) > 0
+    if run_continuous && length(pareto_collected) > 0
         println("\nRunning continuous refinement for $(length(pareto_collected)) Pareto seeds...")
         for (i, (ppaths, pdist, punc, it)) in enumerate(pareto_collected)
             println("  Refining Pareto seed $i (dist=$(round(pdist,digits=3)), unc=$(round(punc,digits=4)))")
@@ -1834,3 +1889,16 @@ function plan_hexspline_cl(scenario, graph::LandmarkGraph, output_dir::String)
 
     return solutions
 end
+
+# ── Public planner entry points (selected by name in `algorithms:`) ──
+# hexspline_cl : joint A* seed + continuous B-spline refinement (full pipeline).
+# straight_cont: straight start→goal seed + continuous refinement (no A* search).
+# discrete_only: joint A* seed, no continuous stage (discrete polyline output).
+plan_hexspline_cl(scenario, graph::LandmarkGraph, output_dir::String) =
+    _plan_hexspline(scenario, graph, output_dir; seed_mode=:discrete, run_continuous=true)
+
+plan_straight_cont(scenario, graph::LandmarkGraph, output_dir::String) =
+    _plan_hexspline(scenario, graph, output_dir; seed_mode=:straight, run_continuous=true)
+
+plan_discrete_only(scenario, graph::LandmarkGraph, output_dir::String) =
+    _plan_hexspline(scenario, graph, output_dir; seed_mode=:discrete, run_continuous=false)

@@ -30,15 +30,30 @@ end
 
 split_algorithms(cfg::Dict) = [strip(s) for s in split(String(cfg["algorithms"]), ",")]
 
+# Planner variants that reuse another planner's engine (source .jl + tuning
+# .yaml) rather than shipping their own. `straight_cont` (straight-line seed +
+# continuous refinement) and `discrete_only` (A* seed, no continuous stage) are
+# just the hexspline_cl engine run through a different pipeline, so they share
+# its code and config. `engine_of(algo)` returns the owning engine (or the algo
+# itself when it has none), used both here (config) and in generate_plan.jl
+# (includes / config snapshot).
+const PLANNER_ENGINE = Dict("straight_cont" => "hexspline_cl",
+                            "discrete_only" => "hexspline_cl")
+engine_of(algo) = get(PLANNER_ENGINE, String(algo), String(algo))
+
 # Reads config/main.yaml, then merges config/<algo>.yaml for each algorithm
 # named in main.yaml's `algorithms:` list. A planner's own config file only
 # needs to exist when that planner is actually selected to run — so running
 # just `straight_line` never requires `hexspline_cl.yaml` to be present/valid.
+# Alias planners also pull their engine's .yaml (loaded first, so an optional
+# per-alias override file can still win).
 function load_config(dir::String)
     cfg = load_yaml(joinpath(dir, "main.yaml"))
     for algo in split_algorithms(cfg)
-        path = joinpath(dir, "$(algo).yaml")
-        isfile(path) && merge!(cfg, load_yaml(path))
+        for name in unique([engine_of(algo), algo])
+            path = joinpath(dir, "$(name).yaml")
+            isfile(path) && merge!(cfg, load_yaml(path))
+        end
     end
     return cfg
 end
