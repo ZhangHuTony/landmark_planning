@@ -69,7 +69,9 @@ const ALGORITHMS = split_algorithms(CFG)
 # instead, so they only need to exist when that planner actually runs.
 # ----------------------
 const NUM_AGENTS         = Int(CFG["num_agents"])
-const LANDMARK_SCENARIO  = Symbol(CFG["landmark_scenario"])
+# ENV override resolved here (not in generate_plan.jl) so obstacles.jl can pick
+# the scenario's `obstacles_<scenario>` key at include time.
+const LANDMARK_SCENARIO  = Symbol(get(ENV, "SCENARIO", String(CFG["landmark_scenario"])))
 
 # Physical scale: all coordinates and distances in meters.
 # Platform: AUV with DVL+IMU dead reckoning, acoustic landmark fixes.

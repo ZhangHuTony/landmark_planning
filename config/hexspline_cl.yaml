@@ -40,8 +40,38 @@ cont_barrier_decay: 0.35
 cont_barrier_stages: 4
 cont_linesearch_shrink: 0.5
 cont_min_improvement: 1.0e-6
-cont_smooth_penalty: 1.0e3
-cont_barrier_hard_penalty: 1.0e4
+# Removed: cont_smooth_penalty / cont_barrier_hard_penalty. The smoothing phase
+# they weighted is gone (Phase I minimizes squared constraint violation, and a
+# uniform weight across all four classes changes neither the relative weighting
+# nor Adam's direction), and Phase II's barrier now continues the log by its own
+# tangent below the knee instead of switching to a quadratic hard penalty.
+
+# Phase I (restoration). The optimizer runs two separate problems: Phase I drives
+# constraint violation to zero *with margin*, Phase II then minimizes path length
+# without ever leaving the feasible set.
+#   cont_restore_margin — ε, the strict-interior margin Phase I must reach before
+#     Phase II starts. Also the knee of Phase II's barrier: above ε the term is
+#     −μ·log(slack), below it the log's own tangent, so the objective stays finite
+#     for finite-difference probes that step outside.
+#     NOTE: slacks are mixed units. Obstacle/support/uncertainty slacks are metres
+#     (uncertainty against a threshold of ~7), so ε=1e-3 is a negligible margin
+#     there; curvature slack is 1/m bounded by MAX_CURVATURE = 1/min_turn_radius_m
+#     = 0.025, so ε is 4% of that class's whole range. Curvature is where a single
+#     scalar ε bites hardest — split into per-class margins if it binds.
+cont_restore_margin: 1.0e-3
+cont_restore_iters: 1000
+cont_restore_restarts: 3
+#   cont_restore_h — finite-difference step for Phase I's gradient, in METRES.
+#     Deliberately much larger than cont_opt_h. The terminal-uncertainty gradient
+#     vanishes to first order at a straight-line configuration (moving an interior
+#     control point perpendicular to a straight path changes arc length only to
+#     second order), so at h=1e-4 the forward difference measures nothing but the
+#     O(h) quadratic remainder and Adam's sign-based step walks uphill. Landmarks
+#     sit 200+ m off the corridor: the landscape's features are metres-to-hundreds
+#     of metres wide, so the probe has to be too. Measured on the dual scenario:
+#     h=1e-4 and h=1e-2 both leave a straight-line seed completely stuck, h=1.0
+#     restores every seed to the interior.
+cont_restore_h: 1.0
 
 # Spline parameters
 spline_degree: 3

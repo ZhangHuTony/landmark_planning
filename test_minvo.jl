@@ -153,9 +153,11 @@ perturbed = copy(ctrls); perturbed[4] = (5.0, -5.0)  # drag a middle ctrl point 
 viols = verify_obstacle_clearance(plan, [perturbed], zerocov)
 @assert !isempty(viols) "perturbed control point into obstacle must be flagged"
 @assert any(v -> v[5] > 0.5, viols) "violation depth should be clearly positive"
-# smoothing/barrier penalties are positive on the violated config, ~0 on the clear one
-@assert obstacle_constraint_value(plan, [perturbed], zerocov; mode=:smooth) > 0.0
-@assert obstacle_constraint_value(plan, [ctrls], zerocov; mode=:smooth) == 0.0
+# the optimizer's constraint rows: some vertex slack goes negative on the violated
+# config, all stay non-negative on the clear one (this is what the smoothing and
+# barrier penalties were built from before they became ordinary slack entries)
+@assert any(x -> x < 0.0, obstacle_slacks(plan, [perturbed], zerocov))
+@assert all(x -> x >= 0.0, obstacle_slacks(plan, [ctrls], zerocov))
 println("end-to-end re-verification (clear seed vs perturbed) OK")
 
 # ── no-obstacle safety: empty plan ⇒ no-op everywhere ──

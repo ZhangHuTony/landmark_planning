@@ -178,41 +178,54 @@ end
     return q
 end
 
-# Barrier/penalty value of the obstacle rows, mirroring the curvature term's
-# treatment exactly. mode=:smooth → CONT_SMOOTH_PENALTY·violation²;
-# mode=:barrier → −μ·log(slack), or CONT_BARRIER_HARD_PENALTY·(1e-9−slack)² when
-# the committed half-space is (nearly) breached.
-function obstacle_constraint_value(plans::Vector{Vector{SegFace}},
-                                   ctrls::Vector{Vector{Tuple{Float64,Float64}}},
-                                   covs::Vector{Vector{Matrix{Float64}}};
-                                   mode::Symbol, barrier_mu::Float64 = 0.0)
-    total = 0.0
+# Tolerance below which a committed-face breach is considered numerical noise.
+# One definition, shared by the clearance certificate and the slack vector the
+# continuous optimizer constrains on, so both agree on what "clear" means.
+const OBSTACLE_SLACK_TOL = 1e-6
+
+# THE definition of obstacle slack: the 4 MINVO-vertex signed clearances of one
+# committed SegFace against its inflated face,  aⱼ·v − (bⱼ + r_a + z·√(aⱼᵀ(Σ+Σₒ)aⱼ)).
+# slack > 0 ⇒ vertex on the safe side. Every consumer below (penalty value,
+# clearance certificate, optimizer constraint row) goes through this, so the
+# inflation formula exists in exactly one place. NTuple ⇒ no allocation in the
+# finite-difference hot loop.
+@inline function seg_face_slacks(sf::SegFace, padded::Vector{Tuple{Float64,Float64}},
+                                 nctrl::Int, covs_a::Vector{Matrix{Float64}})
+    obs = OBSTACLES[sf.obs]
+    ax = obs.A[sf.face, 1]; ay = obs.A[sf.face, 2]
+    quad = worst_proj_var(ax, ay, obs, covs_a, sf.src4, nctrl)
+    rhs = obs.b[sf.face] + AGENT_RADIUS + OBSTACLE_Z * sqrt(max(quad, 0.0))
+    Qmv = seg_control_matrix(padded, sf.seg) * sf.Mseg
+    return ntuple(v -> ax * Qmv[1, v] + ay * Qmv[2, v] - rhs, 4)
+end
+
+# Append every committed vertex's slack onto `out`, shifted by OBSTACLE_SLACK_TOL
+# so that `slack ≥ 0` is exactly the verify_obstacle_clearance gate (which flags
+# only depths strictly greater than the tolerance).
+function obstacle_slacks!(out::Vector{Float64},
+                          plans::Vector{Vector{SegFace}},
+                          ctrls::Vector{Vector{Tuple{Float64,Float64}}},
+                          covs::Vector{Vector{Matrix{Float64}}})
     for a in eachindex(plans)
         isempty(plans[a]) && continue
         padded = bspline_pad_controls(ctrls[a])
         nctrl = length(ctrls[a])
         for sf in plans[a]
-            obs = OBSTACLES[sf.obs]
-            ax = obs.A[sf.face, 1]; ay = obs.A[sf.face, 2]
-            quad = worst_proj_var(ax, ay, obs, covs[a], sf.src4, nctrl)
-            rhs = obs.b[sf.face] + AGENT_RADIUS + OBSTACLE_Z * sqrt(max(quad, 0.0))
-            Qmv = seg_control_matrix(padded, sf.seg) * sf.Mseg
-            for v in 1:4
-                slack = ax * Qmv[1, v] + ay * Qmv[2, v] - rhs
-                if mode === :smooth
-                    slack < 0.0 && (total += CONT_SMOOTH_PENALTY * slack^2)
-                else
-                    if slack <= 1e-9
-                        total += CONT_BARRIER_HARD_PENALTY * (1e-9 - slack)^2
-                    else
-                        total -= barrier_mu * log(slack)
-                    end
-                end
+            for slack in seg_face_slacks(sf, padded, nctrl, covs[a])
+                push!(out, slack + OBSTACLE_SLACK_TOL)
             end
         end
     end
-    return total
+    return out
 end
+
+obstacle_slacks(plans, ctrls, covs) = obstacle_slacks!(Float64[], plans, ctrls, covs)
+
+# NOTE: obstacle_constraint_value used to live here, turning these slacks into a
+# smoothing penalty or a log/hard-penalty barrier term. Both callers are gone:
+# obstacle rows are now ordinary entries in the optimizer's slack vector, so
+# Phase I squares them like every other class and Phase II feeds them through the
+# same tangent-extended log. See planners/hexspline_cl.jl:optimize_continuous.
 
 # Committed-face MINVO-hull clearance certificate — the CONVEX feasibility gate
 # the optimizer uses (obstacles_clear). Re-checks every committed MINVO row
@@ -227,22 +240,16 @@ end
 function verify_obstacle_clearance(plans::Vector{Vector{SegFace}},
                                    ctrls::Vector{Vector{Tuple{Float64,Float64}}},
                                    covs::Vector{Vector{Matrix{Float64}}};
-                                   tol::Float64 = 1e-6)
+                                   tol::Float64 = OBSTACLE_SLACK_TOL)
     viols = Tuple{Int,Int,Int,Int,Float64}[]
     for a in eachindex(plans)
         isempty(plans[a]) && continue
         padded = bspline_pad_controls(ctrls[a])
         nctrl = length(ctrls[a])
         for sf in plans[a]
-            obs = OBSTACLES[sf.obs]
-            ax = obs.A[sf.face, 1]; ay = obs.A[sf.face, 2]
-            quad = worst_proj_var(ax, ay, obs, covs[a], sf.src4, nctrl)
-            rhs = obs.b[sf.face] + AGENT_RADIUS + OBSTACLE_Z * sqrt(max(quad, 0.0))
-            Qmv = seg_control_matrix(padded, sf.seg) * sf.Mseg
             worst = 0.0
-            for v in 1:4
-                depth = rhs - (ax * Qmv[1, v] + ay * Qmv[2, v])
-                worst = max(worst, depth)
+            for slack in seg_face_slacks(sf, padded, nctrl, covs[a])
+                worst = max(worst, -slack)      # penetration depth = −slack
             end
             worst > tol && push!(viols, (a, sf.seg, sf.obs, sf.face, worst))
         end
