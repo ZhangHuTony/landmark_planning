@@ -19,7 +19,7 @@ All tuning parameters live in `config.yaml` at the project root. Each run writes
 
 ## Pipeline
 
-1. Build heading-aware hex graph from `start_x/y`, `goal_x/y`, and the selected landmark scenario.
+1. Build heading-aware hex graph from the selected scenario's start, goal and landmarks.
 2. Run joint discrete A* (`joint_astar`) for support + primary paths.
 3. Run continuous B-spline refinement to minimize primary path length while enforcing uncertainty and curvature constraints.
 
@@ -31,10 +31,9 @@ All parameters are set in `config.yaml`. The most commonly changed ones are desc
 
 | Key | Default | Effect |
 |---|---|---|
-| `landmark_scenario` | `shoreline` | Landmark layout: `single`, `dual`, `clustered`, `shoreline` |
+| `landmark_scenario` | `dual` | Name of a scenario in `src/scenario_generation.jl` (landmarks + obstacles + endpoints), or `manual` to define one inline — see [Scenarios](#scenarios) |
 | `num_agents` | `2` | Total agents including the primary (last index) |
 | `astar_mode` | `threshold` | `threshold`: stop on first feasible path; `limit`: collect full Pareto front |
-| `start_x/y`, `goal_x/y` | `(0,0)→(1000,0)` | Mission endpoints in meters |
 
 ### Uncertainty thresholds
 
@@ -96,7 +95,9 @@ Practical guidance: start with relaxed disabled. Enable with a small δ if searc
 
 ### Static obstacles
 
-Hard no-go **convex-polygon** regions (set in `config/main.yaml`), enforced as a **chance-constrained feasibility filter inside the discrete joint A\***: a joint search state is rejected if any agent's belief has too high a collision probability. This is a pure feasibility check — obstacles never enter the measurement model and never modify covariance propagation. (Continuous B-spline refinement is currently obstacle-unaware.)
+Hard no-go **convex-polygon** regions. Geometry is part of the **scenario**
+(`src/scenario_generation.jl`), not config — `config/main.yaml` holds only the
+risk/enforcement knobs below. They are enforced as a **chance-constrained feasibility filter inside the discrete joint A\***: a joint search state is rejected if any agent's belief has too high a collision probability. This is a pure feasibility check — obstacles never enter the measurement model and never modify covariance propagation. (Continuous B-spline refinement is currently obstacle-unaware.)
 
 Per agent *i* and obstacle *m*, at the state's mean μᵢ and covariance Σᵢ, the agent is **safe** iff it clears at least one polygon face *j*:
 
@@ -108,27 +109,41 @@ where the aⱼ are **unit** outward face normals, r_a the agent radius, and Σ�
 
 | Key | Default | Effect |
 |---|---|---|
-| `obstacles` | *(none)* | Convex polygons (see encoding below). Absent/empty ⇒ no obstacles, filter is a no-op. |
 | `obstacle_delta` | `0.05` | Collision-risk bound δ per (agent, obstacle) pair |
 | `agent_radius` | `0.0` | Vehicle radius r_a; inflates every obstacle face outward |
 | `obstacle_edge_samples` | `2` | Samples along each hex edge: `1` = destination node only, `2` = both endpoints, `≥3` adds interior points |
+| `obstacle_continuous` | `true` | Also enforce avoidance in the continuous B-spline stage (MINVO-hull constraint) |
 
-**Encoding** — a flat one-line string (the parser stores it verbatim; the planner parses it): vertices `x,y` separated by `;`, polygons by `|`, with an optional per-polygon location covariance after `@` as `sxx,sxy,syx,syy` (row-major). Polygons must be **convex** — a non-convex polygon errors out (convex decomposition is out of scope). Φ⁻¹ is computed in-repo (Acklam's rational approximation), since `Distributions`/`StatsFuns` are not installed.
-
-```yaml
-obstacles: 200,-40; 260,-40; 260,40; 200,40 | 400,10; 460,10; 430,70 @ 4,0,0,4
-```
+Polygons must be **convex** — `build_obstacle` errors on a non-convex one (convex decomposition is out of scope) — and may carry an optional location covariance `Σo` (default zero, i.e. exactly known). Φ⁻¹ is computed in-repo (Acklam's rational approximation), since `Distributions`/`StatsFuns` are not installed.
 
 Obstacles are drawn as filled gray polygons on every planner figure. See `test_obstacles.jl` for the predicate's validation checks.
 
-### Landmark scenarios
+### Scenarios
 
-| `landmark_scenario` | Landmarks | Notes |
+A scenario bundles **landmarks + obstacles + start/goal**. All of them are defined in `src/scenario_generation.jl`'s `SCENARIOS` table; `config/main.yaml` only names one via `landmark_scenario:` (overridable per run with the `SCENARIO` env var).
+
+| `landmark_scenario` | Start → goal | Contents |
 |---|---|---|
-| `single` | 1 at (600, −250) | Minimal observation geometry |
-| `dual` | 2 at (700, 200) and (750, −250) | Off-axis placement creates incentive to deviate from shortest path |
-| `clustered` | 3 near (700, −200) | Tests behaviour when all fixes come from one region |
-| `shoreline` | 5 along y ≈ −220 to −300 | Simulates a shoreline; provides cross-track observability |
+| `single` | (0,0) → (1000,0) | 1 landmark at (600, −250); no obstacles. Minimal observation geometry |
+| `dual` | (0,0) → (1000,0) | 2 landmarks at (700, 200) / (750, −250) + a box and an uncertain-location triangle. Off-axis placement creates incentive to deviate from shortest path |
+| `clustered` | (0,0) → (1000,0) | 3 landmarks near (700, −200); no obstacles. All fixes come from one region |
+| `shoreline` | (0,0) → (1000,0) | 5 landmarks along y ≈ −200…−300; no obstacles. Cross-track observability |
+| `two_routes` | (0,0) → (1200,0) | A central island splits the corridor: short blind route (south) vs longer landmark-rich route (north). Feeds the Pareto front two genuinely different trade-offs |
+| `gauntlet` | (0,0) → (1200,0) | Three staggered walls force a down-up-down weave, with a landmark in each gap. Tightest curvature test |
+| `behind_wall` | (0,0) → (1000,0) | The only landmark sits ~300 m off-route below a 500 m wall; a fix requires going around an end |
+| `long_sparse` | (0,0) → (1800,0) | 1800 m of dead reckoning, 2 distant landmarks, no obstacles. Straight-line terminal uncertainty exceeds the threshold, so both must be visited. Slowest to run |
+
+**Defining one inline instead.** Set `landmark_scenario: manual` and give the geometry directly in `config/main.yaml` as flat strings — vertices/points `x,y`, obstacle vertices separated by `;`, items by `|`, with an optional covariance after `@` as `sxx,sxy,syx,syy` (row-major). A landmark with no `@` gets a random SPD covariance. Anything omitted is empty.
+
+```yaml
+landmark_scenario: manual
+start: 0,0
+goal: 1000,0
+landmarks: 700,200 | 750,-250 @ 1.2,0,0,0.8
+obstacles: 200,-150; 260,-150; 260,-100; 200,-100 | 400,60; 460,60; 430,120 @ 4,0,0,4
+```
+
+**Corridor limits.** `build_hex_graph` pads ±260 m about y=0 and lands rows on multiples of `1.5·hex_r`, so at the default `hex_width_m: 100` the reachable rows are y ∈ {−433.0, −346.4, −259.8, −173.2, −86.6, 0, 86.6, 173.2, 259.8}. A wall meant to *block* a route must cover a whole row: hex edges are sampled only at `obstacle_edge_samples` points, so a wall thinner than the 86.6 m row spacing can be stepped over.
 
 ## A* collection modes
 

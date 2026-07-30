@@ -12,9 +12,11 @@ include(joinpath(_ROOT, "src", "config.jl"))
 include(joinpath(_ROOT, "src", "obstacles.jl"))
 include(joinpath(_ROOT, "src", "minvo.jl"))
 include(joinpath(_ROOT, "src", "graph.jl"))
+# Must follow obstacles.jl (build_obstacle) + graph.jl (Landmark): it builds the
+# active scenario and materializes `const OBSTACLES` from it.
+include(joinpath(_ROOT, "src", "scenario_generation.jl"))
 include(joinpath(_ROOT, "src", "covariance.jl"))
 include(joinpath(_ROOT, "src", "viz.jl"))
-include(joinpath(_ROOT, "src", "scenario_generation.jl"))
 include(joinpath(_ROOT, "src", "analysis.jl"))
 # Include each engine source once. Alias planners (straight_cont, discrete_only)
 # resolve to hexspline_cl.jl, which defines their plan_* entry points too.
@@ -37,11 +39,13 @@ for name in unique(vcat(engine_of.(ALGORITHMS), ALGORITHMS))
 end
 
 # ── Scenario + graph (shared across every selected planner) ──
-const RUN_SCENARIO = Symbol(get(ENV, "SCENARIO", string(LANDMARK_SCENARIO)))
-landmarks = make_scattered_landmarks(RUN_SCENARIO)
-START_POS, GOAL_POS = scenario_endpoints(RUN_SCENARIO)
-scenario = (landmarks=landmarks, start=START_POS, goal=GOAL_POS)
-println("Landmark scenario: $(RUN_SCENARIO) — $(length(landmarks)) landmarks")
+# Landmarks, obstacles and start/goal all come from the one scenario definition
+# in src/scenario_generation.jl (config only names it).
+scenario = ACTIVE_SCENARIO
+landmarks = scenario.landmarks
+START_POS, GOAL_POS = scenario.start, scenario.goal
+println("Landmark scenario: $(LANDMARK_SCENARIO) — $(length(landmarks)) landmarks, " *
+        "$(length(scenario.obstacles)) obstacles, start $(START_POS) → goal $(GOAL_POS)")
 
 # Serialize the exact landmark field (positions + covariances) so the Monte
 # Carlo consistency stage reproduces it without re-seeding the RNG generator.

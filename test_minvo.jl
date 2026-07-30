@@ -14,6 +14,9 @@ const CFG = Dict{String,Any}(
     "obstacle_edge_samples" => 2,
 )
 include(joinpath(@__DIR__, "src", "obstacles.jl"))
+# Obstacle geometry comes from the scenario (src/scenario_generation.jl), which
+# needs the whole graph/Landmark stack — stub the field minvo.jl reads.
+const OBSTACLES = parse_obstacles(CFG["obstacles"])
 
 # Constants + pure B-spline helpers that minvo.jl references at runtime (they
 # live in planners/hexspline_cl.jl, too heavy to include standalone — copied

@@ -4,9 +4,29 @@
 # dict at load time (flat key:value only — see src/config.jl).
 
 # Mission setup
-landmark_scenario: dual
+#   landmark_scenario: names a scenario defined in src/scenario_generation.jl —
+#     landmarks, obstacles AND start/goal all live there, not here. Available:
+#       single | dual | clustered | shoreline   (landmark layouts, baselines)
+#       two_routes    two homotopies: short blind route vs long informative one
+#       gauntlet      staggered walls forcing a down-up-down weave, landmarks in the gaps
+#       behind_wall   the only landmark is hidden behind a wall; detour or no fix
+#       long_sparse   1400 m corridor, two sparse landmarks (slowest: big A* space)
+#     Overridable per run with the SCENARIO env var.
+#   `manual` instead defines a scenario inline, right here — set start, goal,
+#   landmarks and obstacles (see the encodings below); anything omitted is empty.
+landmark_scenario: long_sparse
 num_agents: 2
 algorithms: hexspline_cl
+
+# Inline scenario geometry — read ONLY when landmark_scenario: manual.
+#   start / goal: "x,y"
+#   landmarks: "x,y" sep by '|', optional location covariance after '@' as
+#     "sxx,sxy,syx,syy" (omitted ⇒ a random SPD covariance).
+#   obstacles: same encoding as below (CONVEX polygons).
+# start: 0,0
+# goal: 1000,0
+# landmarks: 700,200 | 750,-250 @ 1.2,0,0,0.8
+# obstacles: 200,-150; 260,-150; 260,-100; 200,-100 | 400,60; 460,60; 430,120 @ 4,0,0,4
 
 # Physical / sensor model
 dir_uncertainty_per_meter: 0.05
@@ -29,18 +49,16 @@ comm_fusion: ci   # inter-agent fusion rule: ci (Covariance Intersection, sound)
 hex_width_m: 100.0
 hex_padding: 2
 
-# Static obstacles — chance-constrained no-go regions (discrete A* filter +
-# continuous B-spline MINVO constraint; obstacles never touch the covariance/
-# measurement model).
+# Static obstacles — RISK/enforcement knobs only. The obstacle *geometry* is part
+# of the scenario (src/scenario_generation.jl), not config. Chance-constrained
+# no-go regions: discrete A* filter + continuous B-spline MINVO constraint;
+# obstacles never touch the covariance/measurement model.
 #   obstacle_delta: risk bound per (agent, obstacle) pair. Union bound:
 #     P(any collision) ≤ Σδ over all P·M pairs, so set δ = Δ/(P·M) for a total
 #     budget Δ. z = Φ⁻¹(1−δ) inflates each face by z·√(aⱼᵀ(Σ+Σₒ)aⱼ).
 #   agent_radius: vehicle radius r_a, inflates every obstacle face outward.
 #   obstacle_edge_samples: samples along each hex edge (1 = destination node
 #     only; 2 = both endpoints; ≥3 adds interior points).
-#   obstacles: CONVEX polygons only. Encoding — vertices "x,y" sep by ';',
-#     polygons by '|', optional per-polygon location cov after '@' as
-#     "sxx,sxy,syx,syy" (default zero). Absent/empty ⇒ no obstacles.
 #   obstacle_continuous: also enforce avoidance in the continuous B-spline stage
 #     (MINVO-hull chance constraint; each segment committed to the face the
 #     discrete seed rounded). false ⇒ discrete-only, no continuous enforcement.
@@ -48,7 +66,6 @@ obstacle_delta: 0.05
 agent_radius: 0.0
 obstacle_edge_samples: 2
 obstacle_continuous: true
-obstacles: 200,-150; 260,-150; 260,-100; 200,-100 | 400,60; 460,60; 430,120 @ 4,0,0,4
 
 # Output
 track_comm_events: true

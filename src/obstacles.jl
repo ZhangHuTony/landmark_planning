@@ -157,15 +157,13 @@ function segment_obstacle_free(μprev::NTuple{2,Float64}, μdest::NTuple{2,Float
     return true
 end
 
-# ── Config-materialized constants (safe empty defaults ⇒ zero behavior change
-#    for scenarios with no `obstacles:` key). ──
+# ── Config-materialized RISK constants. Obstacle *geometry* is not config: it is
+#    part of the scenario, so `const OBSTACLES` is materialized by
+#    src/scenario_generation.jl (included after this file) from the active
+#    scenario. Standalone users of this file (test_obstacles.jl, test_minvo.jl)
+#    define their own OBSTACLES stub. ──
 const OBSTACLE_DELTA        = Float64(get(CFG, "obstacle_delta", 0.05))   # risk per (agent, obstacle) pair
 const OBSTACLE_Z            = norminv(1.0 - OBSTACLE_DELTA)                # Φ⁻¹(1−δ), computed once
 const AGENT_RADIUS          = Float64(get(CFG, "agent_radius", 0.0))
 const OBSTACLE_EDGE_SAMPLES = Int(get(CFG, "obstacle_edge_samples", 2))
-# Scenario-specific `obstacles_<scenario>` wins over the generic `obstacles`, so
-# every scenario's geometry can sit in main.yaml at once and `landmark_scenario`
-# selects one. ENV override mirrors SCENARIO.
-const OBSTACLES             = parse_obstacles(String(get(ENV, "OBSTACLES",
-    get(CFG, "obstacles_$(LANDMARK_SCENARIO)", get(CFG, "obstacles", "")))))
 @assert OBSTACLE_EDGE_SAMPLES ≥ 1 "obstacle_edge_samples must be ≥ 1"

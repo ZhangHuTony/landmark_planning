@@ -14,7 +14,7 @@ julia planner.jl path/to/other_config.yaml
 
 Julia 1.12+ is required (installed at `~/.juliaup/bin/julia`). Required packages (`Plots`, `DataStructures`) are pre-installed in the default environment. The script has no `Project.toml`; it relies on the global depot. Config parsing is a hand-rolled line parser (no YAML package dependency).
 
-Scenario is chosen via `landmark_scenario` in `config.yaml`, overridable with the `SCENARIO` env var: `single | dual | clustered | shoreline`. See `README.md` for the full config reference.
+Scenario is chosen via `landmark_scenario` in `config.yaml`, overridable with the `SCENARIO` env var: `single | dual | clustered | shoreline | two_routes | gauntlet | behind_wall | long_sparse | manual`. See `README.md` for the full config reference.
 
 ## Architecture
 
@@ -60,7 +60,7 @@ All parameters live in `config.yaml`; `planner.jl` just reads `CFG[...]` into `c
 | `cont_opt_iters`, `cont_opt_lr` | Continuous optimizer budget and learning rate |
 | `hex_width_m` | Hex cell size; controls graph resolution |
 
-Start/goal positions are baked into `scenario_endpoints` in `planner.jl` per scenario, not config.
+Scenarios own their landmarks, obstacles AND start/goal — all defined in `SCENARIOS` in `src/scenario_generation.jl`, not config. Config only names one (`landmark_scenario:`), or defines one inline with `landmark_scenario: manual`.
 
 ## Outputs
 

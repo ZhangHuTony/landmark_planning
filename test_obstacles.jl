@@ -9,6 +9,9 @@ const CFG = Dict{String,Any}(
     "obstacle_edge_samples" => 2,
 )
 include(joinpath(@__DIR__, "src", "obstacles.jl"))
+# Obstacle geometry comes from the scenario (src/scenario_generation.jl), which
+# needs the whole graph/Landmark stack — stub the field the edge sampler reads.
+const OBSTACLES = parse_obstacles(CFG["obstacles"])
 
 # ── norminv (Acklam) self-check ──
 @assert abs(norminv(0.5)) < 1e-9
