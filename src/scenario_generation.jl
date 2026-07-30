@@ -128,6 +128,50 @@ const SCENARIOS = Dict{Symbol, Function}(
                                build_obstacle([(300.0,-210.0), (700.0,-210.0), (700.0,-130.0), (300.0,-130.0)])],
                            start = (0.0, 0.0), goal = (1000.0, 0.0)),
 
+    # MAZE. Three full-height walls, each with TWO gaps at different rows, plus
+    # five plugs so no chamber has a straight shot: the corridor becomes a set of
+    # narrow passages instead of open space. Two homotopies survive, each with two
+    # landmarks — north (L1 in A's high gap, L4 in the upper middle chamber) is
+    # shorter; south (L2 in B's low gap, L3 in C's low gap) is a longer weave. That
+    # is the distance-vs-uncertainty trade :two_routes failed to produce (there the
+    # cheap side was infeasible, so the front collapsed to one seed).
+    #
+    # Wall geometry is pinned to the lattice, not eyeballed. At hex_width_m: 100 the
+    # rows are the y values in the header comment, and node x depends on row parity:
+    # rows {-346.4,-173.2,0,173.2} sit at x ≡ 0 (mod 100), rows
+    # {-433,-259.8,-86.6,86.6,259.8} at x ≡ 50. So a vertical wall must span ≥150 m
+    # in x to cover one column of EACH parity — a narrower one is stepped around on
+    # the offset row. All three span 150 m. Gaps are the y-bands left uncovered;
+    # since hex moves never skip a row, covering a row's band blocks it outright.
+    #
+    # Tuning knob: if both routes come out infeasible under unc_radius_threshold
+    # (~1500-1800 m of arc here), drop the landmark scale *2 → *1 for stronger fixes.
+    :maze => () -> (landmarks = Landmark[
+                        Landmark(250.0,  173.2, random_landmark_cov() * 2),  # L1, wall A high gap
+                        Landmark(590.0, -259.8, random_landmark_cov() * 2),  # L2, wall B low gap
+                        Landmark(930.0, -346.4, random_landmark_cov() * 2),  # L3, wall C low gap
+                        Landmark(830.0,  173.2, random_landmark_cov() * 2)], # L4, upper middle chamber
+                    obstacles = Obstacle[
+                        # Wall A, x ∈ [175,325] — gaps at rows 173.2 and -86.6
+                        build_obstacle([(175.0, 216.5), (325.0, 216.5), (325.0, 340.0), (175.0, 340.0)]),
+                        build_obstacle([(175.0, -43.3), (325.0, -43.3), (325.0, 129.9), (175.0, 129.9)]),
+                        build_obstacle([(175.0,-520.0), (325.0,-520.0), (325.0,-129.9), (175.0,-129.9)]),
+                        # Wall B, x ∈ [515,665] — gaps at rows 259.8 and -259.8
+                        build_obstacle([(515.0,-216.5), (665.0,-216.5), (665.0, 216.5), (515.0, 216.5)]),
+                        build_obstacle([(515.0,-520.0), (665.0,-520.0), (665.0,-303.1), (515.0,-303.1)]),
+                        # Wall C, x ∈ [855,1005] — gaps at rows 0 and -346.4
+                        build_obstacle([(855.0,  43.3), (1005.0,  43.3), (1005.0, 340.0), (855.0, 340.0)]),
+                        build_obstacle([(855.0,-303.1), (1005.0,-303.1), (1005.0, -43.3), (855.0, -43.3)]),
+                        build_obstacle([(855.0,-520.0), (1005.0,-520.0), (1005.0,-389.7), (855.0,-389.7)]),
+                        # Chamber plugs: each kills a cell or two (named in the trailing
+                        # comment), forcing a row change mid-chamber rather than sealing
+                        # it. Each is offset ≥1 free column from the wall it follows, so
+                        # a gap always keeps an onward move; if a run comes back with no
+                        # path at all, a plug swallowing its gap's exit is the first
+                        # thing to check.
+                        build_obstacle([(1050.0,-216.5), (1150.0,-216.5), (1150.0,-129.9), (1050.0,-129.9)])], # (1100,-173.2)
+                    start = (0.0, 0.0), goal = (1200.0, 0.0)),
+
     # LONG SPARSE CORRIDOR. 1400 m with only two landmarks, one per side: long
     # stretches of pure dead reckoning punctuated by single fixes. A blind
     # straight line drifts to ~10 (vs `unc_radius_threshold: 7`), so both fixes

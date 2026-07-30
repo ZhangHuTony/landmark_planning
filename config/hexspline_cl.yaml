@@ -21,7 +21,7 @@ prune_by_primary_uncertainty: false
 prune_by_support_uncertainty: false
 
 # A* parameters
-astar_iteration_limit: 500000
+astar_iteration_limit: 2500000
 straight_cont_primary_wpts: 11
 support_idle_penalty: 30.0
 support_plot_offset_m: 3.0
@@ -37,7 +37,7 @@ cont_conv_tol: 1.0e-3
 cont_unc_use_waypoints: true
 cont_barrier_start: 20.0
 cont_barrier_decay: 0.35
-cont_barrier_stages: 4
+cont_barrier_stages: 10
 cont_linesearch_shrink: 0.5
 cont_min_improvement: 1.0e-6
 # Removed: cont_smooth_penalty / cont_barrier_hard_penalty. The smoothing phase

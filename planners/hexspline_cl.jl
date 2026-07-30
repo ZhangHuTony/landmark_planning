@@ -280,6 +280,35 @@ function pad_support_paths_to_primary(support_paths::Vector{Vector{Int}}, primar
     return [pad_path_to_length(path, target_len) for path in support_paths]
 end
 
+# THE discrete-seed → B-spline control-point map. Node centres, supports padded to
+# the primary's waypoint count, and the primary's last waypoint pinned to the exact
+# goal (it ends on the goal *cell*, whose centre drifts off the goal). Padding is
+# idempotent, so this is safe on already-padded paths. Shared by optimize_continuous
+# and the seed gate below — they must see the same spline or the gate proves nothing.
+function seed_control_points(agent_paths::Vector{Vector{Int}}, graph::LandmarkGraph)
+    na = length(agent_paths)
+    paths = na == 1 ? agent_paths :
+            vcat(pad_support_paths_to_primary(agent_paths[1:na-1], agent_paths[na]), [agent_paths[na]])
+    ctrls = [[(graph.landmarks[i].x, graph.landmarks[i].y) for i in p] for p in paths]
+    ctrls[na][end] = (graph.landmarks[graph.n].x, graph.landmarks[graph.n].y)
+    return ctrls
+end
+
+# Does this goal candidate survive as a SPLINE? The discrete filter only tests the
+# straight polyline between hex centres (src/obstacles.jl); the refined B-spline cuts
+# those corners off, so a polyline-clean seed can still enter an obstacle. Gate every
+# goal candidate on the same committed-face MINVO test the continuous stage enforces
+# (src/minvo.jl), at the same control points and the same Σ — so a candidate that
+# passes here starts the barrier phase already feasible on its obstacle rows.
+# Costs one evaluate_joint_discrete per goal pop, and only in obstacle scenarios.
+function seed_spline_clear(agent_paths::Vector{Vector{Int}}, graph::LandmarkGraph,
+                           lms::Vector{Landmark})
+    (isempty(OBSTACLES) || !OBSTACLE_CONTINUOUS) && return true
+    ctrls = seed_control_points(agent_paths, graph)
+    covs, _, _, _ = evaluate_joint_discrete(ctrls, lms, length(ctrls))
+    return obstacles_clear(build_obstacle_plan(ctrls, SPLINE_DEGREE), ctrls, covs)
+end
+
 # ==========================================================================
 # Joint A* over all agents simultaneously
 # ==========================================================================
@@ -461,6 +490,18 @@ function apply_joint_step_comms(covs::Vector{Matrix{Float64}},
     return updated
 end
 
+# Single-line A* status bar: iterations done, iterations left, elapsed. Rewrites
+# the same line with \r, so every search loop that calls it must println() once on
+# exit to release the line. Plain print + flush — ProgressMeter is not installed
+# and this is the whole feature.
+const ASTAR_PROGRESS_EVERY = 1000
+@inline function astar_progress(iter::Int, limit::Int, t0::Float64)
+    mod(iter, ASTAR_PROGRESS_EVERY) == 0 || return
+    print("\r  [A*] iter $iter/$limit ($(round(100 * iter / limit, digits=1))%)  " *
+          "left=$(max(0, limit - iter))  elapsed=$(round(time() - t0, digits=1))s   ")
+    flush(stdout)
+end
+
 # ------------------------------------------------------------------
 # Constraint-Aware A* Search
 # ------------------------------------------------------------------
@@ -520,6 +561,7 @@ function joint_astar(graph::LandmarkGraph,
         enqueue!(pq_sa, 1, (w_astar * h0, unc_radius(states_sa[1].cov)))
 
         iter_count_sa = 0
+        t0 = time()
 
         # Node-level Pareto frontier with SOUND covariance dominance.
         # Keep labels (distance, covariance) and only prune when an existing
@@ -531,10 +573,11 @@ function joint_astar(graph::LandmarkGraph,
             si = dequeue!(pq_sa)
             S = states_sa[si]
             iter_count_sa += 1
+            astar_progress(iter_count_sa, ASTAR_ITERATION_LIMIT, t0)
 
             popped_unc = unc_radius(S.cov)
             if PRUNE_BY_PRIMARY_UNCERTAINTY && unc_exceeds_threshold(popped_unc, unc_threshold, UNC_FEAS_TOL)
-                println("  [Constraint A*] Pruned state at iter $iter_count_sa: node=$(S.node), primary_unc=$(round(popped_unc, digits=4)) > threshold=$(round(unc_threshold, digits=4))")
+                println("\n  [Constraint A*] Pruned state at iter $iter_count_sa: node=$(S.node), primary_unc=$(round(popped_unc, digits=4)) > threshold=$(round(unc_threshold, digits=4))")
                 continue
             end
 
@@ -550,12 +593,17 @@ function joint_astar(graph::LandmarkGraph,
                 exact_covs, exact_dists = evaluate_full_paths([path], graph, lms, 1)
                 exact_unc = unc_radius(exact_covs[1])
                 if unc_within_threshold(exact_unc, unc_threshold, UNC_FEAS_TOL)
+                    if !seed_spline_clear([path], graph, lms)
+                        println("\n  [Constraint A*] Goal popped, unc OK, but its B-spline breaches an obstacle; discarded.")
+                        continue
+                    end
+                    println()   # release the status-bar line
                     println("  ✓ FEASIBLE SOLUTION at iter $iter_count_sa: dist=$(round(exact_dists[1], digits=3)), unc=$(round(exact_unc, digits=4))")
                     println("  [Constraint A*] Single-agent complete: $(iter_count_sa) iterations, final_dist=$(round(exact_dists[1], digits=3))")
                     return [path], [exact_dists[1]], exact_unc, iter_count_sa
                 end
 
-                println("  [Constraint A*] Goal popped but infeasible under exact eval: unc=$(round(exact_unc, digits=4))")
+                println("\n  [Constraint A*] Goal popped but infeasible under exact eval: unc=$(round(exact_unc, digits=4))")
                 continue
             end
 
@@ -607,6 +655,7 @@ function joint_astar(graph::LandmarkGraph,
             end
         end
 
+        println()   # release the status-bar line
         println("  [Constraint A*] No feasible single-agent solution found")
         return [Int[]], [0.0], Inf, iter_count_sa
     end
@@ -702,14 +751,16 @@ function joint_astar(graph::LandmarkGraph,
         return plt
     end
 
+    t0 = time()
     while !isempty(pq) && iter_count < ASTAR_ITERATION_LIMIT
         si  = dequeue!(pq)
         S   = states[si]
         iter_count += 1
+        astar_progress(iter_count, ASTAR_ITERATION_LIMIT, t0)
 
         popped_unc = unc_radius(S.covs[primary])
         if PRUNE_BY_PRIMARY_UNCERTAINTY && unc_exceeds_threshold(popped_unc, unc_threshold, UNC_FEAS_TOL)
-            println("  [Constraint A*] Pruned joint state at iter $iter_count: primary_unc=$(round(popped_unc, digits=4)) > threshold=$(round(unc_threshold, digits=4))")
+            println("\n  [Constraint A*] Pruned joint state at iter $iter_count: primary_unc=$(round(popped_unc, digits=4)) > threshold=$(round(unc_threshold, digits=4))")
             continue
         end
 
@@ -732,15 +783,6 @@ function joint_astar(graph::LandmarkGraph,
             end
         end
 
-        # Progress update early; when animation is enabled, match the console cadence
-        # to the animation sampling period so logs align with plotted frames.
-        progress_every = animate_enabled ? animate_sample_period : 100
-        if iter_count <= 5 || mod(iter_count, progress_every) == 0
-            prim_node = isempty(S.paths[primary]) ? 0 : S.paths[primary][end]
-            prim_h = isinf(graph.shortest_paths[prim_node, goal]) ? "∞" : "$(round(graph.shortest_paths[prim_node, goal], digits=1))"
-            #println("  [Constraint A*] Iter $iter_count, prim_node=$prim_node, h=$prim_h, queue_size=$(length(pq))")
-        end
-
         # Standard A* ordering uses f only for priority; no incumbent pruning.
         h = joint_heuristic(S.paths, goal, graph)
         f = S.g + w_astar * h
@@ -752,6 +794,11 @@ function joint_astar(graph::LandmarkGraph,
             exact_covs, exact_dists = evaluate_full_paths(agent_paths, graph, lms, na)
             exact_unc = unc_radius(exact_covs[primary])
             if unc_within_threshold(exact_unc, unc_threshold, UNC_FEAS_TOL)
+                if !seed_spline_clear(agent_paths, graph, lms)
+                    #println("\n  [Constraint A*] Goal popped, unc OK, but its B-spline breaches an obstacle; discarded.")
+                    continue
+                end
+                println()   # release the status-bar line
                 println("  ✓ FEASIBLE SOLUTION at iter $iter_count: dist=$(round(exact_dists[primary], digits=3)), unc=$(round(exact_unc, digits=4))")
                 println("  [Constraint A*] Complete: $(iter_count) iterations, final_dist=$(round(exact_dists[primary], digits=3))")
                 # Save collected debug frames before this early return (bypasses the end-of-function save below).
@@ -762,7 +809,7 @@ function joint_astar(graph::LandmarkGraph,
                 end
                 return agent_paths, exact_dists, exact_unc, iter_count
             else
-                println("  [Constraint A*] Goal popped but infeasible under exact eval: unc=$(round(exact_unc, digits=4)) > $(round(unc_threshold, digits=4))")
+                #println("  [Constraint A*] Goal popped but infeasible under exact eval: unc=$(round(exact_unc, digits=4)) > $(round(unc_threshold, digits=4))")
             end
             continue
         end
@@ -897,6 +944,7 @@ function joint_astar(graph::LandmarkGraph,
     end
 
     # ── No feasible goal reached ──────────────────────────────────────────────
+    println()   # release the status-bar line
     println("  [Constraint A*] No feasible solution found")
     return [Int[] for _ in 1:na], zeros(na), Inf, iter_count
 end
@@ -936,16 +984,24 @@ function joint_astar_collect(graph::LandmarkGraph,
 
         iter_count_sa = 0
         collected = []
+        spline_rejects = 0
+        t0 = time()
         while !isempty(pq_sa) && iter_count_sa < max_iters
             si = dequeue!(pq_sa)
             S = states_sa[si]
             iter_count_sa += 1
+            astar_progress(iter_count_sa, max_iters, t0)
 
             if is_goal_cell[S.node]
                 path = Int[]; psi = si
                 while psi != -1
                     pushfirst!(path, states_sa[psi].node)
                     psi = states_sa[psi].parent
+                end
+                # Spline-level obstacle gate — see seed_spline_clear.
+                if !seed_spline_clear([path], graph, lms)
+                    spline_rejects += 1
+                    continue
                 end
                 exact_covs, exact_dists = evaluate_full_paths([path], graph, lms, 1)
                 exact_unc = unc_radius(exact_covs[1])
@@ -990,6 +1046,8 @@ function joint_astar_collect(graph::LandmarkGraph,
             end
         end
 
+        println()   # release the status-bar line
+        spline_rejects > 0 && println("  [Collector] $spline_rejects goal candidate(s) discarded: B-spline breaches an obstacle")
         return collected
     end
 
@@ -1013,14 +1071,20 @@ function joint_astar_collect(graph::LandmarkGraph,
 
     iter_count = 0
     collected = []
+    spline_rejects = 0
+    t0 = time()
 
     while !isempty(pq) && iter_count < max_iters
         si = dequeue!(pq); S = states[si]; iter_count += 1
-
-        mod(iter_count, 10000) == 0 && println("  A* iter $iter_count")
+        astar_progress(iter_count, max_iters, t0)
 
         if is_goal_cell[S.paths[primary][end]]
             agent_paths = [copy(S.paths[a]) for a in 1:na]
+            # Spline-level obstacle gate — see seed_spline_clear.
+            if !seed_spline_clear(agent_paths, graph, lms)
+                spline_rejects += 1
+                continue
+            end
             exact_covs, exact_dists = evaluate_full_paths(agent_paths, graph, lms, na)
             exact_unc = unc_radius(exact_covs[primary])
             push!(collected, (agent_paths, exact_dists[primary], exact_unc, iter_count))
@@ -1104,6 +1168,8 @@ function joint_astar_collect(graph::LandmarkGraph,
         expand_joint_moves(1, S.dists[primary])
     end
 
+    println()   # release the status-bar line
+    spline_rejects > 0 && println("  [Collector] $spline_rejects goal candidate(s) discarded: B-spline breaches an obstacle")
     return collected
 end
 
@@ -1148,15 +1214,12 @@ function optimize_continuous(paths::Vector{Vector{Int}}, graph::LandmarkGraph, l
         all_agent_wpts[n_agents] = prim_wpts
         is_primary_mask[n_agents] = true
     else
-        for (ai, path) in enumerate(paths)
-            all_agent_wpts[ai] = [(graph.landmarks[i].x, graph.landmarks[i].y) for i in path]
+        # Same builder the discrete seed gate uses (seed_spline_clear), so the spline
+        # checked at goal-pop time is byte-for-byte the spline refined here.
+        all_agent_wpts = seed_control_points(paths, graph)
+        for ai in eachindex(paths)
             is_primary_mask[ai] = (ai == length(paths))
         end
-        # Primary now terminates at the goal cell (not the terminal node), so its last
-        # waypoint is the cell centre.  Override to exact goal_pos so the B-spline is
-        # pinned to the true goal regardless of cell-centre drift.
-        prim = length(paths)
-        all_agent_wpts[prim][end] = (graph.landmarks[graph.n].x, graph.landmarks[graph.n].y)
     end
 
     # Count free variables

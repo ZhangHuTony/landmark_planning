@@ -10,11 +10,12 @@
 #       two_routes    two homotopies: short blind route vs long informative one
 #       gauntlet      staggered walls forcing a down-up-down weave, landmarks in the gaps
 #       behind_wall   the only landmark is hidden behind a wall; detour or no fix
+#       maze          13 obstacles, three double-gapped walls + plugs; two homotopies
 #       long_sparse   1400 m corridor, two sparse landmarks (slowest: big A* space)
 #     Overridable per run with the SCENARIO env var.
 #   `manual` instead defines a scenario inline, right here — set start, goal,
 #   landmarks and obstacles (see the encodings below); anything omitted is empty.
-landmark_scenario: long_sparse
+landmark_scenario: maze
 num_agents: 2
 algorithms: hexspline_cl
 

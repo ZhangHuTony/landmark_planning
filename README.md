@@ -78,6 +78,38 @@ Practical guidance: start with relaxed disabled. Enable with a small δ if searc
 | `min_turn_radius_m` | `40.0` | Minimum AUV turn radius (curvature constraint) |
 | `cont_opt_h` | `1e-4` | Finite-difference step for gradient |
 
+#### Curvature: what the discrete seed does and does not guarantee
+
+The refinement stage constrains `κ ≤ 1/min_turn_radius_m` on every sampled point
+of every agent's spline. The discrete stage is *usually* already inside that
+bound — the hex graph is heading-aware and turns at most ±60° per step, and for
+a control polygon of uniform legs of length `L` the splined turn peaks at
+`κ·L ≈ 1.36` regardless of the route. So seeds satisfy curvature **iff**
+
+```
+hex_width_m  ≳  1.4 · min_turn_radius_m        (100 vs 56 at the defaults)
+```
+
+**This is a scaling law, not a structural guarantee, and it has three gaps:**
+
+1. **Retuning breaks it silently.** Shrinking `hex_width_m` or raising
+   `min_turn_radius_m` past that ratio makes *every* seed curvature-infeasible.
+   Nothing asserts the ratio — the violation surfaces only as a refinement that
+   spends its budget on recovery.
+2. **The primary's final leg is not a full hex step.** The primary path ends on
+   the goal *cell*, and its last waypoint is overridden to the exact goal
+   position (`seed_control_points`), so the final leg is `1 hex step ± hex_r`.
+   Measured on a synthetic ±60° seed, a final leg at ¼ of a step pushes sampled
+   κ to 0.02–0.10 against the default limit of 0.025.
+3. **Short paths.** Under 4 waypoints, `bspline_pad_controls` duplicates the end
+   control points; the resulting near-zero speed makes κ blow up at the clamped
+   ends (a parameterization artifact, not a real turn, but the constraint sees it).
+
+None of the three bound in any current scenario, and the discrete stage does not
+check curvature — a spline-level check at goal pops would cost ~28 µs per
+candidate, more than the obstacle gate below, mostly re-deriving the constant
+above. If you retune the grid or the turn radius, verify the ratio first.
+
 ### Physical / sensor model
 
 | Key | Default | Effect |
@@ -97,7 +129,7 @@ Practical guidance: start with relaxed disabled. Enable with a small δ if searc
 
 Hard no-go **convex-polygon** regions. Geometry is part of the **scenario**
 (`src/scenario_generation.jl`), not config — `config/main.yaml` holds only the
-risk/enforcement knobs below. They are enforced as a **chance-constrained feasibility filter inside the discrete joint A\***: a joint search state is rejected if any agent's belief has too high a collision probability. This is a pure feasibility check — obstacles never enter the measurement model and never modify covariance propagation. (Continuous B-spline refinement is currently obstacle-unaware.)
+risk/enforcement knobs below. They are enforced as a **chance-constrained feasibility filter inside the discrete joint A\***: a joint search state is rejected if any agent's belief has too high a collision probability. This is a pure feasibility check — obstacles never enter the measurement model and never modify covariance propagation.
 
 Per agent *i* and obstacle *m*, at the state's mean μᵢ and covariance Σᵢ, the agent is **safe** iff it clears at least one polygon face *j*:
 
@@ -113,6 +145,17 @@ where the aⱼ are **unit** outward face normals, r_a the agent radius, and Σ�
 | `agent_radius` | `0.0` | Vehicle radius r_a; inflates every obstacle face outward |
 | `obstacle_edge_samples` | `2` | Samples along each hex edge: `1` = destination node only, `2` = both endpoints, `≥3` adds interior points |
 | `obstacle_continuous` | `true` | Also enforce avoidance in the continuous B-spline stage (MINVO-hull constraint) |
+
+**Edge test vs. spline test.** The filter above tests the straight polyline
+between hex centres, sampled at `obstacle_edge_samples` points — at the default
+`2`, that is the endpoints only. The refined B-spline cuts the corners off that
+polyline, so a polyline-clean seed can still enter an obstacle. Every goal
+candidate is therefore additionally gated on its **spline**
+(`seed_spline_clear`): the same committed-face MINVO test the continuous stage
+enforces, at the same control points and the same Σ, so a candidate that passes
+starts refinement already feasible on its obstacle rows. Candidates that fail are
+discarded and the search continues; the count is reported as
+`[Collector] N goal candidate(s) discarded`.
 
 Polygons must be **convex** — `build_obstacle` errors on a non-convex one (convex decomposition is out of scope) — and may carry an optional location covariance `Σo` (default zero, i.e. exactly known). Φ⁻¹ is computed in-repo (Acklam's rational approximation), since `Distributions`/`StatsFuns` are not installed.
 
@@ -131,6 +174,7 @@ A scenario bundles **landmarks + obstacles + start/goal**. All of them are defin
 | `two_routes` | (0,0) → (1200,0) | A central island splits the corridor: short blind route (south) vs longer landmark-rich route (north). Feeds the Pareto front two genuinely different trade-offs |
 | `gauntlet` | (0,0) → (1200,0) | Three staggered walls force a down-up-down weave, with a landmark in each gap. Tightest curvature test |
 | `behind_wall` | (0,0) → (1000,0) | The only landmark sits ~300 m off-route below a 500 m wall; a fix requires going around an end |
+| `maze` | (0,0) → (1200,0) | 13 obstacles: three full-height walls, each with two gaps at different rows, plus five chamber plugs so no chamber has a straight shot. Two homotopies with two landmarks each — a shorter northern one and a longer southern weave. Densest obstacle field |
 | `long_sparse` | (0,0) → (1800,0) | 1800 m of dead reckoning, 2 distant landmarks, no obstacles. Straight-line terminal uncertainty exceeds the threshold, so both must be visited. Slowest to run |
 
 **Defining one inline instead.** Set `landmark_scenario: manual` and give the geometry directly in `config/main.yaml` as flat strings — vertices/points `x,y`, obstacle vertices separated by `;`, items by `|`, with an optional covariance after `@` as `sxx,sxy,syx,syy` (row-major). A landmark with no `@` gets a random SPD covariance. Anything omitted is empty.
@@ -143,7 +187,7 @@ landmarks: 700,200 | 750,-250 @ 1.2,0,0,0.8
 obstacles: 200,-150; 260,-150; 260,-100; 200,-100 | 400,60; 460,60; 430,120 @ 4,0,0,4
 ```
 
-**Corridor limits.** `build_hex_graph` pads ±260 m about y=0 and lands rows on multiples of `1.5·hex_r`, so at the default `hex_width_m: 100` the reachable rows are y ∈ {−433.0, −346.4, −259.8, −173.2, −86.6, 0, 86.6, 173.2, 259.8}. A wall meant to *block* a route must cover a whole row: hex edges are sampled only at `obstacle_edge_samples` points, so a wall thinner than the 86.6 m row spacing can be stepped over.
+**Corridor limits.** `build_hex_graph` pads ±260 m about y=0 and lands rows on multiples of `1.5·hex_r`, so at the default `hex_width_m: 100` the reachable rows are y ∈ {−433.0, −346.4, −259.8, −173.2, −86.6, 0, 86.6, 173.2, 259.8}. A wall meant to *block* a route must cover a whole row: hex edges are sampled only at `obstacle_edge_samples` points, so a wall thinner than the 86.6 m row spacing can be stepped over. Node **x** depends on row parity — rows {−346.4, −173.2, 0, 173.2} sit at x ≡ 0 (mod 100), rows {−433, −259.8, −86.6, 86.6, 259.8} at x ≡ 50 — so a *vertical* wall must span ≥150 m in x to cover one column of each parity, or it is stepped around on the offset row (see `maze`).
 
 ## A* collection modes
 

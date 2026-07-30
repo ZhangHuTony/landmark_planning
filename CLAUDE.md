@@ -14,7 +14,7 @@ julia planner.jl path/to/other_config.yaml
 
 Julia 1.12+ is required (installed at `~/.juliaup/bin/julia`). Required packages (`Plots`, `DataStructures`) are pre-installed in the default environment. The script has no `Project.toml`; it relies on the global depot. Config parsing is a hand-rolled line parser (no YAML package dependency).
 
-Scenario is chosen via `landmark_scenario` in `config.yaml`, overridable with the `SCENARIO` env var: `single | dual | clustered | shoreline | two_routes | gauntlet | behind_wall | long_sparse | manual`. See `README.md` for the full config reference.
+Scenario is chosen via `landmark_scenario` in `config.yaml`, overridable with the `SCENARIO` env var: `single | dual | clustered | shoreline | two_routes | gauntlet | behind_wall | maze | long_sparse | manual`. See `README.md` for the full config reference.
 
 ## Architecture
 
