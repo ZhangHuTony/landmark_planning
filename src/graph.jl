@@ -124,7 +124,7 @@ function build_hex_graph(sensor_landmarks::Vector{Landmark},
 
     # Artificially expand y-extent to allow meaningful lateral planning detours.
     # Wider corridor lets the planner reach off-axis landmark clusters.
-    y_expansion = 260.0
+    y_expansion = CORRIDOR_HALFWIDTH_M
     ymin -= y_expansion
     ymax += y_expansion
 
@@ -142,9 +142,9 @@ function build_hex_graph(sensor_landmarks::Vector{Landmark},
     cells = Tuple{Int,Int}[]
     centers = Dict{Tuple{Int,Int}, Tuple{Float64,Float64}}()
     for gy in 0:grid_h-1
-        # Filter: skip rows with y > 300 and skip lowest y row (gy == 0)
+        # Filter: skip rows above CORRIDOR_Y_MAX_M and skip lowest y row (gy == 0)
         cy = y0 + gy * y_step
-        if cy > 300.0 || gy == 0
+        if cy > CORRIDOR_Y_MAX_M || gy == 0
             continue
         end
         

@@ -96,6 +96,37 @@ function plot_unc_profile(series, num_agents::Int; threshold::Union{Float64,Noth
     return plt
 end
 
+# Per-component companion to plot_unc_profile: instead of the det-based scalar,
+# plot the marginal std dev of each position component (σ_x, σ_y = sqrt of the
+# covariance diagonal) on one axes, colored by component. No threshold line —
+# the feasibility bound is det-based and doesn't apply per component.
+function plot_unc_components(series, num_agents::Int; title::String="uncertainty per component")
+    plt = plot(xlabel="distance traveled (m)", ylabel="σ (m)",
+               title=title, size=(900, 400), legend=:topleft)
+    for a in 1:num_agents
+        is_prim = a == num_agents
+        agent_lbl = is_prim ? "primary" : "support $a"
+        for (i, (name, clr)) in enumerate((("x", :blue), ("y", :darkorange)))
+            for (suffix, arcs, covs, ls, lw_primary, lw_support) in series
+                lbl = "$agent_lbl σ_$name" * (isempty(suffix) ? "" : " $suffix")
+                plot!(plt, arcs[a], [sqrt(max(c[i,i], 0.0)) for c in covs[a]],
+                      color=clr, linestyle=ls,
+                      linewidth=(is_prim ? lw_primary : lw_support), label=lbl)
+            end
+        end
+    end
+    return plt
+end
+
+# Saves both uncertainty figures from one set of series: the det-based profile
+# at base_path, and the per-component one with a "_components" suffix.
+function save_unc_figures(series, num_agents::Int, base_path::String;
+                          threshold::Union{Float64,Nothing}=nothing, title::String="uncertainty profile")
+    savefig(plot_unc_profile(series, num_agents; threshold=threshold, title=title), base_path)
+    stem, ext = splitext(base_path)
+    savefig(plot_unc_components(series, num_agents; title=title), "$(stem)_components$(ext)")
+end
+
 function overlay_comm_events!(plt, events)
     isempty(events) && return
     max_t = maximum(t for (t,_,_,_,_,_) in events)

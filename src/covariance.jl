@@ -31,9 +31,12 @@ end
 end
 
 # Inline: R * diag(sd², sp²) * R' expanded to avoid intermediate allocations
+# Q = q·Δs (random walk): variance grows linearly in arc length, so splitting a
+# segment in two gives the same total as leaving it whole. See Q_DIR_PER_M in
+# config.jl for the calibration that keeps 100 m-mesh numbers unchanged.
 @inline function growth_covariance(distance::Float64, angle::Float64)
-    sd2 = (DIR_UNCERTAINTY_PER_METER  * distance)^2
-    sp2 = (PERP_UNCERTAINTY_PER_METER * distance)^2
+    sd2 = Q_DIR_PER_M  * distance
+    sp2 = Q_PERP_PER_M * distance
     c = cos(angle); s = sin(angle)
     diff = sd2 - sp2
     return [c*c*sd2 + s*s*sp2  c*s*diff;
@@ -180,6 +183,52 @@ function propagate_segment!(covs::Vector{Matrix{Float64}},
     return cov
 end
 
+# Advance one agent along its waypoint polyline to arc position `target_arc`,
+# threading covariance. Waypoints crossed are propagated exactly as in
+# propagate_segment! (growth + landmark fusion) and written into `covs`; segment
+# lengths come from `arcs` so a segment already partly consumed is not
+# double-counted. A trailing partial hop to a mid-segment `target_arc` accrues
+# dead-reckoning growth only, no landmark update: Q is linear in arc length, so
+# stopping mid-segment leaves both the total growth and the number of landmark
+# updates along the path unchanged.
+# `idx`/`arc_in`/`pos_in` are the agent's current (possibly mid-segment) state.
+# Returns (idx, arc, pos, cov) at target_arc, clamped to the end of the path.
+function advance_to_arc!(covs::Vector{Matrix{Float64}},
+                         positions::Vector{Tuple{Float64,Float64}},
+                         arcs::Vector{Float64},
+                         lms::Vector{Landmark},
+                         idx::Int, arc_in::Float64,
+                         pos_in::Tuple{Float64,Float64},
+                         cov::Matrix{Float64},
+                         target_arc::Float64;
+                         landmark_events=nothing, agent::Int=0)
+    n = length(positions)
+    t = min(target_arc, arcs[end])
+    arc = arc_in; pos = pos_in
+    while idx < n && arcs[idx+1] <= t
+        x0, y0 = positions[idx]; x1, y1 = positions[idx+1]
+        seg = arcs[idx+1] - arc                      # unconsumed part of this segment
+        seg > 0.0 && (cov = cov + growth_covariance(seg, atan(y1 - y0, x1 - x0)))
+        I11, I12, I22 = accumulate_landmark_info(x1, y1, lms;
+                                                 landmark_events=landmark_events,
+                                                 agent=agent, arc=arcs[idx+1])
+        if I11 > 0.0 || I22 > 0.0
+            updated = kalman_info_update(cov, I11, I12, I22)
+            updated !== nothing && (cov = updated)
+        end
+        idx += 1; arc = arcs[idx]; pos = positions[idx]
+        covs[idx] = copy(cov)
+    end
+    if idx < n && t > arc
+        x0, y0 = positions[idx]; x1, y1 = positions[idx+1]
+        cov = cov + growth_covariance(t - arc, atan(y1 - y0, x1 - x0))
+        f   = (t - arcs[idx]) / (arcs[idx+1] - arcs[idx])
+        pos = (x0 + f*(x1 - x0), y0 + f*(y1 - y0))
+        arc = t
+    end
+    return idx, arc, pos, cov
+end
+
 function propagate_cov_discrete(positions::Vector{Tuple{Float64,Float64}},
                                  lms::Vector{Landmark},
                                  init_cov::Matrix{Float64};
@@ -306,8 +355,13 @@ function apply_synchronized_propagation!(agent_positions::Vector{Vector{Tuple{Fl
         end
     end
 
-    # Cursors: current waypoint index and running covariance per agent
+    # Cursors: current waypoint index, arc, position and running covariance per
+    # agent. arc/pos may sit mid-segment — every checkpoint is evaluated at the
+    # exact comm arc, so how much drift an agent is credited with at fusion time
+    # does not depend on where its waypoints happen to fall.
     cur_idx = ones(Int, na)
+    cur_arc = zeros(na)
+    cur_pos = [isempty(agent_positions[a]) ? (0.0, 0.0) : agent_positions[a][1] for a in 1:na]
     cur_cov = [copy(lms[1].cov) for _ in 1:na]
 
     max_arc   = maximum(arcs[end] for arcs in all_arcs)
@@ -316,74 +370,57 @@ function apply_synchronized_propagation!(agent_positions::Vector{Vector{Tuple{Fl
     landmark_events = Tuple{Float64,Int,Int,Float64,Tuple{Float64,Float64},Tuple{Float64,Float64}}[]
 
     for comm_time in comm_times
-        # --- Step 1: advance each agent to its nearest waypoint for this checkpoint ---
-        agent_indices = Vector{Int}(undef, na)
+        # --- Step 1: advance every agent to exactly this checkpoint arc ---
         for a in 1:na
-            nearest_idx = 1
-            min_diff = abs(all_arcs[a][1] - comm_time)
-            for i in 2:length(all_arcs[a])
-                diff = abs(all_arcs[a][i] - comm_time)
-                if diff < min_diff
-                    min_diff = diff
-                    nearest_idx = i
-                end
-            end
-            # Propagate the segment (cur_idx[a], nearest_idx] starting from cur_cov[a]
-            if nearest_idx > cur_idx[a]
-                cur_cov[a] = propagate_segment!(all_covs[a], agent_positions[a], lms,
-                                                cur_idx[a], nearest_idx, cur_cov[a];
-                                                landmark_events=landmark_events, agent=a, arcs=all_arcs[a])
-                cur_idx[a] = nearest_idx
-            end
-            agent_indices[a] = nearest_idx
+            cur_idx[a], cur_arc[a], cur_pos[a], cur_cov[a] =
+                advance_to_arc!(all_covs[a], agent_positions[a], all_arcs[a], lms,
+                                cur_idx[a], cur_arc[a], cur_pos[a], cur_cov[a], comm_time;
+                                landmark_events=landmark_events, agent=a)
         end
 
         # --- Step 2: pairwise Kalman fusion at this checkpoint (unchanged algebra) ---
         for sender in 1:na
-            idx_s = agent_indices[sender]
-            pos_s = agent_positions[sender][idx_s]
+            pos_s = cur_pos[sender]
             for receiver in sender+1:na
-                idx_r = agent_indices[receiver]
-                pos_r = agent_positions[receiver][idx_r]
+                pos_r = cur_pos[receiver]
                 dx = pos_s[1] - pos_r[1]
                 dy = pos_s[2] - pos_r[2]
                 d2_comm = dx*dx + dy*dy
                 weight = comm_weight(d2_comm)
                 if weight > COMM_WEIGHT_MIN
                     if COMM_FUSION === :ci
-                        new_s, new_r = ci_comm(all_covs[sender][idx_s], all_covs[receiver][idx_r], weight)
-                        all_covs[sender][idx_s]   = new_s
-                        all_covs[receiver][idx_r] = new_r
+                        new_s, new_r = ci_comm(cur_cov[sender], cur_cov[receiver], weight)
+                        cur_cov[sender]   = new_s
+                        cur_cov[receiver] = new_r
                     else
                         # legacy weighted information-filter add (overconfident)
-                        S_s = all_covs[sender][idx_s] + COMM_SENSOR_NOISE^2 * I(2)
-                        S_r = all_covs[receiver][idx_r] + COMM_SENSOR_NOISE^2 * I(2)
-                        inv_P_r = inv(all_covs[receiver][idx_r])
-                        new_inv_P_r = inv_P_r + weight * inv(S_s)
-                        all_covs[receiver][idx_r] = inv(new_inv_P_r)
-                        inv_P_s = inv(all_covs[sender][idx_s])
-                        new_inv_P_s = inv_P_s + weight * inv(S_r)
-                        all_covs[sender][idx_s] = inv(new_inv_P_s)
+                        S_s = cur_cov[sender] + COMM_SENSOR_NOISE^2 * I(2)
+                        S_r = cur_cov[receiver] + COMM_SENSOR_NOISE^2 * I(2)
+                        new_inv_P_r = inv(cur_cov[receiver]) + weight * inv(S_s)
+                        new_inv_P_s = inv(cur_cov[sender])   + weight * inv(S_r)
+                        cur_cov[receiver] = inv(new_inv_P_r)
+                        cur_cov[sender]   = inv(new_inv_P_s)
                     end
                     push!(comm_events, (comm_time, sender, receiver, weight, pos_s, pos_r))
                 end
             end
         end
 
-        # Refresh running covariances to post-fusion values so next segment starts there
+        # When the checkpoint lands exactly on a waypoint (start of path, or an
+        # agent already parked at its goal), record the fused covariance there.
         for a in 1:na
-            cur_cov[a] = all_covs[a][cur_idx[a]]
+            if !isempty(agent_positions[a]) && cur_arc[a] == all_arcs[a][cur_idx[a]]
+                all_covs[a][cur_idx[a]] = cur_cov[a]
+            end
         end
     end
 
-    # Propagate any remaining waypoints beyond the last comm checkpoint
+    # Propagate the remaining path beyond the last comm checkpoint (no-op for an
+    # agent already at its final waypoint)
     for a in 1:na
-        n_a = length(agent_positions[a])
-        if cur_idx[a] < n_a
-            propagate_segment!(all_covs[a], agent_positions[a], lms,
-                               cur_idx[a], n_a, cur_cov[a];
-                               landmark_events=landmark_events, agent=a, arcs=all_arcs[a])
-        end
+        advance_to_arc!(all_covs[a], agent_positions[a], all_arcs[a], lms,
+                        cur_idx[a], cur_arc[a], cur_pos[a], cur_cov[a], all_arcs[a][end];
+                        landmark_events=landmark_events, agent=a)
     end
 
     return all_covs, comm_events, landmark_events

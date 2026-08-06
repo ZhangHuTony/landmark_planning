@@ -32,9 +32,8 @@ function run_path_eval(input_csv_path::String, landmarks::Vector{Landmark}, grap
     println("  → Saved trajectory: $out_traj")
 
     # Uncertainty profile
-    plt_unc = plot_unc_profile([("", arcs, covs, :solid, 2.0, 1.3)], na; threshold=threshold,
-                               title="eval paths — uncertainty profile ($(LANDMARK_SCENARIO))")
     out_unc = fig_path(output_dir, "eval_paths_unc_profile.png")
-    savefig(plt_unc, out_unc)
+    save_unc_figures([("", arcs, covs, :solid, 2.0, 1.3)], na, out_unc; threshold=threshold,
+                     title="eval paths — uncertainty profile ($(LANDMARK_SCENARIO))")
     println("  → Saved uncertainty profile: $out_unc")
 end

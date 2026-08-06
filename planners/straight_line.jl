@@ -51,10 +51,9 @@ function plan_straight_line(scenario, graph::LandmarkGraph, output_dir::String)
         write_landmark_csv(csv_path(output_dir, "landmark_events.csv"), landmark_events)
     end
 
-    plt_unc = plot_unc_profile([("", arcs, covs, :solid, 2.0, 1.3)], NUM_AGENTS;
-                               title="straight_line — uncertainty profile ($(LANDMARK_SCENARIO))")
     unc_profile_fname = fig_path(output_dir, "main_unc_profile.png")
-    savefig(plt_unc, unc_profile_fname)
+    save_unc_figures([("", arcs, covs, :solid, 2.0, 1.3)], NUM_AGENTS, unc_profile_fname;
+                     title="straight_line — uncertainty profile ($(LANDMARK_SCENARIO))")
     println("  → Saved uncertainty profile: $unc_profile_fname")
 
     write_ctrls_csv(csv_path(output_dir, "main_ctrls.csv"), ctrls)

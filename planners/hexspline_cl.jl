@@ -7,8 +7,8 @@
 const ASTAR_MODE      = Symbol(CFG["astar_mode"])
 const PRIMARY_EPSILON = Float64(CFG["primary_epsilon"])
 
-const UNC_RADIUS_THRESHOLD = Float64(CFG["unc_radius_threshold"])
-const UNC_FEAS_TOL         = Float64(CFG["unc_feas_tol"])
+# UNC_RADIUS_THRESHOLD / UNC_FEAS_TOL / MIN_TURN_RADIUS_M / MAX_CURVATURE are the
+# shared problem constraints and live in src/config.jl (config/main.yaml), not here.
 
 const ENABLE_RELAXED_DISCRETE_FOR_CONTINUOUS = Bool(CFG["enable_relaxed_discrete"])
 const RELAXED_DISCRETE_DELTA_MODE = Symbol(CFG["relaxed_discrete_delta_mode"])
@@ -31,8 +31,6 @@ const SUPPORT_PLOT_OFFSET_M = Float64(CFG["support_plot_offset_m"])
 const SPLINE_DEGREE                    = Int(CFG["spline_degree"])
 const SPLINE_SAMPLES_PER_SEG           = Int(CFG["spline_samples_per_seg"])
 const SPLINE_CURVATURE_SAMPLES_PER_SEG = Int(CFG["spline_curvature_samples_per_seg"])
-const MIN_TURN_RADIUS_M                = Float64(CFG["min_turn_radius_m"])
-const MAX_CURVATURE                    = 1.0 / MIN_TURN_RADIUS_M
 const CONT_BARRIER_START               = Float64(CFG["cont_barrier_start"])
 const CONT_BARRIER_DECAY               = Float64(CFG["cont_barrier_decay"])
 const CONT_BARRIER_STAGES              = Int(CFG["cont_barrier_stages"])
@@ -40,19 +38,19 @@ const CONT_LINESEARCH_SHRINK           = Float64(CFG["cont_linesearch_shrink"])
 const CONT_MIN_IMPROVEMENT             = Float64(CFG["cont_min_improvement"])
 
 const CONT_OPT_H             = Float64(CFG["cont_opt_h"])
+# Finite-difference probe used while still infeasible — see config/hexspline_cl.yaml.
+# Only the step width differs from CONT_OPT_H; same objective, same loop.
+const CONT_RECOVER_H         = Float64(CFG["cont_recover_h"])
 const CONT_ADAM_B1           = Float64(CFG["cont_adam_b1"])
 const CONT_ADAM_B2           = Float64(CFG["cont_adam_b2"])
 const CONT_ADAM_EPS          = Float64(CFG["cont_adam_eps"])
 const CONT_CONV_TOL          = Float64(CFG["cont_conv_tol"])
 const CONT_UNC_USE_WAYPOINTS = Bool(CFG["cont_unc_use_waypoints"])
 
-# Phase I (restoration) — see config/hexspline_cl.yaml for the units caveat on
-# CONT_RESTORE_MARGIN. It is both the strict-interior margin Phase I must reach
-# and the knee where Phase II's log barrier switches to its tangent.
-const CONT_RESTORE_MARGIN   = Float64(CFG["cont_restore_margin"])
-const CONT_RESTORE_ITERS    = Int(CFG["cont_restore_iters"])
-const CONT_RESTORE_RESTARTS = Int(CFG["cont_restore_restarts"])
-const CONT_RESTORE_H        = Float64(CFG["cont_restore_h"])
+# ε — the knee where the barrier's log switches to its own tangent, and the
+# strict-interior margin a seed is expected to clear. See config/hexspline_cl.yaml
+# for the mixed-units caveat.
+const CONT_RESTORE_MARGIN = Float64(CFG["cont_restore_margin"])
 
 # Relaxed discrete acceptance for discrete->continuous pipeline.
 # When enabled, discrete search may return seeds with goal uncertainty up to
@@ -301,10 +299,30 @@ end
 # (src/minvo.jl), at the same control points and the same Σ — so a candidate that
 # passes here starts the barrier phase already feasible on its obstacle rows.
 # Costs one evaluate_joint_discrete per goal pop, and only in obstacle scenarios.
+#
+# Same story for the SUPPORT CAP, which is why it is re-tested here. The search
+# prunes on graph distance (`support_dist_next <= primary_dist`), but the optimizer
+# constrains spline length — and corner-cutting takes a different bite out of each
+# agent, so two paths tied at equal graph distance can still come out unequal once
+# splined. Nothing enforced the spline version, so A* was free to hand the barrier a
+# seed already violating it; the barrier then had to LENGTHEN the primary to recover
+# instead of shortening it. Cheap enough to run unconditionally (a spline resample
+# per agent, at goal pops only — not per expansion, where a partial path's length is
+# not even meaningful).
 function seed_spline_clear(agent_paths::Vector{Vector{Int}}, graph::LandmarkGraph,
                            lms::Vector{Landmark})
-    (isempty(OBSTACLES) || !OBSTACLE_CONTINUOUS) && return true
     ctrls = seed_control_points(agent_paths, graph)
+    na = length(ctrls)
+    if na > 1
+        # Same expression as the optimizer's slacks_from support row, on the same
+        # control points, so a seed that passes here starts feasible on those rows.
+        seed_len(c) = bspline_path_length(first(bspline_sample_path(c)))
+        plen = seed_len(ctrls[na])
+        for a in 1:(na - 1)
+            plen + UNC_FEAS_TOL - seed_len(ctrls[a]) >= 0.0 || return false
+        end
+    end
+    (isempty(OBSTACLES) || !OBSTACLE_CONTINUOUS) && return true
     covs, _, _, _ = evaluate_joint_discrete(ctrls, lms, length(ctrls))
     return obstacles_clear(build_obstacle_plan(ctrls, SPLINE_DEGREE), ctrls, covs)
 end
@@ -998,7 +1016,7 @@ function joint_astar_collect(graph::LandmarkGraph,
                     pushfirst!(path, states_sa[psi].node)
                     psi = states_sa[psi].parent
                 end
-                # Spline-level obstacle gate — see seed_spline_clear.
+                # Spline-level seed gate — see seed_spline_clear.
                 if !seed_spline_clear([path], graph, lms)
                     spline_rejects += 1
                     continue
@@ -1080,7 +1098,7 @@ function joint_astar_collect(graph::LandmarkGraph,
 
         if is_goal_cell[S.paths[primary][end]]
             agent_paths = [copy(S.paths[a]) for a in 1:na]
-            # Spline-level obstacle gate — see seed_spline_clear.
+            # Spline-level seed gate — see seed_spline_clear.
             if !seed_spline_clear(agent_paths, graph, lms)
                 spline_rejects += 1
                 continue
@@ -1202,17 +1220,18 @@ function optimize_continuous(paths::Vector{Vector{Int}}, graph::LandmarkGraph, l
         gx = graph.landmarks[graph.n].x
         gy = graph.landmarks[graph.n].y
         n_seed = max(3, STRAIGHT_CONT_PRIMARY_WPTS)
-        for ai in 1:(n_agents - 1)
-            all_agent_wpts[ai] = [(sx, sy), (sx, sy)]
-            is_primary_mask[ai] = false
-        end
-        prim_wpts = Vector{Tuple{Float64,Float64}}(undef, n_seed)
+        # Every agent — supports included — is seeded on the same start→goal line,
+        # matching the discrete stage, which already hands supports [1, goal_node].
+        # (Supports used to get two coincident points at start, i.e. no path at all.)
+        line_wpts = Vector{Tuple{Float64,Float64}}(undef, n_seed)
         for i in 1:n_seed
             t = (i - 1) / (n_seed - 1)
-            prim_wpts[i] = ((1 - t) * sx + t * gx, (1 - t) * sy + t * gy)
+            line_wpts[i] = ((1 - t) * sx + t * gx, (1 - t) * sy + t * gy)
         end
-        all_agent_wpts[n_agents] = prim_wpts
-        is_primary_mask[n_agents] = true
+        for ai in 1:n_agents
+            all_agent_wpts[ai] = copy(line_wpts)
+            is_primary_mask[ai] = (ai == n_agents)
+        end
     else
         # Same builder the discrete seed gate uses (seed_spline_clear), so the spline
         # checked at goal-pop time is byte-for-byte the spline refined here.
@@ -1244,19 +1263,21 @@ function optimize_continuous(paths::Vector{Vector{Int}}, graph::LandmarkGraph, l
         seed_unc = (isempty(covs_seed) || isempty(covs_seed[end])) ? Inf : unc_radius(covs_seed[end][end])
         seed_len = bspline_path_length(seed_ctrls[end])
         return seed_len, seed_unc, seed_ctrls, covs_seed, seed_ctrls,
-               (status = :no_free_vars, min_slack = NaN, restore_iters = 0)
+               (status = :no_free_vars, min_slack = NaN)
     end
 
     # Static-obstacle avoidance (MINVO enclosure, chance-constrained). Commit
-    # each spline segment to the obstacle face the discrete seed cleared; those
-    # committed half-spaces enter the smoothing/barrier objectives below as
-    # linear rows over the MINVO hull vertices, and are re-verified after
-    # refinement. No-op (empty plans) when there are no obstacles.
-    # The straight_cont pipeline (straight_seed) skips the discrete filter, so it
-    # has no committed homotopy — which side of each obstacle to pass — to enforce
-    # continuously; reuse the empty no-obstacle plan (see OBSTACLE_AVOIDANCE.md).
-    obstacle_plans = straight_seed ? [SegFace[] for _ in eachindex(all_agent_wpts)] :
-                     build_obstacle_plan(all_agent_wpts, SPLINE_DEGREE)
+    # each spline segment to the obstacle face the seed rounded; those committed
+    # half-spaces enter the barrier objective below as linear rows over the MINVO
+    # hull vertices, and are re-verified after refinement. No-op (empty plans)
+    # when there are no obstacles.
+    # Built the same way for BOTH seeds. The straight seed skips the discrete
+    # filter, so its committed homotopy is whichever side each segment already
+    # leans toward — for a segment sitting inside an obstacle that is the nearest
+    # face, i.e. the shortest way out. That commitment being arbitrary rather than
+    # searched is precisely what the ablation measures; handing it the empty
+    # no-obstacle plan instead would let it "pass" by not being asked the question.
+    obstacle_plans = build_obstacle_plan(all_agent_wpts, SPLINE_DEGREE)
 
     # pack/unpack
     function pack_waypoints(wpts_list::Vector{Vector{Tuple{Float64,Float64}}})
@@ -1367,13 +1388,6 @@ function optimize_continuous(paths::Vector{Vector{Int}}, graph::LandmarkGraph, l
     is_feasible(s::Vector{Float64}) = min_slack(s) >= 0.0
     is_interior(s::Vector{Float64}, ε::Float64) = min_slack(s) >= ε
 
-    # Slacks + primary length straight from a free-variable vector, for the two
-    # objectives (which have no eval_continuous result in hand).
-    function constraint_slacks(f::Vector{Float64})
-        plen, unc, _, covs_all, curvatures, _, ctrl_list, support_lens = eval_continuous(f)
-        return slacks_from(plen, unc, curvatures, ctrl_list, covs_all, support_lens), plen
-    end
-
     # Initialize optimizer state
     flat = pack_waypoints(all_agent_wpts)
     init_len, init_unc, init_wpts, init_covs, init_curvs, init_max_curv, init_ctrls, init_support_lens = eval_continuous(flat)
@@ -1381,103 +1395,20 @@ function optimize_continuous(paths::Vector{Vector{Int}}, graph::LandmarkGraph, l
 
     init_slacks = slacks_from(init_len, init_unc, init_curvs, init_ctrls, init_covs, init_support_lens)
 
-    # ── Phase I — restoration ─────────────────────────────────────────────────
-    # Minimize CONSTRAINT VIOLATION ONLY, until every slack clears the margin ε.
-    # Two deliberate differences from the penalty phase this replaces:
-    #  * no `plen` term. Path length used to be summed into this objective, so the
-    #    optimizer traded feasibility against shortness while still infeasible —
-    #    the main reason recovery failed when it failed.
-    #  * the target is ε, not 0. Stopping the instant feasibility flips true (slack
-    #    ≈ 0) is the worst possible hand-off to Phase II: −μ·log(slack) is enormous
-    #    there and the h=1e-4 finite-difference gradient is unreliable.
-    # L1 (exact) penalty, NOT a sum of squares. A squared penalty's gradient is
-    # proportional to the residual, so it vanishes exactly as the constraint is
-    # approached: measured on single_5, restoration closed min_slack from −20 to
-    # −0.06 in 350 iterations and then crawled to only −0.013 over the next 650,
-    # exhausting the budget still short of the margin. The L1 gradient magnitude is
-    # independent of the residual, so progress per iteration does not decay and
-    # violations reach zero in finite steps. Non-smooth at the kink, which Adam plus
-    # backtracking already tolerate (the barrier's own knee is a kink too).
-    restoration_objective(f::Vector{Float64}) =
-        sum(x -> max(0.0, CONT_RESTORE_MARGIN - x), constraint_slacks(f)[1]; init=0.0)
-
-    # Accept-test floor that scales WITH the objective. Less critical under L1 (near
-    # the margin the objective is O(ε) ≈ 1e-3, comfortably above CONT_MIN_IMPROVEMENT)
-    # than it was under the squared form, where the whole objective was O(ε²) ≈ 1e-6
-    # — at or below the fixed floor, so the line search demanded more progress than
-    # remained and stalled. Kept so the failure cannot return if ε is tightened.
-    restore_min_improve(obj0::Float64) = min(CONT_MIN_IMPROVEMENT, 1e-3 * obj0)
-
-    restore_iters = 0
-    restoration_failed = false
-
-    if !is_interior(init_slacks, CONT_RESTORE_MARGIN)
-        println("  [Restoration] seed min_slack=$(round(min_slack(init_slacks),digits=6)) < ε=$(CONT_RESTORE_MARGIN); restoring to strict interior...")
-        smooth_adam_m = zeros(total_free_cont)
-        smooth_adam_v = zeros(total_free_cont)
-        # CONT_RESTORE_H, not CONT_OPT_H — see config/hexspline_cl.yaml. The
-        # uncertainty gradient is first-order zero at a straight-line seed, so a
-        # 1e-4 m probe reads only the quadratic remainder and Adam steps uphill.
-        h_smooth = CONT_RESTORE_H; lr_smooth = CONT_OPT_LR * 0.5
-        smooth_flat = copy(flat)
-        restarts = 0; adam_t = 0
-        while restore_iters < CONT_RESTORE_ITERS
-            restore_iters += 1; adam_t += 1
-            obj0 = restoration_objective(smooth_flat)
-            grad = zeros(total_free_cont)
-            for k in 1:total_free_cont
-                smooth_flat[k] += h_smooth; obj1 = restoration_objective(smooth_flat); grad[k] = (obj1 - obj0) / h_smooth; smooth_flat[k] -= h_smooth
-            end
-            b1t = CONT_ADAM_B1^adam_t; b2t = CONT_ADAM_B2^adam_t
-            step = zeros(total_free_cont)
-            for k in 1:total_free_cont
-                g = grad[k]
-                smooth_adam_m[k] = CONT_ADAM_B1 * smooth_adam_m[k] + (1 - CONT_ADAM_B1) * g
-                smooth_adam_v[k] = CONT_ADAM_B2 * smooth_adam_v[k] + (1 - CONT_ADAM_B2) * g^2
-                m̂ = smooth_adam_m[k] / (1 - b1t); v̂ = smooth_adam_v[k] / (1 - b2t)
-                step[k] = lr_smooth * m̂ / (sqrt(v̂) + CONT_ADAM_EPS)
-            end
-            min_improve = restore_min_improve(obj0)
-            trial = smooth_flat .- step; trial_obj = restoration_objective(trial); backtracks = 0
-            while (!isfinite(trial_obj) || trial_obj > obj0 - min_improve) && backtracks < 12
-                step .*= CONT_LINESEARCH_SHRINK; trial = smooth_flat .- step; trial_obj = restoration_objective(trial); backtracks += 1
-            end
-            if !isfinite(trial_obj) || trial_obj > obj0 - min_improve
-                # A stall is a property of Adam's momentum, not of the point: re-zero
-                # the moments, halve the step, and try again before calling it a
-                # failure. (This is what the old code's accidental second attempt
-                # bought, made explicit and bounded.)
-                if restarts < CONT_RESTORE_RESTARTS
-                    restarts += 1; adam_t = 0
-                    fill!(smooth_adam_m, 0.0); fill!(smooth_adam_v, 0.0)
-                    lr_smooth *= 0.5
-                    println("    line search stalled; Adam restart $(restarts)/$(CONT_RESTORE_RESTARTS) (lr=$(round(lr_smooth,digits=6)))")
-                    continue
-                end
-                break
-            end
-            smooth_flat .= trial
-            restarts = 0        # budget covers CONSECUTIVE stalls; progress refills it
-            slen, sunc, swpts, scovs, scurvs, smax_curv, sctrls, ssupport_lens = eval_continuous(smooth_flat)
-            s_now = slacks_from(slen, sunc, scurvs, sctrls, scovs, ssupport_lens)
-            if mod(restore_iters, 50) == 0
-                println("    Restore iter $(lpad(restore_iters,3)): len=$(round(slen,digits=2)), unc=$(round(sunc,digits=4)), min_slack=$(round(min_slack(s_now),digits=6))")
-            end
-            if is_interior(s_now, CONT_RESTORE_MARGIN)
-                println("    → Strictly interior at restoration iter $restore_iters (min_slack=$(round(min_slack(s_now),digits=6)))")
-                break
-            end
-        end
-        flat = smooth_flat
-        init_len, init_unc, init_wpts, init_covs, init_curvs, init_max_curv, init_ctrls, init_support_lens = eval_continuous(flat)
-        init_slacks = slacks_from(init_len, init_unc, init_curvs, init_ctrls, init_covs, init_support_lens)
-        println("  After restoration: prim_len=$(round(init_len,digits=3)), unc=$(round(init_unc,digits=4)), min_slack=$(round(min_slack(init_slacks),digits=6))")
-        restoration_failed = !is_interior(init_slacks, CONT_RESTORE_MARGIN)
-        if restoration_failed
-            @warn "Restoration failed: min_slack=$(min_slack(init_slacks)) after $(restore_iters) iters (ε=$(CONT_RESTORE_MARGIN)); skipping length optimization and returning the lowest-violation iterate."
-        end
-    else
-        println("  [Restoration] seed is already strictly interior (min_slack=$(round(min_slack(init_slacks),digits=6))); proceeding to barrier optimization")
+    # Feasibility is an INVARIANT once attained, not a precondition on the seed.
+    # `reached_feasible` latches: while false the line search below accepts any
+    # objective-improving step so the barrier's tangent can pull an infeasible seed
+    # in; the moment a feasible iterate is accepted it flips true and the hard
+    # feasible-only gate arms permanently. Still ONE phase and one objective — the
+    # tangent-extended barrier already dominates path length ~4 orders of magnitude
+    # while violated, so it recovers first and shortens after, on its own.
+    # Under the discrete seed the gate certifies the seed, so this is true from the
+    # start and the loop below is bit-for-bit the feasible-only optimizer it was.
+    reached_feasible = is_feasible(init_slacks)
+    if !reached_feasible
+        @warn "Seed is infeasible (min_slack=$(min_slack(init_slacks)), ε=$(CONT_RESTORE_MARGIN)); the barrier will try to recover it before shortening. Expected for the straight_cont ablation; a gated discrete seed should never land here."
+    elseif !is_interior(init_slacks, CONT_RESTORE_MARGIN)
+        @warn "Seed is feasible but not strictly interior (min_slack=$(min_slack(init_slacks)), ε=$(CONT_RESTORE_MARGIN)); the barrier is past its knee and steps will be small."
     end
 
     # Barrier optimizer (simplified reuse of in-file logic but using cont_threshold)
@@ -1485,7 +1416,7 @@ function optimize_continuous(paths::Vector{Vector{Int}}, graph::LandmarkGraph, l
     best_feasible_flat = nothing; best_feasible_len = Inf; best_feasible_unc = Inf
     prev_len = init_len
 
-    # ── Phase II objective — length under a tangent-extended log barrier ──────
+    # ── Objective — length under a tangent-extended log barrier ───────────────
     # Below the knee δ the log is continued by its own tangent at δ:
     #     B(s) = −μ·log(s)                      s > δ
     #            −μ·[ log δ + (s − δ)/δ ]       s ≤ δ
@@ -1520,22 +1451,21 @@ function optimize_continuous(paths::Vector{Vector{Int}}, graph::LandmarkGraph, l
 
     stage_iters = max(25, cld(CONT_OPT_ITERS, CONT_BARRIER_STAGES))
     barrier_mu = CONT_BARRIER_START; total_iter = 0
-    # Phase II runs only from a certified strictly-interior start. If Phase I could
-    # not produce one, skip length optimization entirely rather than hand the
-    # barrier an infeasible point — best_flat still holds Phase I's lowest-violation
-    # iterate, which is what gets returned.
-    barrier_stages = restoration_failed ? 0 : CONT_BARRIER_STAGES
-    # Documents the precondition the old code silently violated: it entered the
-    # barrier from whatever the smoothing phase left behind, feasible or not.
-    barrier_stages > 0 && @assert is_interior(init_slacks, CONT_RESTORE_MARGIN) "Phase II requires a strictly interior start (min_slack=$(min_slack(init_slacks)), ε=$(CONT_RESTORE_MARGIN))"
-    for stage in 1:barrier_stages
+    for stage in 1:CONT_BARRIER_STAGES
         println("  Barrier stage $(stage)/$(CONT_BARRIER_STAGES): μ=$(round(barrier_mu,digits=4))")
         for iter in 1:stage_iters
             total_iter += 1
             obj0, _ = spline_barrier_objective(flat, barrier_mu)
+            # Probe width tracks the regime, not a separate phase: while infeasible
+            # the uncertainty gradient is first-order zero at a straight-line seed,
+            # so a 1e-4 m probe reads only quadratic remainder and the step is
+            # numerically zero. Reverts to CONT_OPT_H the moment feasibility is
+            # reached — which is iteration 1 for a gated discrete seed, so that
+            # pipeline never sees CONT_RECOVER_H at all.
+            h_fd = reached_feasible ? CONT_OPT_H : CONT_RECOVER_H
             grad = zeros(total_free_cont)
             for k in 1:total_free_cont
-                flat[k] += CONT_OPT_H; obj1, _ = spline_barrier_objective(flat, barrier_mu); grad[k] = (obj1 - obj0) / CONT_OPT_H; flat[k] -= CONT_OPT_H
+                flat[k] += h_fd; obj1, _ = spline_barrier_objective(flat, barrier_mu); grad[k] = (obj1 - obj0) / h_fd; flat[k] -= h_fd
             end
             b1t = CONT_ADAM_B1^total_iter; b2t = CONT_ADAM_B2^total_iter
             step = zeros(total_free_cont)
@@ -1547,31 +1477,49 @@ function optimize_continuous(paths::Vector{Vector{Int}}, graph::LandmarkGraph, l
                 step[k] = CONT_OPT_LR * m̂ / (sqrt(v̂) + CONT_ADAM_EPS)
             end
             # Rejecting infeasible trials here is what makes feasibility an
-            # INVARIANT rather than a force: Phase II starts feasible (Phase I
-            # certified it) and no step that leaves the feasible set is ever
-            # accepted, so every iterate below is feasible by construction.
+            # INVARIANT rather than a force: once feasible, no step that leaves the
+            # feasible set is ever accepted, so every later iterate is feasible by
+            # construction. Before feasibility is first reached the gate is off —
+            # otherwise an infeasible seed rejects every trial (they are all still
+            # infeasible), backtracks 12 times and stalls on iteration 1, which is
+            # exactly what used to make an ungated seed unrecoverable. Objective
+            # descent is still required in both regimes.
+            accept(ok::Bool, obj::Float64) =
+                (ok || !reached_feasible) && isfinite(obj) && obj <= obj0 - CONT_MIN_IMPROVEMENT
             trial = flat .- step; trial_obj, trial_ok = spline_barrier_objective(trial, barrier_mu); backtracks = 0
-            while (!trial_ok || !isfinite(trial_obj) || trial_obj > obj0 - CONT_MIN_IMPROVEMENT) && backtracks < 12
+            while !accept(trial_ok, trial_obj) && backtracks < 12
                 step .*= CONT_LINESEARCH_SHRINK; trial = flat .- step; trial_obj, trial_ok = spline_barrier_objective(trial, barrier_mu); backtracks += 1
             end
-            if !trial_ok || !isfinite(trial_obj) || trial_obj > obj0 - CONT_MIN_IMPROVEMENT
+            if !accept(trial_ok, trial_obj)
                 println("  [Spline barrier] line search stalled; stopping at stage $stage")
                 break
             end
             flat .= trial
             len2, unc2, wpts2, covs2, curv2, max_curv2, ctrls2, support_lens2 = eval_continuous(flat)
-            # The invariant, checked rather than assumed: every accepted iterate is
-            # feasible. Nearly free — eval_continuous above is the expensive part.
-            @assert is_feasible(slacks_from(len2, unc2, curv2, ctrls2, covs2, support_lens2)) "Phase II accepted an infeasible iterate at stage $stage iter $total_iter"
+            slacks2 = slacks_from(len2, unc2, curv2, ctrls2, covs2, support_lens2)
+            feasible2 = is_feasible(slacks2)
+            # The invariant, checked rather than assumed: once feasibility has been
+            # reached it is never given back. Nearly free — eval_continuous above is
+            # the expensive part.
+            @assert feasible2 || !reached_feasible "Barrier accepted an infeasible iterate at stage $stage iter $total_iter"
+            if feasible2 && !reached_feasible
+                reached_feasible = true
+                println("    → Recovered into the feasible set at iter $total_iter (min_slack=$(round(min_slack(slacks2),digits=6))); feasible-only gate now armed")
+            end
             # Only one incumbent is needed now. The old code also tracked a
             # length-only `best_flat` with NO feasibility test and returned it when
             # no feasible iterate was ever found — i.e. it shipped the shortest,
-            # most-violating point. That fallback is gone: this loop cannot produce
-            # an infeasible iterate.
-            if len2 < best_feasible_len
+            # most-violating point. That fallback stays gone: the incumbent is
+            # feasible-only, which under an infeasible seed also excludes the
+            # pre-recovery iterates.
+            if feasible2 && len2 < best_feasible_len
                 best_feasible_len = len2; best_feasible_unc = unc2; best_feasible_flat = copy(flat)
             end
-            if abs(len2 - prev_len) < CONT_CONV_TOL
+            # Length-stationarity means "converged" only while length is what is
+            # being minimized. During recovery the objective is dominated by the
+            # barrier tangent and length can sit still for several iterations while
+            # violation drops — breaking there would abort the recovery.
+            if reached_feasible && abs(len2 - prev_len) < CONT_CONV_TOL
                 println("  → Converged at iter $total_iter (Δlen=$(round(abs(len2-prev_len),digits=6)))")
                 break
             end
@@ -1580,27 +1528,29 @@ function optimize_continuous(paths::Vector{Vector{Int}}, graph::LandmarkGraph, l
         barrier_mu *= CONT_BARRIER_DECAY
     end
 
-    # best_feasible_flat is unset only when Phase II never accepted a step (either
-    # it was skipped after a failed restoration, or its very first line search
-    # stalled). `flat` is then Phase I's output — the certified-interior start, or
-    # its lowest-violation iterate if restoration failed. Never an "optimized but
-    # violating" point.
+    # best_feasible_flat is unset when no FEASIBLE step was ever accepted: either the
+    # first line search stalled outright, or the seed was infeasible and recovery
+    # never made it in. `flat` is then the last iterate — the untouched seed in the
+    # first case, the lowest-objective violating point in the second. Never an
+    # "optimized but violating" point passed off as a solution; the status says which.
     selected_flat = isnothing(best_feasible_flat) ? flat : best_feasible_flat
     opt_len, opt_unc, opt_wpts, opt_covs, opt_curvs, opt_max_curv, opt_ctrls, opt_support_lens = eval_continuous(selected_flat)
 
     # Status of what is actually being returned, so a caller (and results.yaml) can
     # tell a certified solution from a fallback instead of having to trust that one
-    # was found. :optimized      — Phase I interior, Phase II improved length
-    #            :restored_only  — Phase I interior, Phase II never accepted a step
-    #                              (still feasible, just not shortened)
-    #            :restoration_failed — Phase I could not reach the margin; this is
-    #                              its lowest-violation iterate and may violate
+    # was found.
+    #   :optimized       — a feasible iterate was found and its length improved
+    #   :seed_only       — the seed was already feasible but no step was accepted;
+    #                      this is the seed spline, feasible but not shortened
+    #   :recovery_failed — the seed was infeasible and the barrier never reached the
+    #                      feasible set. THIS RESULT VIOLATES CONSTRAINTS (min_slack
+    #                      < 0) and is the ablation's failure case — count these to
+    #                      get the failure rate without the discrete search.
     final_slacks = slacks_from(opt_len, opt_unc, opt_curvs, opt_ctrls, opt_covs, opt_support_lens)
-    refinement_status = restoration_failed   ? :restoration_failed :
-                        isnothing(best_feasible_flat) ? :restored_only : :optimized
-    refinement_info = (status = refinement_status,
-                       min_slack = min_slack(final_slacks),
-                       restore_iters = restore_iters)
+    refinement_status = !isnothing(best_feasible_flat) ? :optimized :
+                        reached_feasible               ? :seed_only :
+                                                         :recovery_failed
+    refinement_info = (status = refinement_status, min_slack = min_slack(final_slacks))
     println("  Final: prim_len=$(round(opt_len,digits=3)), unc=$(round(opt_unc,digits=4)), threshold=$(round(cont_threshold,digits=4)), status=$(refinement_status), min_slack=$(round(min_slack(final_slacks),digits=6))")
 
     # Post-refinement re-verification (spec E), two views of the FINAL solution:
@@ -1660,18 +1610,22 @@ function optimize_continuous(paths::Vector{Vector{Int}}, graph::LandmarkGraph, l
     cont_eval_paths = CONT_UNC_USE_WAYPOINTS ? opt_ctrls : opt_wpts
     c_covs, c_arcs, c_comm, c_landmark_events = evaluate_joint_discrete(cont_eval_paths, landmarks, num_agents)
 
+    # The event CSVs are meant to describe the FINAL solution, so hand the
+    # continuous-eval events back to the caller. The discrete d_* events stay
+    # local: they only feed the left panel of the comparison figure.
+    refinement_info = merge(refinement_info, (comm_events = c_comm, landmark_events = c_landmark_events))
+
     # Combined side-by-side figure: discrete (left) vs continuous (right)
     save_path_figures_pair(plt1, plt2,
         fig_path(output_dir, string(fig_prefix, "fig_compare_discrete_continuous", (fig_prefix == "" ? "" : "_"), string(round(opt_len,digits=2)), ".png")),
         d_comm, c_comm, d_landmark_events, c_landmark_events)
     println("Fig combined (", fig_prefix, ") saved: Discrete Len=$(round(init_len,digits=2)) → Continuous Len=$(round(opt_len,digits=2))")
-    plt_unc = plot_unc_profile(
+    unc_profile_fname = fig_path(output_dir, string(fig_prefix == "" ? "main" : fig_prefix, "_unc_profile.png"))
+    save_unc_figures(
         [("discrete", d_arcs, d_covs, :dash, 1.2, 1.2),
          ("continuous", c_arcs, c_covs, :solid, 2.0, 1.3)],
-        num_agents; threshold=cont_threshold,
+        num_agents, unc_profile_fname; threshold=cont_threshold,
         title=string(fig_prefix == "" ? "main" : fig_prefix, " — uncertainty profile (", LANDMARK_SCENARIO, ")"))
-    unc_profile_fname = fig_path(output_dir, string(fig_prefix == "" ? "main" : fig_prefix, "_unc_profile.png"))
-    savefig(plt_unc, unc_profile_fname)
     println("Fig uncertainty profile (", fig_prefix == "" ? "main" : fig_prefix, ") saved: ", unc_profile_fname)
 
     return opt_len, opt_unc, opt_wpts, opt_covs, opt_ctrls, refinement_info
@@ -1806,7 +1760,7 @@ function _plan_hexspline(scenario, graph::LandmarkGraph, output_dir::String;
         println("\n  seed_mode=:straight — skipping discrete search and using direct start→goal seed")
         primary_path = [1, goal_node]
         primary_dist = graph.distance[1, goal_node]
-        support_paths = [Int[1, 1] for _ in 1:(NUM_AGENTS - 1)]
+        support_paths = [Int[1, goal_node] for _ in 1:(NUM_AGENTS - 1)]
     elseif seed_mode == :discrete
         support_paths, primary_path, primary_dist = run_discrete_seed_search(disc_unc_threshold)
     else
@@ -1902,6 +1856,8 @@ function _plan_hexspline(scenario, graph::LandmarkGraph, output_dir::String;
     end
     println("Converged at iteration : ", converged_iter)
 
+    have_paths = !isempty(paths) && all(length.(paths) .> 0)
+
     # ==========================================================================
     # Figure 1 - discrete graph solution
     # ==========================================================================
@@ -1968,11 +1924,17 @@ function _plan_hexspline(scenario, graph::LandmarkGraph, output_dir::String;
         save_path_figures(plt1, fig_path(output_dir, "fig1_joint_discrete_astar.png"),
                            comm_events_fig1, landmark_events_fig1)
         println("Fig 1 saved.")
-        if TRACK_COMM_EVENTS
-            write_comm_csv(csv_path(output_dir, "comm_events.csv"), comm_events_fig1)
-        end
-        if TRACK_LANDMARK_EVENTS
-            write_landmark_csv(csv_path(output_dir, "landmark_events.csv"), landmark_events_fig1)
+        # Discrete events are only the deliverable when no continuous stage will
+        # run (plan_discrete_only, or no feasible path). Otherwise the continuous
+        # refinement overwrites these CSVs with events from the FINAL spline --
+        # writing the discrete ones here would describe a path we don't ship.
+        if !(run_continuous && have_paths)
+            if TRACK_COMM_EVENTS
+                write_comm_csv(csv_path(output_dir, "comm_events.csv"), comm_events_fig1)
+            end
+            if TRACK_LANDMARK_EVENTS
+                write_landmark_csv(csv_path(output_dir, "landmark_events.csv"), landmark_events_fig1)
+            end
         end
     end
 
@@ -1982,10 +1944,17 @@ function _plan_hexspline(scenario, graph::LandmarkGraph, output_dir::String;
     main_refine    = nothing
     solutions = NamedTuple[]
 
-    have_paths = !isempty(paths) && all(length.(paths) .> 0)
     if run_continuous && have_paths  # Continuous optimization only if all agents have paths
         opt_len, opt_unc, opt_wpts, opt_covs, opt_ctrls, main_refine = optimize_continuous(paths, graph, landmarks, NUM_AGENTS, output_dir; cont_threshold=UNC_RADIUS_THRESHOLD, fig_prefix="main", straight_seed=(seed_mode == :straight))
         write_ctrls_csv(csv_path(output_dir, "main_ctrls.csv"), opt_ctrls)
+        # Events from the refined spline, matching main_ctrls.csv (see the fig1
+        # block above, which defers to this write).
+        if TRACK_COMM_EVENTS
+            write_comm_csv(csv_path(output_dir, "comm_events.csv"), main_refine.comm_events)
+        end
+        if TRACK_LANDMARK_EVENTS
+            write_landmark_csv(csv_path(output_dir, "landmark_events.csv"), main_refine.landmark_events)
+        end
         main_cont_len = opt_len
         if !isempty(opt_covs) && all(a -> !isempty(opt_covs[a]), 1:NUM_AGENTS)
             main_cont_uncs = [unc_radius(opt_covs[a][end]) for a in 1:NUM_AGENTS]
@@ -2047,7 +2016,6 @@ function _plan_hexspline(scenario, graph::LandmarkGraph, output_dir::String;
         if !isnothing(main_refine)
             write(io, "  refinement_status: $(main_refine.status)\n")
             write(io, "  refinement_min_slack: $(fmt4(main_refine.min_slack))\n")
-            write(io, "  restoration_iters: $(main_refine.restore_iters)\n")
         end
         if !isempty(pareto_collected)
             write(io, "pareto_seeds:\n")
@@ -2064,7 +2032,6 @@ function _plan_hexspline(scenario, graph::LandmarkGraph, output_dir::String;
                     write(io, "    continuous_uncertainties: $(fmtlist(cont_uncs))\n")
                     write(io, "    refinement_status: $(crefine.status)\n")
                     write(io, "    refinement_min_slack: $(fmt4(crefine.min_slack))\n")
-                    write(io, "    restoration_iters: $(crefine.restore_iters)\n")
                 end
             end
         end
@@ -2075,7 +2042,14 @@ end
 
 # ── Public planner entry points (selected by name in `algorithms:`) ──
 # hexspline_cl : joint A* seed + continuous B-spline refinement (full pipeline).
-# straight_cont: straight start→goal seed + continuous refinement (no A* search).
+# straight_cont: ABLATION of the discrete search. Everything downstream of the
+#   seed is identical to hexspline_cl — same homotopy commitment
+#   (build_obstacle_plan), same constraints, same single-phase barrier optimizer
+#   — only the seed differs: a direct start→goal line instead of the A* path.
+#   The straight seed passes no gate, so it typically starts infeasible and the
+#   barrier must recover it before it can shorten anything; `refinement_status:
+#   recovery_failed` in results.yaml is the case where it could not, which is the
+#   measurement this ablation exists to produce.
 # discrete_only: joint A* seed, no continuous stage (discrete polyline output).
 plan_hexspline_cl(scenario, graph::LandmarkGraph, output_dir::String) =
     _plan_hexspline(scenario, graph, output_dir; seed_mode=:discrete, run_continuous=true)

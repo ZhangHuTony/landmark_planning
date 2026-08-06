@@ -15,9 +15,9 @@
 #     Overridable per run with the SCENARIO env var.
 #   `manual` instead defines a scenario inline, right here — set start, goal,
 #   landmarks and obstacles (see the encodings below); anything omitted is empty.
-landmark_scenario: maze
+landmark_scenario: behind_wall
 num_agents: 2
-algorithms: hexspline_cl
+algorithms: discrete_only
 
 # Inline scenario geometry — read ONLY when landmark_scenario: manual.
 #   start / goal: "x,y"
@@ -46,9 +46,32 @@ comm_weight_min: 1.0e-4
 comm_interval_dist: 5.0
 comm_fusion: ci   # inter-agent fusion rule: ci (Covariance Intersection, sound) | kf (legacy, overconfident)
 
+# Problem constraints — the feasible set itself, shared by every algorithm.
+# These define what a valid plan IS, so they are not one planner's tuning: an
+# ablation is only a fair comparison if it is held to the same constraints as
+# the full pipeline. (The obstacle constraint's knobs are below; the geometry
+# is part of the scenario.) Optimizer knobs that merely decide *how* a planner
+# chases these stay in config/<algorithm>.yaml.
+#   unc_radius_threshold — feasibility bound on primary goal uncertainty, in
+#     metres (det(Σ)^0.25, = σ for isotropic Σ).
+#   unc_feas_tol — slack tolerance on that bound, so a solution sitting exactly
+#     on the threshold is not rejected by floating-point noise.
+#   min_turn_radius_m — vehicle turn radius; the curvature constraint is
+#     κ ≤ 1/min_turn_radius_m.
+unc_radius_threshold: 7.0
+unc_feas_tol: 1.0e-6
+min_turn_radius_m: 40.0
+
 # Graph / hex grid
+#   corridor_halfwidth_m / corridor_y_max_m bound the lateral planning space in
+#   METRES; they do not derive from hex_width_m. Row pitch is 1.5·hex_r, so these
+#   two set the row COUNT — at the defaults below, 9 rows. Retune them whenever
+#   hex_width_m changes, or the graph blows up (Floyd-Warshall is O(n³)); see
+#   config/hardware/main.yaml for the 4 m version.
 hex_width_m: 100.0
 hex_padding: 2
+corridor_halfwidth_m: 260.0
+corridor_y_max_m: 300.0
 
 # Static obstacles — RISK/enforcement knobs only. The obstacle *geometry* is part
 # of the scenario (src/scenario_generation.jl), not config. Chance-constrained
@@ -64,7 +87,7 @@ hex_padding: 2
 #     (MINVO-hull chance constraint; each segment committed to the face the
 #     discrete seed rounded). false ⇒ discrete-only, no continuous enforcement.
 obstacle_delta: 0.05
-agent_radius: 0.0
+agent_radius: 5.0
 obstacle_edge_samples: 2
 obstacle_continuous: true
 

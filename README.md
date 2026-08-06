@@ -35,12 +35,21 @@ All parameters are set in `config.yaml`. The most commonly changed ones are desc
 | `num_agents` | `2` | Total agents including the primary (last index) |
 | `astar_mode` | `threshold` | `threshold`: stop on first feasible path; `limit`: collect full Pareto front |
 
-### Uncertainty thresholds
+### Problem constraints (`config/main.yaml`)
+
+These define the **feasible set** — what a valid plan is — so they live in
+`config/main.yaml` and apply to every algorithm, not in any one planner's file.
+An ablation is only a fair comparison if it is held to the same constraints as
+the pipeline it is being compared against. (Obstacle enforcement knobs are in
+the same file; the obstacle *geometry* belongs to the scenario.) A planner
+`.yaml` that redefines one of these shadows it silently, so `load_config` warns
+whenever an algorithm file overrides a `main.yaml` key.
 
 | Key | Default | Effect |
 |---|---|---|
-| `unc_radius_threshold` | `3.1` | Feasibility bound on primary goal uncertainty (det-based scalar, meters). Lower = harder. |
+| `unc_radius_threshold` | `7.0` | Feasibility bound on primary goal uncertainty (det-based scalar, meters). Lower = harder. |
 | `unc_feas_tol` | `1e-6` | Boundary tolerance for feasibility comparisons |
+| `min_turn_radius_m` | `40.0` | Minimum AUV turn radius; the curvature constraint is `κ ≤ 1/min_turn_radius_m` |
 
 ### Relaxed discrete handoff
 
@@ -75,8 +84,16 @@ Practical guidance: start with relaxed disabled. Enable with a small δ if searc
 | `cont_barrier_stages` | `4` | Barrier method stages |
 | `cont_barrier_start` | `20.0` | Initial barrier weight μ |
 | `cont_barrier_decay` | `0.35` | μ decay per stage |
-| `min_turn_radius_m` | `40.0` | Minimum AUV turn radius (curvature constraint) |
-| `cont_opt_h` | `1e-4` | Finite-difference step for gradient |
+| `cont_opt_h` | `1e-4` | Finite-difference step for the gradient, once feasible |
+| `cont_recover_h` | `1.0` | Finite-difference step while still **infeasible** (see [Ablation](#ablation-straight_cont)). Same objective and loop — only the probe width differs. Never used by `hexspline_cl`, whose seed is feasible from iteration 1. |
+
+The optimizer is a **single phase** for every seed: minimize primary path length
+under a tangent-extended log barrier. Feasibility is an *invariant*, not a
+precondition — the line search rejects any step that leaves the feasible set,
+but only once feasibility has been reached. From an infeasible seed the
+barrier's tangent below the knee carries a restoring gradient of `−μ/ε`
+(~4 orders of magnitude above the length gradient at the defaults), so the same
+objective recovers first and shortens after, with no separate restoration pass.
 
 #### Curvature: what the discrete seed does and does not guarantee
 
@@ -187,7 +204,15 @@ landmarks: 700,200 | 750,-250 @ 1.2,0,0,0.8
 obstacles: 200,-150; 260,-150; 260,-100; 200,-100 | 400,60; 460,60; 430,120 @ 4,0,0,4
 ```
 
-**Corridor limits.** `build_hex_graph` pads ±260 m about y=0 and lands rows on multiples of `1.5·hex_r`, so at the default `hex_width_m: 100` the reachable rows are y ∈ {−433.0, −346.4, −259.8, −173.2, −86.6, 0, 86.6, 173.2, 259.8}. A wall meant to *block* a route must cover a whole row: hex edges are sampled only at `obstacle_edge_samples` points, so a wall thinner than the 86.6 m row spacing can be stepped over. Node **x** depends on row parity — rows {−346.4, −173.2, 0, 173.2} sit at x ≡ 0 (mod 100), rows {−433, −259.8, −86.6, 86.6, 259.8} at x ≡ 50 — so a *vertical* wall must span ≥150 m in x to cover one column of each parity, or it is stepped around on the offset row (see `maze`).
+**Corridor limits.** `build_hex_graph` pads ±`corridor_halfwidth_m` about y=0, drops rows above `corridor_y_max_m`, and lands rows on multiples of `1.5·hex_r`, so at the defaults (`hex_width_m: 100`, `corridor_halfwidth_m: 260`, `corridor_y_max_m: 300`) the reachable rows are y ∈ {−433.0, −346.4, −259.8, −173.2, −86.6, 0, 86.6, 173.2, 259.8}. A wall meant to *block* a route must cover a whole row: hex edges are sampled only at `obstacle_edge_samples` points, so a wall thinner than the 86.6 m row spacing can be stepped over. Node **x** depends on row parity — rows {−346.4, −173.2, 0, 173.2} sit at x ≡ 0 (mod 100), rows {−433, −259.8, −86.6, 86.6, 259.8} at x ≡ 50 — so a *vertical* wall must span ≥150 m in x to cover one column of each parity, or it is stepped around on the offset row (see `maze`).
+
+`corridor_halfwidth_m` and `corridor_y_max_m` are in **metres and do not derive
+from `hex_width_m`** — they set the row *count*, which is what drives graph size.
+Retune them whenever you change `hex_width_m`, in the same proportion: the
+defaults over a 3.46 m row pitch would build ~150 rows, and Floyd-Warshall is
+O(n³), so the run never starts. `config/hardware/main.yaml` is the worked
+example (`hex_width_m: 4.0`, `corridor_halfwidth_m: 12.0`,
+`corridor_y_max_m: 13.0` → the same 9 rows the defaults give).
 
 ## A* collection modes
 
@@ -196,6 +221,45 @@ obstacles: 200,-150; 260,-150; 260,-100; 200,-100 | 400,60; 460,60; 430,120 @ 4,
 **`:limit`** — runs until `astar_iteration_limit` and collects the full Pareto front (non-dominated on distance vs. uncertainty). Slower but reveals the full solution space; generates one optimized path per Pareto seed.
 
 Interaction with `continue_astar_on_infeasible`: only relevant for `:threshold` mode. In `:limit` mode the flag is ignored.
+
+## Ablation: `straight_cont`
+
+Set `algorithms: straight_cont` to run the discrete search's ablation.
+Everything downstream of the seed is **identical** to `hexspline_cl` — same
+homotopy commitment (`build_obstacle_plan`), same constraints, same
+single-phase barrier optimizer. Only the seed differs: a direct start→goal line
+with `straight_cont_primary_wpts` control points instead of the joint A* path.
+
+The straight seed passes no gate, so it typically starts outside the feasible
+set and the barrier must recover it before it can shorten anything.
+`refinement_status` in `results.yaml` is the measurement:
+
+| Status | Meaning |
+|---|---|
+| `optimized` | A feasible iterate was found and shortened |
+| `seed_only` | Seed was already feasible; no step improved it |
+| `recovery_failed` | **Never reached the feasible set — this result violates constraints** (`min_slack < 0`) |
+
+Measured across all nine scenarios (2 agents, `unc_radius_threshold: 7.0`),
+`straight_cont` recovers in **1 of 9** (`gauntlet`: min_slack −48.2 → +0.022,
+unc 5.55). The other eight end `recovery_failed`. Two distinct failure modes,
+both of which the discrete search exists to solve:
+
+- **Flat uncertainty landscape.** Detection probability is a logistic on
+  distance with `visibility_width: 2.5` against a `visibility_range: 100`
+  plateau, so a landmark 250 m off-corridor (`single`) has detection
+  probability ≈ 1e-26. The uncertainty gradient there is *exponentially* zero:
+  no probe width finds a descent direction, and gradient descent cannot
+  discover a detour it cannot yet feel. A combinatorial search does not need a
+  gradient to jump to a distant homotopy.
+- **Wrong homotopy, committed.** The straight seed commits each spline segment
+  to whichever obstacle face it already leans toward. In `behind_wall` the only
+  landmark is on the *far* side of the wall, so lowering uncertainty requires
+  breaching a committed face — the recovery is trapped in a homotopy that has
+  no feasible point. A* picks the homotopy that makes the problem feasible.
+
+Reproduce with `SCENARIO=<name> julia generate_plan.jl` after setting
+`algorithms: straight_cont`.
 
 ## Outputs
 

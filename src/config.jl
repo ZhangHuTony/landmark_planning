@@ -49,10 +49,23 @@ engine_of(algo) = get(PLANNER_ENGINE, String(algo), String(algo))
 # per-alias override file can still win).
 function load_config(dir::String)
     cfg = load_yaml(joinpath(dir, "main.yaml"))
+    shared = Set(keys(cfg))
     for algo in split_algorithms(cfg)
         for name in unique([engine_of(algo), algo])
             path = joinpath(dir, "$(name).yaml")
-            isfile(path) && merge!(cfg, load_yaml(path))
+            isfile(path) || continue
+            algo_cfg = load_yaml(path)
+            # A per-planner file silently shadowing a main.yaml key is a footgun:
+            # main.yaml owns the shared problem constraints, so an override there
+            # would let one algorithm be judged against a different feasible set
+            # than the ablation it is compared to — invisibly, since the merged CFG
+            # looks fine. Warn rather than error: an alias .yaml overriding its
+            # engine's tuning is a documented use, and this only fires for keys
+            # main.yaml itself defines.
+            for k in intersect(shared, keys(algo_cfg))
+                @warn "config: $(name).yaml overrides main.yaml key `$k` ($(cfg[k]) -> $(algo_cfg[k])). Shared keys — especially problem constraints — belong in main.yaml only."
+            end
+            merge!(cfg, algo_cfg)
         end
     end
     return cfg
@@ -78,6 +91,20 @@ const LANDMARK_SCENARIO  = Symbol(get(ENV, "SCENARIO", String(CFG["landmark_scen
 const DIR_UNCERTAINTY_PER_METER  = Float64(CFG["dir_uncertainty_per_meter"])
 const MAJ_MIN_UNC_RATIO          = Int(CFG["maj_min_unc_ratio"])
 const PERP_UNCERTAINTY_PER_METER = DIR_UNCERTAINTY_PER_METER / MAJ_MIN_UNC_RATIO
+# Random-walk process-noise rates (m² of variance per m travelled), used by
+# growth_covariance as Q = q·Δs. Linear in arc length, so a path's uncertainty
+# no longer depends on how finely it was sampled.
+#
+# UNC_CALIB_SEG_M is a CALIBRATION constant, not a sensor datasheet number: it
+# is the segment length at which this model reproduces the legacy quadratic
+# form (q·Δs == (rate·Δs)² exactly when Δs == UNC_CALIB_SEG_M). It is pinned to
+# 100 m — today's hex_width_m — so every uniform-hex path reports the number it
+# reported before, and unc_radius_threshold / barrier tuning carry over
+# unchanged. Deliberately NOT derived from HEX_WIDTH_M: changing the mesh must
+# not rescale the physics, which is the resolution dependence being fixed here.
+const UNC_CALIB_SEG_M = 100.0
+const Q_DIR_PER_M     = DIR_UNCERTAINTY_PER_METER^2  * UNC_CALIB_SEG_M
+const Q_PERP_PER_M    = PERP_UNCERTAINTY_PER_METER^2 * UNC_CALIB_SEG_M
 const MARKER_PROPORTION          = Float64(CFG["marker_proportion"])
 const LANDMARK_SENSOR_NOISE      = Float64(CFG["landmark_sensor_noise"])
 const COMM_SENSOR_NOISE          = Float64(CFG["comm_sensor_noise"])
@@ -91,8 +118,24 @@ const COMM_WIDTH                 = Float64(CFG["comm_width"])
 const COMM_WEIGHT_MIN            = Float64(CFG["comm_weight_min"])
 const COMM_INTERVAL_DIST         = Float64(CFG["comm_interval_dist"])
 const COMM_FUSION                = Symbol(CFG["comm_fusion"])   # :ci (Covariance Intersection) | :kf (legacy)
+
+# Problem constraints — the feasible set, shared by every algorithm rather than
+# owned by one planner's .yaml. An ablation is only a fair comparison if it is
+# held to the same constraints as the full pipeline, so these live here even
+# though hexspline_cl is currently their only consumer.
+const UNC_RADIUS_THRESHOLD       = Float64(CFG["unc_radius_threshold"])
+const UNC_FEAS_TOL               = Float64(CFG["unc_feas_tol"])
+const MIN_TURN_RADIUS_M          = Float64(CFG["min_turn_radius_m"])
+const MAX_CURVATURE              = 1.0 / MIN_TURN_RADIUS_M
 const HEX_WIDTH_M                = Float64(CFG["hex_width_m"])
 const HEX_RADIUS_M               = HEX_WIDTH_M / sqrt(3.0)
 const HEX_PADDING                = Int(CFG["hex_padding"])
+# Corridor extent, in metres, used by build_hex_graph. These do NOT derive from
+# hex_width_m, so they must be retuned alongside it: the row pitch is 1.5·hex_r,
+# and leaving the 260/300 defaults under a small hex would build hundreds of rows
+# (Floyd-Warshall is O(n³) — it never finishes). Defaults are the values that
+# were hardcoded in graph.jl, so an existing config that omits them is unchanged.
+const CORRIDOR_HALFWIDTH_M       = Float64(get(CFG, "corridor_halfwidth_m", 260.0))
+const CORRIDOR_Y_MAX_M           = Float64(get(CFG, "corridor_y_max_m",     300.0))
 const TRACK_COMM_EVENTS          = Bool(CFG["track_comm_events"])
 const TRACK_LANDMARK_EVENTS      = Bool(CFG["track_landmark_events"])
