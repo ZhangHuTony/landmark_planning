@@ -4,7 +4,6 @@
 # Algorithm-specific tuning. Only materialized when this planner is selected
 # (see src/config.jl / config/hexspline_cl.yaml).
 
-const ASTAR_MODE      = Symbol(CFG["astar_mode"])
 const PRIMARY_EPSILON = Float64(CFG["primary_epsilon"])
 
 # UNC_RADIUS_THRESHOLD / UNC_FEAS_TOL / MIN_TURN_RADIUS_M / MAX_CURVATURE are the
@@ -833,9 +832,6 @@ function joint_astar(graph::LandmarkGraph,
         end
 
         # ── Expansion: move all agents synchronously one edge at a time ──────
-        # NOTE: joint_astar_collect contains a near-duplicate of this closure.
-        # The two differ in: (a) pruning gates present only here, (b) exact_state_best
-        # guard condition, (c) enqueue style. See joint_astar_collect for the collect variant.
         candidate_nodes = Vector{Int}(undef, na)
         move_order = Vector{Int}(undef, na)
         move_order[1] = primary
@@ -967,229 +963,6 @@ function joint_astar(graph::LandmarkGraph,
     return [Int[] for _ in 1:na], zeros(na), Inf, iter_count
 end
 
-
-# ------------------------------------------------------------------
-# Collector variant of joint A*: run up to `max_iters` expansions and
-# collect all goal states popped. Returns a vector of tuples
-# (agent_paths, primary_dist, primary_unc, iter_popped).
-# ------------------------------------------------------------------
-function joint_astar_collect(graph::LandmarkGraph,
-                             lms::Vector{Landmark},
-                             unc_threshold::Float64,
-                             num_agents::Int; max_iters::Int=ASTAR_ITERATION_LIMIT)
-    # We'll largely reuse joint_astar logic but keep the loop focused on
-    # collecting goal pops rather than returning on first feasible solution.
-    n         = graph.n
-    goal      = n
-    na        = num_agents
-    primary   = na
-    is_goal_cell = falses(n)
-    for v in 1:(n-1); goal in graph.neighbors[v] && (is_goal_cell[v] = true); end
-
-    # Use single-agent fast path for na==1
-    if na == 1
-        # reuse single-agent search but collect all goal pops (rare)
-        w_astar = 1.0 + PRIMARY_EPSILON
-        init_visited = falses(n)
-        init_visited[1] = true
-        states_sa = State[]
-        push!(states_sa, State(1, 0.0, copy(lms[1].cov), -1, init_visited))
-        pq_sa = PriorityQueue{Int, Tuple{Float64, Float64}}()
-        h0 = graph.shortest_paths[1, goal]
-        enqueue!(pq_sa, 1, (w_astar * h0, unc_radius(states_sa[1].cov)))
-        frontier_at_node = Dict{Int, Vector{Tuple{Float64, Matrix{Float64}}}}()
-        frontier_at_node[1] = [(0.0, copy(states_sa[1].cov))]
-
-        iter_count_sa = 0
-        collected = []
-        spline_rejects = 0
-        t0 = time()
-        while !isempty(pq_sa) && iter_count_sa < max_iters
-            si = dequeue!(pq_sa)
-            S = states_sa[si]
-            iter_count_sa += 1
-            astar_progress(iter_count_sa, max_iters, t0)
-
-            if is_goal_cell[S.node]
-                path = Int[]; psi = si
-                while psi != -1
-                    pushfirst!(path, states_sa[psi].node)
-                    psi = states_sa[psi].parent
-                end
-                # Spline-level seed gate — see seed_spline_clear.
-                if !seed_spline_clear([path], graph, lms)
-                    spline_rejects += 1
-                    continue
-                end
-                exact_covs, exact_dists = evaluate_full_paths([path], graph, lms, 1)
-                exact_unc = unc_radius(exact_covs[1])
-                push!(collected, ( [path], exact_dists[1], exact_unc, iter_count_sa ))
-                continue
-            end
-
-            for u in graph.neighbors[S.node]
-                S.visited[u] && continue
-                nd = S.dist + graph.distance[S.node, u]
-                ncov = edge_cov_continuous(S.node, u, graph, lms, S.cov)
-                # Chance-constrained static-obstacle feasibility filter (no-op if none).
-                if !isempty(OBSTACLES)
-                    p0 = graph.landmarks[S.node]; p1 = graph.landmarks[u]
-                    segment_obstacle_free((p0.x, p0.y), (p1.x, p1.y), ncov) || continue
-                end
-                if !haskey(frontier_at_node, u)
-                    frontier_at_node[u] = Tuple{Float64, Matrix{Float64}}[]
-                end
-                dominated = false
-                for (od, ocov) in frontier_at_node[u]
-                    if od <= nd + 1e-9 && cov_dominates(ocov, ncov)
-                        dominated = true; break
-                    end
-                end
-                dominated && continue
-                kept = Tuple{Float64, Matrix{Float64}}[]
-                for (od, ocov) in frontier_at_node[u]
-                    if nd <= od + 1e-9 && cov_dominates(ncov, ocov)
-                        continue
-                    end
-                    push!(kept, (od, ocov))
-                end
-                push!(kept, (nd, copy(ncov)))
-                frontier_at_node[u] = kept
-
-                nvis = copy(S.visited); nvis[u] = true
-                push!(states_sa, State(u, nd, ncov, si, nvis))
-                nsi = length(states_sa)
-                nh = graph.shortest_paths[u, goal]
-                enqueue!(pq_sa, nsi, (nd + w_astar * nh, unc_radius(ncov)))
-            end
-        end
-
-        println()   # release the status-bar line
-        spline_rejects > 0 && println("  [Collector] $spline_rejects goal candidate(s) discarded: B-spline breaches an obstacle")
-        return collected
-    end
-
-    # For multi-agent case use joint A* core but collect goal pops
-    init_paths   = [fill(1, 1) for _ in 1:na]
-    init_visited = [falses(n) for _ in 1:na]
-    for a in 1:na; init_visited[a][1] = true; end
-    init_covs, init_dists = evaluate_full_paths(init_paths, graph, lms, na)
-    states = JointState[]; push!(states, JointState(init_paths, init_covs, init_dists, 0.0, -1, init_visited))
-    exact_state_best = Dict{Tuple{Vararg{Tuple{Vararg{Int}}}}, Int}()
-    exact_state_best[joint_path_key(init_paths)] = 1
-    w_astar = 1.0 + PRIMARY_EPSILON
-    pq = PriorityQueue{Int, Tuple{Float64, Float64, Float64}}()
-    init_h = joint_heuristic(init_paths, goal, graph)
-    init_f = init_dists[primary] + w_astar * init_h
-    enqueue!(pq, 1, (init_f, unc_radius(init_covs[primary]), support_idle_score(init_dists)))
-
-    frontier_by_signature = Dict{Any, Vector{Tuple{Float64, Matrix{Float64}}}}()
-    init_sig = (joint_node_key(init_paths), joint_visited_key(init_visited))
-    frontier_by_signature[init_sig] = [(0.0, copy(init_covs[primary]))]
-
-    iter_count = 0
-    collected = []
-    spline_rejects = 0
-    t0 = time()
-
-    while !isempty(pq) && iter_count < max_iters
-        si = dequeue!(pq); S = states[si]; iter_count += 1
-        astar_progress(iter_count, max_iters, t0)
-
-        if is_goal_cell[S.paths[primary][end]]
-            agent_paths = [copy(S.paths[a]) for a in 1:na]
-            # Spline-level seed gate — see seed_spline_clear.
-            if !seed_spline_clear(agent_paths, graph, lms)
-                spline_rejects += 1
-                continue
-            end
-            exact_covs, exact_dists = evaluate_full_paths(agent_paths, graph, lms, na)
-            exact_unc = unc_radius(exact_covs[primary])
-            push!(collected, (agent_paths, exact_dists[primary], exact_unc, iter_count))
-            # continue searching for other goal candidates
-            continue
-        end
-
-        # ── Expansion (near-duplicate of joint_astar's expand_joint_moves) ──────
-        # Differences from joint_astar: no pruning gates, different exact_state_best
-        # guard (haskey + > 0 check), inline f-value in enqueue call.
-        candidate_nodes = Vector{Int}(undef, na)
-        move_order = Vector{Int}(undef, na)
-        move_order[1] = primary; order_pos = 2
-        for a in 1:na; a == primary && continue; move_order[order_pos] = a; order_pos += 1; end
-
-        function expand_joint_moves(agent_idx::Int, primary_dist::Float64)
-            if agent_idx > na
-                new_paths = [copy(S.paths[a]) for a in 1:na]
-                new_covs = Vector{Matrix{Float64}}(undef, na)
-                new_dists = Vector{Float64}(undef, na)
-                new_visited = [copy(S.visited[a]) for a in 1:na]
-                for a in 1:na
-                    u = candidate_nodes[a]
-                    prev_node = S.paths[a][end]
-                    push!(new_paths[a], u)
-                    new_dists[a] = S.dists[a] + graph.distance[prev_node, u]
-                    new_covs[a] = edge_cov_continuous(prev_node, u, graph, lms, S.covs[a])
-                    new_visited[a][u] = true
-                end
-                for a in 1:(primary - 1); new_dists[a] > new_dists[primary] && return; end
-                new_covs = apply_joint_step_comms(new_covs, candidate_nodes, new_dists, graph)
-                # Chance-constrained static-obstacle feasibility filter (no-op if none).
-                if !isempty(OBSTACLES)
-                    for a in 1:na
-                        p0 = graph.landmarks[S.paths[a][end]]; p1 = graph.landmarks[candidate_nodes[a]]
-                        segment_obstacle_free((p0.x, p0.y), (p1.x, p1.y), new_covs[a]) || return
-                    end
-                end
-                new_g = new_dists[primary]
-                sig_key = (joint_node_key(new_paths), joint_visited_key(new_visited))
-                labels = get(frontier_by_signature, sig_key, Tuple{Float64, Matrix{Float64}}[])
-                for (od, ocov) in labels
-                    if od <= new_g + 1e-9 && cov_dominates(ocov, new_covs[primary])
-                        return
-                    end
-                end
-                kept_labels = Tuple{Float64, Matrix{Float64}}[]
-                for (od, ocov) in labels
-                    if new_g <= od + 1e-9 && cov_dominates(new_covs[primary], ocov)
-                        continue
-                    end
-                    push!(kept_labels, (od, ocov))
-                end
-                push!(kept_labels, (new_g, copy(new_covs[primary])))
-                frontier_by_signature[sig_key] = kept_labels
-                new_path_key = joint_path_key(new_paths)
-                if haskey(exact_state_best, new_path_key) && exact_state_best[new_path_key] > 0
-                    return
-                end
-                push!(states, JointState(copy(new_paths), new_covs, new_dists, new_g, si, new_visited))
-                new_si = length(states)
-                exact_state_best[new_path_key] = new_si
-                enqueue!(pq, new_si, (new_g + w_astar * joint_heuristic(new_paths, goal, graph), unc_radius(new_covs[primary]), support_idle_score(new_dists)))
-                return
-            end
-            agent = move_order[agent_idx]
-            curr_node = S.paths[agent][end]
-            for u in graph.neighbors[curr_node]
-                S.visited[agent][u] && continue
-                candidate_nodes[agent] = u
-                if agent == primary
-                    primary_dist_next = S.dists[primary] + graph.distance[curr_node, u]
-                    expand_joint_moves(agent_idx + 1, primary_dist_next)
-                else
-                    support_dist_next = S.dists[agent] + graph.distance[curr_node, u]
-                    support_dist_next <= primary_dist && expand_joint_moves(agent_idx + 1, primary_dist)
-                end
-            end
-        end
-
-        expand_joint_moves(1, S.dists[primary])
-    end
-
-    println()   # release the status-bar line
-    spline_rejects > 0 && println("  [Collector] $spline_rejects goal candidate(s) discarded: B-spline breaches an obstacle")
-    return collected
-end
 
 # ==========================================================================
 # Continuous spline optimizer — barrier-based search in control-point space
@@ -1635,10 +1408,8 @@ end
 # Entry point: joint discrete A* seed search -> continuous B-spline refinement
 # ==========================================================================
 # Returns a Vector of solutions (NamedTuples: id, ctrls, primary_length,
-# primary_unc). In `astar_mode: threshold` this is a single "main" solution;
-# in `astar_mode: limit` it is the full Pareto front (main + one per seed) --
-# see notes/PLAN.md "Pareto front handling" for why this is a Vector and not
-# a single path.
+# primary_unc) -- one "main" solution, the first feasible seed the A* finds.
+# (Still a Vector: the interface in notes/PLAN.md is multi-solution.)
 # Shared engine for the hexspline_cl family of pipelines. `seed_mode` picks the
 # discrete seed source (:discrete = joint A*, :straight = direct start→goal line,
 # no search); `run_continuous` toggles the B-spline refinement stage. The three
@@ -1671,90 +1442,22 @@ function _plan_hexspline(scenario, graph::LandmarkGraph, output_dir::String;
         println("  Discrete acceptance relaxed for continuous handoff: threshold=$(round(UNC_RADIUS_THRESHOLD, digits=4)) -> $(round(disc_unc_threshold, digits=4))")
     end
 
-    pareto_collected = Vector{Tuple{Vector{Vector{Int}}, Float64, Float64, Int}}()
     discrete_iter = 0
 
     function run_discrete_seed_search(search_unc_threshold::Float64)
-        println("\n  Running joint discrete A* collector (threshold=$(round(search_unc_threshold, digits=4)))... (max_iters=$(ASTAR_ITERATION_LIMIT))")
-        # :limit collects every non-dominated discrete candidate up to the
-        # iteration budget and builds a genuine Pareto front (multiple seeds
-        # go on to their own continuous refinement). :threshold always stops
-        # at the first feasible candidate, so there is only ever one seed —
-        # no front to prune/collect/plot, so that machinery is skipped
-        # entirely rather than run trivially over a 1-element list.
-        if ASTAR_MODE == :limit
-            collected = joint_astar_collect(graph, landmarks, search_unc_threshold, NUM_AGENTS; max_iters=ASTAR_ITERATION_LIMIT)
-            if isempty(collected)
-                println("  ✗ No goal candidates found by A* collector")
-                return [Int[] for _ in 1:(NUM_AGENTS - 1)], Int[], Inf
-            end
-
-            # Each entry: (agent_paths, dist, unc, iter)
-            # Compute Pareto front (minimize dist and unc)
-            tol = 1e-9
-            pareto = Vector{Tuple{Vector{Vector{Int}}, Float64, Float64, Int}}()
-            for (paths_c, d_c, u_c, it) in collected
-                dominated = false
-                for (p_paths, p_d, p_u, _) in pareto
-                    if p_d <= d_c + tol && p_u <= u_c + tol
-                        dominated = true; break
-                    end
-                end
-                if dominated; continue; end
-                # remove any existing pareto points dominated by this one
-                keep = Vector{Tuple{Vector{Vector{Int}}, Float64, Float64, Int}}()
-                for item in pareto
-                    p_paths, p_d, p_u, p_it = item
-                    if d_c <= p_d + tol && u_c <= p_u + tol
-                        continue
-                    end
-                    push!(keep, item)
-                end
-                push!(keep, (paths_c, d_c, u_c, it))
-                pareto = keep
-            end
-
-            # Sort pareto by increasing distance
-            sort!(pareto, by = x -> x[2])
-
-            # Plot Pareto front
-            ds = [x[2] for x in pareto]
-            us = [x[3] for x in pareto]
-            pltp = plot(ds, us, seriestype=:scatter, xlabel="Primary distance", ylabel="Primary uncertainty", title="Pareto (distance vs uncertainty)", legend=false)
-            for (i, (pp, pd, pu, it)) in enumerate(pareto)
-                annotate!(pltp, pd, pu, text("$i", :black, 8))
-            end
-            savefig(pltp, fig_path(output_dir, "fig_pareto_discrete.png")); println("Fig Pareto (discrete) saved: $(length(pareto)) points")
-
-            # Store pareto set for later continuous refinement
-            pareto_collected = pareto
-            discrete_iter = pareto[1][4]
-            println("  Pareto seeds collected: $(length(pareto)). Continuous refinement deferred until optimizer is available.")
-
-            # Return first Pareto entry as a representative seed (for compatibility)
-            first_paths, first_d, first_u, _ = pareto[1]
-            support_paths = pad_support_paths_to_primary(first_paths[1:NUM_AGENTS-1], first_paths[NUM_AGENTS])
-            primary_path = first_paths[NUM_AGENTS]
-            primary_dist = first_d
-            return support_paths, primary_path, primary_dist
-
-        elseif ASTAR_MODE == :threshold
-            println("  Running threshold-stop A* (stops on first feasible under threshold)...")
-            ppaths, pdists, punc, disc_iter = joint_astar(graph, landmarks, search_unc_threshold, NUM_AGENTS)
-            if length(ppaths) != NUM_AGENTS || any(isempty, ppaths)
-                println("  ✗ No feasible path found by threshold-stop A*")
-                return [Int[] for _ in 1:(NUM_AGENTS - 1)], Int[], Inf
-            end
-            discrete_iter = disc_iter
-
-            support_paths = pad_support_paths_to_primary(ppaths[1:NUM_AGENTS-1], ppaths[NUM_AGENTS])
-            primary_path = ppaths[NUM_AGENTS]
-            primary_dist = pdists[NUM_AGENTS]
-            return support_paths, primary_path, primary_dist
-        else
-            error("Unsupported ASTAR_MODE=$(ASTAR_MODE). Use :limit or :threshold")
+        println("\n  Running joint discrete A* (threshold=$(round(search_unc_threshold, digits=4)))... (max_iters=$(ASTAR_ITERATION_LIMIT))")
+        println("  Stops on the first feasible candidate under the threshold.")
+        ppaths, pdists, punc, disc_iter = joint_astar(graph, landmarks, search_unc_threshold, NUM_AGENTS)
+        if length(ppaths) != NUM_AGENTS || any(isempty, ppaths)
+            println("  ✗ No feasible path found by A*")
+            return [Int[] for _ in 1:(NUM_AGENTS - 1)], Int[], Inf
         end
+        discrete_iter = disc_iter
+
+        support_paths = pad_support_paths_to_primary(ppaths[1:NUM_AGENTS-1], ppaths[NUM_AGENTS])
+        return support_paths, ppaths[NUM_AGENTS], pdists[NUM_AGENTS]
     end
+
 
     if seed_mode == :straight
         println("\n  seed_mode=:straight — skipping discrete search and using direct start→goal seed")
@@ -1793,7 +1496,7 @@ function _plan_hexspline(scenario, graph::LandmarkGraph, output_dir::String;
         println("  ├─ Communication: every $(COMM_INTERVAL)m, sigmoid taper range=$(COMM_RANGE)m width=$(COMM_WIDTH)m")
         println("  └─ All agents' uncertainties benefit from synchronized Kalman fusion at checkpoints")
 
-        if seed_mode == :discrete && CONTINUE_ASTAR_ON_INFEASIBLE && ASTAR_MODE != :limit && unc_exceeds_threshold(primary_goal_unc, disc_unc_threshold, UNC_FEAS_TOL)
+        if seed_mode == :discrete && CONTINUE_ASTAR_ON_INFEASIBLE && unc_exceeds_threshold(primary_goal_unc, disc_unc_threshold, UNC_FEAS_TOL)
             println("\n  Seed exceeded relaxed discrete threshold (goal_unc=$(round(primary_goal_unc, digits=4)) > threshold=$(round(disc_unc_threshold, digits=4))).")
             println("  Continuing A* under relaxed threshold...")
             next_support_paths, next_primary_path, next_primary_dist = run_discrete_seed_search(disc_unc_threshold)
@@ -1924,11 +1627,11 @@ function _plan_hexspline(scenario, graph::LandmarkGraph, output_dir::String;
         save_path_figures(plt1, fig_path(output_dir, "fig1_joint_discrete_astar.png"),
                            comm_events_fig1, landmark_events_fig1)
         println("Fig 1 saved.")
-        # Discrete events are only the deliverable when no continuous stage will
-        # run (plan_discrete_only, or no feasible path). Otherwise the continuous
-        # refinement overwrites these CSVs with events from the FINAL spline --
-        # writing the discrete ones here would describe a path we don't ship.
-        if !(run_continuous && have_paths)
+        # Only write the discrete events when nothing downstream will: both
+        # pipelines ship a spline and overwrite these CSVs with its events
+        # (continuous refinement below, or the discrete_only branch) -- writing
+        # the polyline's events here would describe a path we don't ship.
+        if !have_paths
             if TRACK_COMM_EVENTS
                 write_comm_csv(csv_path(output_dir, "comm_events.csv"), comm_events_fig1)
             end
@@ -1961,39 +1664,60 @@ function _plan_hexspline(scenario, graph::LandmarkGraph, output_dir::String;
         end
         push!(solutions, (id=0, ctrls=opt_ctrls, primary_length=opt_len, primary_unc=opt_unc))
     elseif !run_continuous && have_paths
-        # discrete_only pipeline: the discrete node polyline IS the deliverable.
-        # Downstream (run_path_eval / mc_nees) reads main_ctrls.csv as waypoints
-        # and evaluates it directly, so write the node coordinates (pin primary's
-        # last point to the exact goal, matching the continuous stage).
-        disc_ctrls = [[(graph.landmarks[i].x, graph.landmarks[i].y) for i in p] for p in paths]
-        disc_ctrls[end][end] = (graph.landmarks[goal_node].x, graph.landmarks[goal_node].y)
+        # discrete_only pipeline: the deliverable is the B-SPLINE through the A*
+        # seed's control points, not the node polyline. The spline is what the
+        # agents actually fly (it cuts the hex corners); the polyline is only the
+        # search's abstraction of it. Built by seed_control_points -- the same map
+        # optimize_continuous seeds from -- so discrete_only ships exactly
+        # hexspline_cl's seed trajectory, just unrefined.
+        disc_ctrls = seed_control_points(paths, graph)
         write_ctrls_csv(csv_path(output_dir, "main_ctrls.csv"), disc_ctrls)
-        push!(solutions, (id=0, ctrls=disc_ctrls, primary_length=dists[end], primary_unc=uncs[end]))
-    end
 
-    # If Pareto seeds were collected earlier, run continuous optimizer for each now
-    optimized_results = Tuple[]
-    if run_continuous && length(pareto_collected) > 0
-        println("\nRunning continuous refinement for $(length(pareto_collected)) Pareto seeds...")
-        for (i, (ppaths, pdist, punc, it)) in enumerate(pareto_collected)
-            println("  Refining Pareto seed $i (dist=$(round(pdist,digits=3)), unc=$(round(punc,digits=4)))")
-            support_paths = pad_support_paths_to_primary(ppaths[1:NUM_AGENTS-1], ppaths[NUM_AGENTS])
-            primary_path = ppaths[NUM_AGENTS]
-            all_paths = vcat(support_paths, [primary_path])
-            opt_len, opt_unc, opt_wpts, opt_covs, opt_ctrls, seed_refine = optimize_continuous(all_paths, graph, landmarks, NUM_AGENTS, output_dir; cont_threshold=punc, fig_prefix="pareto_$(i)")
-            write_ctrls_csv(csv_path(output_dir, "pareto_$(i)_ctrls.csv"), opt_ctrls)
-            push!(optimized_results, (i, pdist, punc, opt_len, opt_unc, opt_wpts, opt_covs, opt_ctrls, seed_refine))
-            push!(solutions, (id=i, ctrls=opt_ctrls, primary_length=opt_len, primary_unc=opt_unc))
+        # Score the spline, not the polyline: length off the sampled curve, and
+        # uncertainty through the same evaluation the continuous stage reports
+        # (CONT_UNC_USE_WAYPOINTS, mirroring cont_eval_paths in optimize_continuous).
+        disc_wpts = [first(bspline_sample_path(c)) for c in disc_ctrls]
+        disc_len  = bspline_path_length(disc_wpts[end])
+        disc_covs, disc_arcs, disc_comm, disc_lm = evaluate_joint_discrete(
+            CONT_UNC_USE_WAYPOINTS ? disc_ctrls : disc_wpts, landmarks, NUM_AGENTS)
+        disc_unc = unc_radius(disc_covs[end][end])
+        println("Discrete-only spline: prim_len=$(round(disc_len, digits=3)), unc=$(round(disc_unc, digits=4))")
+
+        # Events of the shipped spline (fig1's are the A* polyline's -- see the
+        # write it defers to there).
+        if TRACK_COMM_EVENTS
+            write_comm_csv(csv_path(output_dir, "comm_events.csv"), disc_comm)
+        end
+        if TRACK_LANDMARK_EVENTS
+            write_landmark_csv(csv_path(output_dir, "landmark_events.csv"), disc_lm)
         end
 
-        # Overlay optimized primary paths from Pareto seeds
-        plt_overlay = make_base_plot(landmarks, graph)
-        for (i, pdist, punc, opt_len, opt_unc, opt_wpts, opt_covs, opt_ctrls, _) in optimized_results
-            prim = opt_wpts[end]
-            xs = [w[1] for w in prim]; ys = [w[2] for w in prim]
-            plot!(plt_overlay, xs, ys, label="pareto_$i (len=$(round(opt_len,digits=2)), unc=$(round(opt_unc,digits=4)))")
+        # Figure of what we ship. fig1 stays the A* diagnostic (shared with the
+        # other two pipelines), so the spline gets its own.
+        plt_sp = make_base_plot(landmarks, graph)
+        for ai in 1:NUM_AGENTS
+            is_prim = (ai == NUM_AGENTS)
+            xs = [w[1] for w in disc_wpts[ai]]
+            ys = [w[2] for w in disc_wpts[ai]]
+            is_prim || (ys = ys .+ (SUPPORT_PLOT_OFFSET_M * ai))
+            plot!(plt_sp, xs, ys, label=(is_prim ? "primary" : "support $ai (offset)"),
+                  color=(is_prim ? :blue : get(agent_colors, ai, :gray)),
+                  linewidth=(is_prim ? 2.4 : 1.3), linestyle=(is_prim ? :solid : :dash))
         end
-        savefig(plt_overlay, fig_path(output_dir, "fig_pareto_continuous_overlay.png")); println("Fig Pareto continuous overlay saved.")
+        title!(plt_sp, "Discrete-only spline [len=$(round(disc_len,digits=2)), unc=$(round(disc_unc,digits=3))]")
+        xlabel!(plt_sp, "x (m)"); ylabel!(plt_sp, "y (m)")
+        save_path_figures(plt_sp, fig_path(output_dir, "fig_discrete_spline.png"), disc_comm, disc_lm)
+        save_unc_figures([("", disc_arcs, disc_covs, :solid, 2.0, 1.3)], NUM_AGENTS,
+                         fig_path(output_dir, "main_unc_profile.png");
+                         threshold=UNC_RADIUS_THRESHOLD,
+                         title="discrete_only — uncertainty profile ($(LANDMARK_SCENARIO))")
+
+        # results.yaml's continuous_* fields = the shipped trajectory's metrics.
+        # Non-null here now: the path IS a continuous curve, only unoptimized
+        # (refinement_status stays absent, which is what marks it unrefined).
+        main_cont_len  = disc_len
+        main_cont_uncs = [unc_radius(disc_covs[a][end]) for a in 1:NUM_AGENTS]
+        push!(solutions, (id=0, ctrls=disc_ctrls, primary_length=disc_len, primary_unc=disc_unc))
     end
 
     # ==========================================================================
@@ -2004,8 +1728,15 @@ function _plan_hexspline(scenario, graph::LandmarkGraph, output_dir::String;
         fmt3(x) = isfinite(x) ? string(round(x, digits=3)) : "null"
         fmtlist(v) = isempty(v) ? "[]" : "[" * join(fmt4.(v), ", ") * "]"
 
-        write(io, "astar_mode: $(ASTAR_MODE)\n")
         write(io, "main:\n")
+        # The two-key contract every planner honours, batch harnesses read, and
+        # nothing else in results.yaml is required to satisfy. Named for the
+        # deliverable rather than the stage that produced it, so a planner with
+        # no continuous phase (or one that doesn't exist yet) reports through
+        # the same field instead of an awkwardly-named `continuous_*`. Both are
+        # null exactly when no solution was returned.
+        write(io, "  primary_length: $(fmt3(isempty(solutions) ? NaN : solutions[1].primary_length))\n")
+        write(io, "  primary_unc: $(fmt4(isempty(solutions) ? NaN : solutions[1].primary_unc))\n")
         write(io, "  astar_iterations: $(converged_iter)\n")
         write(io, "  discrete_uncertainties: $(fmtlist(isempty(paths) ? Float64[] : uncs))\n")
         write(io, "  continuous_primary_length: $(fmt3(main_cont_len))\n")
@@ -2016,24 +1747,6 @@ function _plan_hexspline(scenario, graph::LandmarkGraph, output_dir::String;
         if !isnothing(main_refine)
             write(io, "  refinement_status: $(main_refine.status)\n")
             write(io, "  refinement_min_slack: $(fmt4(main_refine.min_slack))\n")
-        end
-        if !isempty(pareto_collected)
-            write(io, "pareto_seeds:\n")
-            for (idx, (pp, pd, pu, it)) in enumerate(pareto_collected)
-                write(io, "  - rank: $(idx)\n")
-                write(io, "    astar_iterations: $(it)\n")
-                write(io, "    discrete_primary_unc: $(fmt4(pu))\n")
-                r = findfirst(x -> x[1] == idx, optimized_results)
-                if !isnothing(r)
-                    _, _, _, clen, _, _, ccovs, _, crefine = optimized_results[r]
-                    cont_uncs = (!isempty(ccovs) && all(a -> !isempty(ccovs[a]), 1:NUM_AGENTS)) ?
-                        [unc_radius(ccovs[a][end]) for a in 1:NUM_AGENTS] : Float64[]
-                    write(io, "    continuous_primary_length: $(fmt3(clen))\n")
-                    write(io, "    continuous_uncertainties: $(fmtlist(cont_uncs))\n")
-                    write(io, "    refinement_status: $(crefine.status)\n")
-                    write(io, "    refinement_min_slack: $(fmt4(crefine.min_slack))\n")
-                end
-            end
         end
     end
 

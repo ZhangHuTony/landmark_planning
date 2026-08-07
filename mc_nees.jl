@@ -7,11 +7,11 @@
 # fusion math in src/covariance.jl is self-consistent — i.e. inter-agent comm
 # fusion is NOT double-counting shared information (not overconfident).
 #
-#   A consistent filter  → mean NEES ≈ state dim = 2.
-#   Double-counting (kf) → NEES > 2 once the same pair fuses repeatedly.
+#   A consistent filter → mean NEES ≈ state dim = 2; a double-counting one
+#   gives NEES > 2 once the same pair fuses repeatedly.
 #
 # Usage:
-#   julia mc_nees.jl <path/to/<planner>/csv> [--fusion ci|kf] [--trials M] [--seed S]
+#   julia mc_nees.jl <path/to/<planner>/csv> [--trials M] [--seed S]
 #
 # All covariance ALGEBRA is reused verbatim from src/covariance.jl (READ-ONLY):
 # growth_covariance, accumulate_landmark_info, kalman_info_update, inv2,
@@ -24,9 +24,9 @@
 #               at the plan position; x̂⁺ = Σ⁺(Σ⁻⁻¹x̂ + I_tot·x_true + n)
 #   - comm:     RELATIVE, correlated — z_self = x̂_other + (x_true_self − x_true_other) + v,
 #               v ~ N(0, COMM_SENSOR_NOISE²·I).  z carries the OTHER agent's estimate
-#               error, so repeated fusion of the same pair shares history (the thing kf
-#               double-counts).  The 1/w taper inflates only the filter's assumed cov
-#               (as ci_comm/kf do), never the truth-side draw v.
+#               error, so repeated fusion of the same pair shares history -- the thing a
+#               naive information add double-counts.  The 1/w taper inflates only the
+#               filter's assumed cov (as ci_comm does), never the truth-side draw v.
 # Each choice above was derived so that Cov(e[k]) = Σ[k] for a consistent update.
 # ==========================================================================
 
@@ -38,7 +38,7 @@ using Plots
 const N_SCATTER = 600   # per-waypoint estimate-error samples kept for the consistency plot
 
 # ---- CLI (parsed before config.jl, which consumes ARGS[1] as the config dir) ----
-length(ARGS) >= 1 || error("usage: julia mc_nees.jl <path/to/<planner>/csv> [--fusion ci|kf] [--trials M] [--seed S]")
+length(ARGS) >= 1 || error("usage: julia mc_nees.jl <path/to/<planner>/csv> [--trials M] [--seed S]")
 
 function _flag(name::String, default)
     i = findfirst(==(name), ARGS)
@@ -48,7 +48,6 @@ end
 
 const CSV_DIR = abspath(ARGS[1])
 isdir(CSV_DIR) || error("not a directory: $CSV_DIR")
-const _FUSION_OVERRIDE = _flag("--fusion", nothing)
 const M_TRIALS  = parse(Int, _flag("--trials", "2000"))
 const BASE_SEED = parse(Int, _flag("--seed", "1"))
 const PLOTS     = findfirst(==("--plots"), ARGS) !== nothing
@@ -67,9 +66,6 @@ include(joinpath(_ROOT, "src", "config.jl"))
 include(joinpath(_ROOT, "src", "graph.jl"))
 include(joinpath(_ROOT, "src", "covariance.jl"))
 include(joinpath(_ROOT, "src", "viz.jl"))
-
-const FUSION = _FUSION_OVERRIDE === nothing ? COMM_FUSION : Symbol(_FUSION_OVERRIDE)
-FUSION in (:ci, :kf) || error("--fusion must be ci or kf, got $(FUSION)")
 
 # ponytail: mc only supports the polyline-of-control-points evaluation the planner
 # uses under cont_unc_use_waypoints=true. If false, the planner scored the sampled
@@ -140,34 +136,24 @@ function propagate_segment_mc!(covs, means, pos, lms, from_idx, to_idx, cov, mea
 end
 
 # --------------------------------------------------------------------------
-# Bidirectional inter-agent comm fusion at a checkpoint. Covariance ops match
-# covariance.jl (ci_comm for :ci; the inline weighted-info add for :kf); the
-# mean uses the matching info weights on the relative-correlated pseudo-msmt.
+# Bidirectional inter-agent comm fusion at a checkpoint. Covariance ops are
+# ci_comm verbatim from covariance.jl; the mean uses the matching info weights
+# on the relative-correlated pseudo-msmt.
 # xt* = truth = plan position. Returns (Σs⁺, x̂s⁺, Σr⁺, x̂r⁺).
 # --------------------------------------------------------------------------
-function comm_fuse(fusion, Σs, x̂s, xts, Σr, x̂r, xtr, w, rng)
+function comm_fuse(Σs, x̂s, xts, Σr, x̂r, xtr, w, rng)
     R = COMM_SENSOR_NOISE^2 .* [1.0 0.0; 0.0 1.0]
     # Pseudo-measurements: z_self = x̂_other + (x_true_self − x_true_other) + v
     z_s = x̂r .+ (xts .- xtr) .+ sample_gauss(R, rng)   # s's msmt, from r's estimate
     z_r = x̂s .+ (xtr .- xts) .+ sample_gauss(R, rng)   # r's msmt, from s's estimate
-    if fusion === :ci
-        Σs⁺, Σr⁺ = ci_comm(Σs, Σr, w)                  # covariance verbatim from library
-        Ia = inv2(Σs); Itb = inv2((Σr .+ R) ./ w)      # s ← r : ω and info weights
-        ωa = ci_omega_det(Ia, Itb)
-        Ib = inv2(Σr); Ita = inv2((Σs .+ R) ./ w)      # r ← s
-        ωb = ci_omega_det(Ib, Ita)
-        x̂s⁺ = Σs⁺ * (ωa .* (Ia * x̂s) .+ (1.0-ωa) .* (Itb * z_s))
-        x̂r⁺ = Σr⁺ * (ωb .* (Ib * x̂r) .+ (1.0-ωb) .* (Ita * z_r))
-        return Σs⁺, x̂s⁺, Σr⁺, x̂r⁺
-    else  # :kf — legacy weighted information-filter add (mirrors covariance.jl:357)
-        It_s = w .* inv2(Σr .+ R)                       # s fuses r's (Σ_r+R) at weight w
-        It_r = w .* inv2(Σs .+ R)                       # r fuses s's (Σ_s+R)
-        Σs⁺ = inv2(inv2(Σs) .+ It_s)
-        Σr⁺ = inv2(inv2(Σr) .+ It_r)
-        x̂s⁺ = Σs⁺ * (inv2(Σs) * x̂s .+ It_s * z_s)
-        x̂r⁺ = Σr⁺ * (inv2(Σr) * x̂r .+ It_r * z_r)
-        return Σs⁺, x̂s⁺, Σr⁺, x̂r⁺
-    end
+    Σs⁺, Σr⁺ = ci_comm(Σs, Σr, w)                  # covariance verbatim from library
+    Ia = inv2(Σs); Itb = inv2((Σr .+ R) ./ w)      # s ← r : ω and info weights
+    ωa = ci_omega_det(Ia, Itb)
+    Ib = inv2(Σr); Ita = inv2((Σs .+ R) ./ w)      # r ← s
+    ωb = ci_omega_det(Ib, Ita)
+    x̂s⁺ = Σs⁺ * (ωa .* (Ia * x̂s) .+ (1.0-ωa) .* (Itb * z_s))
+    x̂r⁺ = Σr⁺ * (ωb .* (Ib * x̂r) .+ (1.0-ωb) .* (Ita * z_r))
+    return Σs⁺, x̂s⁺, Σr⁺, x̂r⁺
 end
 
 # --------------------------------------------------------------------------
@@ -175,7 +161,7 @@ end
 # apply_synchronized_propagation!, threading covariance (deterministic) and
 # the noisy estimate mean. Returns per-agent (covs, means); truth = positions.
 # --------------------------------------------------------------------------
-function run_trial(fusion, positions, lms, na, rng)
+function run_trial(positions, lms, na, rng)
     lens = [length(positions[a]) for a in 1:na]
     arcs = [cum_arc(positions[a]) for a in 1:na]
     Σ0   = copy(lms[1].cov)
@@ -209,7 +195,7 @@ function run_trial(fusion, positions, lms, na, rng)
             ps = positions[s][is]; pr = positions[r][ir]
             w = comm_weight((ps[1]-pr[1])^2 + (ps[2]-pr[2])^2)
             w > COMM_WEIGHT_MIN || continue
-            Σs⁺, x̂s⁺, Σr⁺, x̂r⁺ = comm_fuse(fusion,
+            Σs⁺, x̂s⁺, Σr⁺, x̂r⁺ = comm_fuse(
                 covs[s][is], means[s][is], [ps[1], ps[2]],
                 covs[r][ir], means[r][ir], [pr[1], pr[2]], w, rng)
             covs[s][is] = Σs⁺; means[s][is] = x̂s⁺
@@ -232,7 +218,7 @@ end
 # --------------------------------------------------------------------------
 # Aggregate M trials into per-waypoint NEES for the primary agent.
 # --------------------------------------------------------------------------
-function run_nees(fusion, positions, lms, na, M, base_seed)
+function run_nees(positions, lms, na, M, base_seed)
     primary = na
     np = length(positions[primary])
     Σ_track = Vector{Matrix{Float64}}(undef, np)   # deterministic across trials
@@ -241,8 +227,8 @@ function run_nees(fusion, positions, lms, na, M, base_seed)
     errs = [Vector{Tuple{Float64,Float64}}() for _ in 1:np]   # primary estimate errors (subsample)
 
     for m in 1:M
-        rng = MersenneTwister(base_seed + m)       # per-trial seed ⇒ CRN across ci/kf at same base_seed
-        covs, means = run_trial(fusion, positions, lms, na, rng)
+        rng = MersenneTwister(base_seed + m)       # per-trial seed ⇒ common random numbers across runs
+        covs, means = run_trial(positions, lms, na, rng)
         m == 1 && (Σ_track = covs[primary])
         for k in 1:np
             e = [positions[primary][k][1], positions[primary][k][2]] .- means[primary][k]
@@ -261,7 +247,7 @@ end
 function selfcheck()
     lms = [Landmark(50.0, 25.0, [1.0 0.0; 0.0 1.0])]
     positions = [[(float(x), 0.0) for x in 0.0:5.0:120.0]]
-    nees, _, _ = run_nees(:ci, positions, lms, 1, 3000, 90000)
+    nees, _, _ = run_nees(positions, lms, 1, 3000, 90000)
     mean_nees = sum(nees) / length(nees)
     @assert abs(mean_nees - 2.0) < 0.25 "self-check FAILED: process+landmark mean NEES = $(round(mean_nees,digits=3)) (expected ≈ 2)"
     println("  self-check OK: process+landmark mean NEES = $(round(mean_nees, digits=3)) ≈ 2")
@@ -284,18 +270,16 @@ function read_nees_csv(file)
     return steps, vals, lo, hi
 end
 
-# NEES vs step, overlaying every nees_<mode>.csv present in the folder so a
-# ci run and a kf run land on one comparison figure.
+# NEES vs step.
 function plot_nees_curves(csv_dir, out_png)
     plt = plot(xlabel="waypoint (step)", ylabel="mean NEES (primary)",
                title="Filter consistency — NEES vs step", size=(820, 460), legend=:topright)
     lo = hi = nothing
-    for (mode, clr) in ((:ci, :seagreen), (:kf, :crimson))
-        f = joinpath(csv_dir, "nees_$(mode).csv")
-        isfile(f) || continue
-        steps, vals, l, h = read_nees_csv(f)
-        lo, hi = l, h
-        plot!(plt, steps, vals, marker=:circle, ms=4, lw=2, color=clr, label=string(mode))
+    let f = joinpath(csv_dir, "nees.csv")
+        if isfile(f)
+            steps, vals, lo, hi = read_nees_csv(f)
+            plot!(plt, steps, vals, marker=:circle, ms=4, lw=2, color=:seagreen, label="ci")
+        end
     end
     if lo !== nothing
         hspan!(plt, [lo, hi], color=:green, alpha=0.12, label="consistent band")
@@ -319,13 +303,13 @@ end
 # colors, with each run's primary position estimate (est = truth − e) scattered
 # over them and the planned path overlaid. A consistent filter keeps estimates
 # within the bands in the expected proportions (~39%/86%/99% inside 1/2/3σ);
-# an overconfident kf spills its estimates past the bands.
-function plot_consistency(errs, Σ_track, positions_primary, fusion, out_png)
+# an overconfident filter spills its estimates past the bands.
+function plot_consistency(errs, Σ_track, positions_primary, out_png)
     np = length(Σ_track)
     px = [p[1] for p in positions_primary]; py = [p[2] for p in positions_primary]
     plt = plot(size=(2000, 620), legend=:topright, aspect_ratio=:equal,
                xlabel="x (m)", ylabel="y (m)",
-               title="$(uppercase(string(fusion))): 1σ/2σ/3σ bands (filter Σ) at true waypoints vs run estimates")
+               title="1σ/2σ/3σ bands (filter Σ) at true waypoints vs run estimates")
     plot!(plt, px, py, color=:black, lw=1.5, alpha=0.6, label="planned path")
 
     # Draw outer→inner so inner bands sit on top; distinct color per band.
@@ -370,13 +354,13 @@ const NA = length(positions)
 const PRIMARY = NA
 
 println("  run: $(RUN_DIR)")
-println("  landmarks: $(length(landmarks))   agents: $(NA) (primary = $(PRIMARY))   fusion: $(FUSION)   trials: $(M_TRIALS)")
+println("  landmarks: $(length(landmarks))   agents: $(NA) (primary = $(PRIMARY))   trials: $(M_TRIALS)")
 
 # Fidelity check: our deterministic covariance track must match the library's
-# evaluate_joint_discrete (config fusion mode) waypoint-for-waypoint.
-if FUSION === COMM_FUSION
+# evaluate_joint_discrete waypoint-for-waypoint.
+let
     lib_covs, _, _, _ = evaluate_joint_discrete(positions, landmarks, NA)
-    _, Σ_track, _ = run_nees(FUSION, positions, landmarks, NA, 1, 0)
+    _, Σ_track, _ = run_nees(positions, landmarks, NA, 1, 0)
     maxdiff = maximum(abs(unc_radius(Σ_track[k]) - unc_radius(lib_covs[PRIMARY][k])) for k in 1:length(positions[PRIMARY]))
     @assert maxdiff < 1e-9 "covariance track diverges from library by $(maxdiff) — mc loop does not mirror apply_synchronized_propagation!"
     println("  covariance fidelity OK: matches evaluate_joint_discrete (max Δ = $(maxdiff))")
@@ -384,7 +368,7 @@ if FUSION === COMM_FUSION
 end
 
 # Run the Monte Carlo.
-nees, Σ_track, errs = run_nees(FUSION, positions, landmarks, NA, M_TRIALS, BASE_SEED)
+nees, Σ_track, errs = run_nees(positions, landmarks, NA, M_TRIALS, BASE_SEED)
 
 const N_DIM = 2
 const HALFWIDTH = 1.96 * sqrt(2.0 * N_DIM / M_TRIALS)   # normal approx to the χ²/M band (no Distributions.jl)
@@ -392,8 +376,8 @@ const LO = N_DIM - HALFWIDTH
 const HI = N_DIM + HALFWIDTH
 classify(x) = x > HI ? "overconfident" : x < LO ? "pessimistic" : "ok"
 
-# Write nees_<fusion>.csv into the same csv/ folder.
-const OUT_CSV = joinpath(CSV_DIR, "nees_$(FUSION).csv")
+# Write nees.csv into the same csv/ folder.
+const OUT_CSV = joinpath(CSV_DIR, "nees.csv")
 open(OUT_CSV, "w") do io
     println(io, "step,mean_nees,lower,upper,expected,flag")
     for k in 1:length(nees)
@@ -406,8 +390,8 @@ terminal = nees[end]
 n_over = count(x -> x > HI, nees)
 n_under = count(x -> x < LO, nees)
 
-open(joinpath(CSV_DIR, "nees_$(FUSION)_meta.yaml"), "w") do io
-    println(io, "fusion: $(FUSION)")
+open(joinpath(CSV_DIR, "nees_meta.yaml"), "w") do io
+    println(io, "fusion: ci")
     println(io, "trials: $(M_TRIALS)")
     println(io, "base_seed: $(BASE_SEED)")
     println(io, "state_dim: $(N_DIM)")
@@ -424,7 +408,6 @@ open(joinpath(CSV_DIR, "nees_$(FUSION)_meta.yaml"), "w") do io
     println(io, "waypoints_overconfident: $(n_over)")
     println(io, "waypoints_pessimistic: $(n_under)")
     println(io, "comm_measurement_model: relative-correlated (z_self = x_hat_other + rel_truth + v, v~N(0,COMM_SENSOR_NOISE^2 I); 1/w taper filter-side only)")
-    println(io, "override: $(_FUSION_OVERRIDE === nothing ? "none (config fusion)" : "--fusion $(_FUSION_OVERRIDE)")")
 end
 
 println("  NEES band (consistent): [$(round(LO,digits=3)), $(round(HI,digits=3))]")
@@ -434,5 +417,5 @@ println("  → $(OUT_CSV)")
 
 if PLOTS
     plot_nees_curves(CSV_DIR, joinpath(CSV_DIR, "nees_curves.png"))
-    plot_consistency(errs, Σ_track, positions[PRIMARY], FUSION, joinpath(CSV_DIR, "consistency_$(FUSION).png"))
+    plot_consistency(errs, Σ_track, positions[PRIMARY], joinpath(CSV_DIR, "consistency.png"))
 end

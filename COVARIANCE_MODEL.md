@@ -190,11 +190,9 @@ gets large $R_j$, so it contributes little information. This is the code's reali
 ## 5. Inter-agent cooperative fusion
 
 Supports reduce the primary's uncertainty by sharing localization information when nearby —
-the cooperative-localization mechanism (paper §II / §III, refs [2], [7]). The fusion rule is
-selected by `comm_fusion` in `config/main.yaml` (`COMM_FUSION` in `src/config.jl`).
-
-**`ci` — Covariance Intersection (default, sound).** Fuses by a determinant-optimal convex
-combination in information space (Carrillo-Arce et al., IROS 2013):
+the cooperative-localization mechanism (paper §II / §III, refs [2], [7]). The rule is
+**Covariance Intersection**: a determinant-optimal convex combination in information space
+(Carrillo-Arce et al., IROS 2013).
 
 $$\Sigma_a^{+} = \Big(\omega\,\Sigma_a^{-1} + (1-\omega)\,P_t^{-1}\Big)^{-1}, \qquad
   P_t = \tfrac{1}{w_{ab}}\big(\Sigma_b + R\big), \quad \omega\in[0,1], \ R=\texttt{SENSOR\_NOISE}^2 I$$
@@ -208,18 +206,17 @@ $\tilde H P_b \tilde H^\top + \Gamma R \Gamma^\top$ (with $\tilde H=\Gamma=I$); 
 $w_{ab}$ enters by inflating $P_t$ by $1/w_{ab}$, so fusion vanishes as $w_{ab}\to0$. Helpers:
 `ci_comm` / `ci_omega_det` (`src/covariance.jl`).
 
-**`kf` — legacy weighted information-filter add (overconfident, not sound).**
+> **Removed: the legacy weighted information-filter add**
+> $\Sigma_a^{+} = (\Sigma_a^{-1} + w_{ab}(\Sigma_b + R)^{-1})^{-1}$. It *adds* information,
+> which is valid only for independent estimates; cooperative agents share history, so the add
+> double-counts it → overconfidence (NEES above state dim) → the terminal certificate can be
+> silently violated. Measured at NEES 2.39 with 7/12 waypoints outside the consistency band
+> (`mc_nees.jl`, 2026-07-15), against 1.5 and 0/12 for CI. Two agents flying an identical path
+> in lockstep also collapsed from ~9.2 to ~2.9 uncertainty under it — a spurious 3× reduction
+> CI correctly refuses.
 
-$$\Sigma_a^{+} = \Big(\Sigma_a^{-1} + w_{ab}\,(\Sigma_b + R)^{-1}\Big)^{-1}$$
-
-*Adds* information, valid only when the two estimates are independent. In cooperative
-localization they share history, so the add double-counts shared information → overconfidence
-(NEES above state dim) → the terminal certificate can be silently violated. Kept only for A/B
-comparison. (Empirically, two agents flying an identical path in lockstep collapse under `kf`
-from ~9.2 to ~2.9 uncertainty — a spurious 3× reduction that `ci` correctly refuses.)
-
-Both rules are applied bidirectionally (each agent fuses the other). There are **two
-implementations** (both dispatch on `COMM_FUSION`) that must stay consistent:
+Fusion is bidirectional (each agent fuses the other). There are **two implementations** that
+must stay consistent:
 
 ### (a) Exact evaluator — `apply_synchronized_propagation!`
 
@@ -238,35 +235,25 @@ propagation toward event *k+1*, exactly as real cooperative localization behaves
 ```julia
 weight = comm_weight(d2_comm)                           # logistic taper, half-weight at COMM_RANGE
 if weight > COMM_WEIGHT_MIN                              # floor = 1e-4
-    if COMM_FUSION === :ci
-        new_s, new_r = ci_comm(all_covs[sender][idx_s], all_covs[receiver][idx_r], weight)
-        all_covs[sender][idx_s]   = new_s               # det-optimal CI, bidirectional
-        all_covs[receiver][idx_r] = new_r
-    else                                                # legacy :kf — overconfident add
-        S_s = all_covs[sender][idx_s] + COMM_SENSOR_NOISE^2 * I(2)   # Σ_b + R
-        S_r = all_covs[receiver][idx_r] + COMM_SENSOR_NOISE^2 * I(2)
-        all_covs[receiver][idx_r] = inv(inv(all_covs[receiver][idx_r]) + weight * inv(S_s))
-        all_covs[sender][idx_s]   = inv(inv(all_covs[sender][idx_s])   + weight * inv(S_r))
-    end
+    new_s, new_r = ci_comm(cur_cov[sender], cur_cov[receiver], weight)
+    cur_cov[sender]   = new_s                           # det-optimal CI, bidirectional
+    cur_cov[receiver] = new_r
 end
 ```
 The per-step propagation math is shared with `propagate_cov_discrete` via the helper
 `propagate_segment!` to ensure both paths use identical physics.
 
-### (b) In-search approximation — `pairwise_comm`, **L957–972**
+### (b) In-search approximation — `pairwise_comm`
 
 A cheaper version used *during* the A* expansion (so the heuristic stays consistent and each
-expansion is fast). Same algebra, different taper scale and a per-step trigger:
+expansion is fast). Same CI algebra and taper as (a); what differs is the trigger — per step,
+rather than at fixed arc checkpoints:
 
 ```julia
 d2 = (xa-xb)^2 + (ya-yb)^2
-w  = exp(-d2 / (2*COMM_RADIUS^2))            # L961  (σ_c = COMM_RADIUS = 300)
-w < 1e-3 && return cov_a, cov_b             # L962  skip negligible fusion
-noise = COMM_SENSOR_NOISE^2
-Ib = inv2(cov_b .+ noise .* I)              # (Σ_b + R)⁻¹
-new_a = inv2(inv2(cov_a) .+ w .* Ib)        # Σ_a⁺ = (Σ_a⁻¹ + w·(Σ_b+R)⁻¹)⁻¹
-Ia = inv2(cov_a .+ noise .* I)
-new_b = inv2(inv2(cov_b) .+ w .* Ia)        # bidirectional
+w  = comm_weight(d2)                        # logistic taper, half-weight at COMM_RANGE
+w < COMM_WEIGHT_MIN && return cov_a, cov_b  # skip negligible fusion
+return ci_comm(cov_a, cov_b, w)             # same CI algebra as (a)
 ```
 Driven by `apply_joint_step_comms` (**L1029–1048**), which only fuses agent pairs whose
 arc-distances are within `COMM_INTERVAL_DIST = 5.0` (L501) of each other:
@@ -319,7 +306,7 @@ evaluate_full_paths (L1060)                ← A* goal scoring & continuous opti
             │    └─ kalman_info_update (L575)        §3 information update
             └─ (inter-agent fusion, L786)            §5(a) cooperative fusion
 
-joint_astar / joint_astar_collect           ← per-expansion (approximate)
+joint_astar                                ← per-expansion (approximate)
   └─ edge_cov_continuous (L824)
        └─ propagate_cov_continuous (L636)    same §2 + §3 along the edge
   └─ apply_joint_step_comms (L1029)

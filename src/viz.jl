@@ -5,15 +5,21 @@
 # Raw-data CSVs and diagnostic figures live in their own subfolders under a
 # run's output_dir (results.yaml stays at the top level as the run's
 # manifest) so the two kinds of output are easy to tell apart at a glance.
+#
+# EMIT_CSV / EMIT_FIGURES gate both kinds wholesale (see src/config.jl). The
+# gate is enforced in the writers below, not at their ~15 call sites; these two
+# helpers only skip the mkpath so a gated run leaves no empty csv/ or figures/
+# behind. They still return a well-formed path — the writer that would use it
+# returns first.
 function csv_path(output_dir::String, filename::String)
     dir = joinpath(output_dir, "csv")
-    mkpath(dir)
+    EMIT_CSV && mkpath(dir)
     return joinpath(dir, filename)
 end
 
 function fig_path(output_dir::String, filename::String)
     dir = joinpath(output_dir, "figures")
-    mkpath(dir)
+    EMIT_FIGURES && mkpath(dir)
     return joinpath(dir, filename)
 end
 
@@ -122,6 +128,7 @@ end
 # at base_path, and the per-component one with a "_components" suffix.
 function save_unc_figures(series, num_agents::Int, base_path::String;
                           threshold::Union{Float64,Nothing}=nothing, title::String="uncertainty profile")
+    EMIT_FIGURES || return
     savefig(plot_unc_profile(series, num_agents; threshold=threshold, title=title), base_path)
     stem, ext = splitext(base_path)
     savefig(plot_unc_components(series, num_agents; title=title), "$(stem)_components$(ext)")
@@ -160,6 +167,7 @@ end
 # flags on this produces 3 files total; both off, just the base. Variant
 # files get a "_comm"/"_landmarks" suffix inserted before the extension.
 function save_path_figures(plt, base_path::String, comm_events, landmark_events)
+    EMIT_FIGURES || return
     savefig(plt, base_path)
     stem, ext = splitext(base_path)
     if TRACK_COMM_EVENTS
@@ -178,6 +186,7 @@ end
 # of plots side-by-side (e.g. hexspline_cl's discrete-vs-continuous compare).
 function save_path_figures_pair(plt_left, plt_right, base_path::String,
                                  comm_left, comm_right, landmark_left, landmark_right)
+    EMIT_FIGURES || return
     combine(l, r) = plot(l, r, layout=(1, 2), size=(1200, 500))
     savefig(combine(plt_left, plt_right), base_path)
     stem, ext = splitext(base_path)
@@ -217,6 +226,7 @@ end
 
 # Save control points (CSV): each row = agent, ctrl_index, x, y
 function write_ctrls_csv(filename::String, ctrls::Vector{Vector{Tuple{Float64,Float64}}})
+    EMIT_CSV || return
     open(filename, "w") do io
         println(io, "agent,ctrl_index,x,y")
         for (ai, ctrl) in enumerate(ctrls)
@@ -234,6 +244,7 @@ end
 # re-running the RNG-seeded scenario generator. Σ₀ (initial agent covariance)
 # is lms[1].cov, so this also pins the initial uncertainty.
 function write_landmarks_csv(filename::String, landmarks::Vector{Landmark})
+    EMIT_CSV || return
     open(filename, "w") do io
         println(io, "landmark_id,x,y,c11,c12,c21,c22")
         for (i, lm) in enumerate(landmarks)
@@ -260,6 +271,7 @@ function read_landmarks_csv(filename::String)
 end
 
 function write_comm_csv(filename::String, events)
+    EMIT_CSV || return
     open(filename, "w") do io
         println(io, "arc_dist,agent_a,agent_b,weight,xa,ya,xb,yb")
         for (t, a, b, w, pa, pb) in events
@@ -270,6 +282,7 @@ function write_comm_csv(filename::String, events)
 end
 
 function write_landmark_csv(filename::String, events)
+    EMIT_CSV || return
     open(filename, "w") do io
         println(io, "arc_dist,agent,landmark_id,quality,xa,ya,xl,yl")
         for (t, agent, lm_id, q, apos, lpos) in events

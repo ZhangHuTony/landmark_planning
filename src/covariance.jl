@@ -388,19 +388,9 @@ function apply_synchronized_propagation!(agent_positions::Vector{Vector{Tuple{Fl
                 d2_comm = dx*dx + dy*dy
                 weight = comm_weight(d2_comm)
                 if weight > COMM_WEIGHT_MIN
-                    if COMM_FUSION === :ci
-                        new_s, new_r = ci_comm(cur_cov[sender], cur_cov[receiver], weight)
-                        cur_cov[sender]   = new_s
-                        cur_cov[receiver] = new_r
-                    else
-                        # legacy weighted information-filter add (overconfident)
-                        S_s = cur_cov[sender] + COMM_SENSOR_NOISE^2 * I(2)
-                        S_r = cur_cov[receiver] + COMM_SENSOR_NOISE^2 * I(2)
-                        new_inv_P_r = inv(cur_cov[receiver]) + weight * inv(S_s)
-                        new_inv_P_s = inv(cur_cov[sender])   + weight * inv(S_r)
-                        cur_cov[receiver] = inv(new_inv_P_r)
-                        cur_cov[sender]   = inv(new_inv_P_s)
-                    end
+                    new_s, new_r = ci_comm(cur_cov[sender], cur_cov[receiver], weight)
+                    cur_cov[sender]   = new_s
+                    cur_cov[receiver] = new_r
                     push!(comm_events, (comm_time, sender, receiver, weight, pos_s, pos_r))
                 end
             end
@@ -485,16 +475,7 @@ end
     d2 = (xa-xb)^2 + (ya-yb)^2
     w  = comm_weight(d2)
     w < COMM_WEIGHT_MIN && return cov_a, cov_b
-    COMM_FUSION === :ci && return ci_comm(cov_a, cov_b, w)
-    # Information-filter fusion weighted by range (legacy KF; overconfident)
-    noise = COMM_SENSOR_NOISE^2
-    # a receives from b
-    Ib = inv2(cov_b .+ noise .* [1.0 0.0; 0.0 1.0])
-    new_a = inv2(inv2(cov_a) .+ w .* Ib)
-    # b receives from a
-    Ia = inv2(cov_a .+ noise .* [1.0 0.0; 0.0 1.0])
-    new_b = inv2(inv2(cov_b) .+ w .* Ia)
-    return new_a, new_b
+    return ci_comm(cov_a, cov_b, w)
 end
 
 # ------------------------------------------------------------------

@@ -23,13 +23,12 @@ Everything lives in a single file: `planner.jl`. It runs top-to-bottom as a scri
 ### 1. Graph construction (`build_hex_graph`)
 Builds a **heading-aware hex grid** over the start→goal corridor. Each graph node is a `(hex_cell, heading)` pair, so turns are constrained to ±60° per step (forward, forward-left, forward-right). Sensor landmarks are appended as extra nodes after the routing states but are never traversed — they exist only for covariance fusion. The terminal goal node is always `graph.n` (the last node).
 
-### 2. Discrete joint A* (`joint_astar` / `joint_astar_collect`)
+### 2. Discrete joint A* (`joint_astar`)
 Searches the joint state space of all agents simultaneously. The last agent is the **primary**; earlier agents are **supports**. Key design decisions:
 - Priority key: `f = primary_dist + (1 + PRIMARY_EPSILON) * h`, where `h` is the Floyd-Warshall shortest-path distance from the primary's current node to goal.
 - Pareto pruning via covariance PSD dominance: state A dominates B if `A.dist ≤ B.dist` and `cov_dominates(A.cov, B.cov)` (i.e., `B.cov - A.cov` is PSD).
 - Covariance along each edge is propagated via `edge_cov_continuous` (discrete straight-line samples + information-filter Kalman update from visible landmarks).
-- `ASTAR_MODE = :limit` collects all goal states up to `ASTAR_ITERATION_LIMIT` and exposes a Pareto front; `:threshold` stops on first feasible solution.
-- Collected Pareto seeds are stored in the global `PARETO_COLLECTED` for later continuous refinement.
+- Stops on the first feasible goal state under the uncertainty threshold, or gives up at `ASTAR_ITERATION_LIMIT` expansions. One seed per run.
 
 ### 3. Continuous B-spline refinement (`optimize_continuous`)
 Takes discrete node-sequence seeds and refines them as **clamped cubic B-splines**:
@@ -42,7 +41,7 @@ Takes discrete node-sequence seeds and refines them as **clamped cubic B-splines
 - **State**: 2×2 position covariance matrix per agent.
 - **Propagation**: dead-reckoning growth along direction of travel, anisotropic (`DIR_UNCERTAINTY_PER_METER` along-track, `PERP_UNCERTAINTY_PER_METER = DIR/3` cross-track), heading-rotated.
 - **Landmark fusion**: information-filter (Joseph form) Kalman update. Detection probability is a logistic sigmoid on distance (plateaus near 1 within `VISIBILITY_RANGE`, rolls off over `VISIBILITY_WIDTH`, no hard cutoff); low-probability observations are up-weighted in noise to reduce their influence.
-- **Inter-agent fusion**: bidirectional Kalman fusion at fixed `COMM_INTERVAL` arc-distance checkpoints, weighted by `comm_weight` — a logistic sigmoid taper, half-weight at `COMM_RANGE`, transition softness `COMM_WIDTH`.
+- **Inter-agent fusion**: bidirectional Covariance Intersection (`ci_comm`) at fixed `COMM_INTERVAL` arc-distance checkpoints, weighted by `comm_weight` — a logistic sigmoid taper, half-weight at `COMM_RANGE`, transition softness `COMM_WIDTH`.
 - **Scalar metric**: `unc_radius(cov) = det(cov)^0.25` — equal to `σ` for isotropic covariance.
 
 ## Key tuning knobs (`config.yaml`)
@@ -52,8 +51,7 @@ All parameters live in `config.yaml`; `planner.jl` just reads `CFG[...]` into `c
 | Key | Effect |
 |---|---|
 | `unc_radius_threshold` | Feasibility bound on primary goal uncertainty |
-| `astar_iteration_limit` | Max A* expansions before stopping collection |
-| `astar_mode` | `limit` (Pareto collection) vs `threshold` (first feasible) |
+| `astar_iteration_limit` | Max A* expansions before the search gives up |
 | `primary_epsilon` | Weighted A* suboptimality factor (0 = exact) |
 | `num_agents` | Total agents including primary (last index) |
 | `enable_relaxed_discrete` | Allow discrete seeds above strict threshold |
@@ -66,11 +64,9 @@ Scenarios own their landmarks, obstacles AND start/goal — all defined in `SCEN
 
 Each run writes to a fresh timestamped directory `results/<yyyy-mm-dd_HH-MM-SS>/`, including a copy of the `config.yaml` used:
 - `fig1_joint_discrete_astar.png` — discrete A* solution
-- `main_ctrls.csv` / `pareto_N_ctrls.csv` — B-spline control points (CSV)
+- `main_ctrls.csv` — B-spline control points (CSV)
 - `mainfig_compare_discrete_continuous_*.png` — side-by-side discrete vs. continuous comparison
-- `fig_pareto_discrete.png` — Pareto front plot (`:limit` mode only)
-- `fig_pareto_continuous_overlay.png` — all refined Pareto paths overlaid
-- `results.yaml` — summary of iteration counts, discrete/continuous uncertainties, and Pareto seed stats
+- `results.yaml` — summary of iteration counts and discrete/continuous uncertainties
 - `comm_events.csv` — inter-agent fusion events, when `track_comm_events: true`
 
 ## Workflow

@@ -24,7 +24,7 @@ include(joinpath(@__DIR__, "test_obstacle_robustness.jl"))   # gen_obstacles, SC
 using Random, Printf
 # obstacle_penetration (Σ=0 geometric containment) is shared from src/minvo.jl.
 
-# Read main_ctrls.csv / pareto_*_ctrls.csv → Dict(agent => control points).
+# Read a *_ctrls.csv → Dict(agent => control points).
 function read_ctrls(path::String)
     agents = Dict{Int, Vector{Tuple{Float64,Float64}}}()
     for (i, line) in enumerate(eachline(path))

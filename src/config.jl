@@ -117,7 +117,6 @@ const COMM_RANGE                 = Float64(CFG["comm_range"])
 const COMM_WIDTH                 = Float64(CFG["comm_width"])
 const COMM_WEIGHT_MIN            = Float64(CFG["comm_weight_min"])
 const COMM_INTERVAL_DIST         = Float64(CFG["comm_interval_dist"])
-const COMM_FUSION                = Symbol(CFG["comm_fusion"])   # :ci (Covariance Intersection) | :kf (legacy)
 
 # Problem constraints — the feasible set, shared by every algorithm rather than
 # owned by one planner's .yaml. An ablation is only a fair comparison if it is
@@ -139,3 +138,10 @@ const CORRIDOR_HALFWIDTH_M       = Float64(get(CFG, "corridor_halfwidth_m", 260.
 const CORRIDOR_Y_MAX_M           = Float64(get(CFG, "corridor_y_max_m",     300.0))
 const TRACK_COMM_EVENTS          = Bool(CFG["track_comm_events"])
 const TRACK_LANDMARK_EVENTS      = Bool(CFG["track_landmark_events"])
+# Emission gates for the two DIAGNOSTIC output kinds. results.yaml is never
+# gated — it is the run manifest, and batch harnesses read nothing else. Both
+# default true, so an existing config that omits them is unchanged; a Monte
+# Carlo sweep turns them off so a few hundred runs don't render thousands of
+# PNGs nobody looks at.
+const EMIT_FIGURES               = Bool(get(CFG, "emit_figures", true))
+const EMIT_CSV                   = Bool(get(CFG, "emit_csv",     true))

@@ -17,7 +17,7 @@
 #   landmarks and obstacles (see the encodings below); anything omitted is empty.
 landmark_scenario: behind_wall
 num_agents: 2
-algorithms: discrete_only
+algorithms: discrete_only, straight_cont, hexspline_cl
 
 # Inline scenario geometry — read ONLY when landmark_scenario: manual.
 #   start / goal: "x,y"
@@ -44,7 +44,6 @@ comm_range: 100.0
 comm_width: 2.5
 comm_weight_min: 1.0e-4
 comm_interval_dist: 5.0
-comm_fusion: ci   # inter-agent fusion rule: ci (Covariance Intersection, sound) | kf (legacy, overconfident)
 
 # Problem constraints — the feasible set itself, shared by every algorithm.
 # These define what a valid plan IS, so they are not one planner's tuning: an
@@ -92,5 +91,13 @@ obstacle_edge_samples: 2
 obstacle_continuous: true
 
 # Output
+#   emit_figures / emit_csv gate the two DIAGNOSTIC output kinds wholesale.
+#   results.yaml is never gated — it is the run manifest, and a batch harness
+#   (run_constraint_sweep.jl) reads nothing else. Turn both off for sweeps:
+#   a few hundred runs otherwise render thousands of PNGs nobody opens.
+#   track_comm_events / track_landmark_events select WHICH extra event figures
+#   and CSVs are produced, within whatever emit_* allows.
+emit_figures: true
+emit_csv: true
 track_comm_events: true
 track_landmark_events: true

@@ -63,4 +63,4 @@ let Pa = [4.0 0.0; 0.0 4.0], Pb = [4.0 0.0; 0.0 4.0]
     @assert det2(na) < det2(Pa) "CI failed to reduce uncertainty from a confident helper"
 end
 
-println("test_comm_ci: all assertions passed (COMM_FUSION = $(COMM_FUSION))")
+println("test_comm_ci: all assertions passed")

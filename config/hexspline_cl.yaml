@@ -1,7 +1,6 @@
 # Parameters used only by the hexspline_cl planner (joint discrete A* +
 # continuous B-spline refinement). Merged with config/main.yaml at load time.
 
-astar_mode: threshold
 primary_epsilon: 0.0
 
 # NOTE: the constraint parameters this planner is judged against

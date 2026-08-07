@@ -33,7 +33,6 @@ All parameters are set in `config.yaml`. The most commonly changed ones are desc
 |---|---|---|
 | `landmark_scenario` | `dual` | Name of a scenario in `src/scenario_generation.jl` (landmarks + obstacles + endpoints), or `manual` to define one inline — see [Scenarios](#scenarios) |
 | `num_agents` | `2` | Total agents including the primary (last index) |
-| `astar_mode` | `threshold` | `threshold`: stop on first feasible path; `limit`: collect full Pareto front |
 
 ### Problem constraints (`config/main.yaml`)
 
@@ -61,7 +60,7 @@ Allows the discrete A* stage to accept seeds slightly above the strict threshold
 | `relaxed_discrete_delta_mode` | `relative` | `absolute`: δ = `relaxed_discrete_delta_abs`; `relative`: δ = `relaxed_discrete_delta_rel × unc_radius_threshold` |
 | `relaxed_discrete_delta_abs` | `0.20` | Absolute relaxation δ |
 | `relaxed_discrete_delta_rel` | `0.2` | Relative relaxation δ multiplier |
-| `continue_astar_on_infeasible` | `true` | Re-run A* if a relaxed seed fails continuous refinement (`:threshold` mode only) |
+| `continue_astar_on_infeasible` | `true` | Re-run A* if a relaxed seed fails continuous refinement |
 
 Practical guidance: start with relaxed disabled. Enable with a small δ if search is too slow or frequently fails.
 
@@ -70,7 +69,7 @@ Practical guidance: start with relaxed disabled. Enable with a small δ if searc
 | Key | Default | Effect |
 |---|---|---|
 | `primary_epsilon` | `0.0` | Weighted A* suboptimality. Higher = faster, worse primary length |
-| `astar_iteration_limit` | `200000` | Max expansions (`:limit` mode) or search budget (`:threshold` mode) |
+| `astar_iteration_limit` | `200000` | Max expansions before the search gives up |
 | `prune_by_comm_radius_joint` | `false` | Prune joint states where agents are out of comm range |
 | `prune_by_primary_uncertainty` | `false` | Prune states where primary uncertainty already exceeds threshold |
 | `prune_by_support_uncertainty` | `false` | Prune states where support uncertainty is too high |
@@ -140,7 +139,6 @@ above. If you retune the grid or the turn radius, verify the ratio first.
 | `comm_radius` | `200.0` | Acoustic modem range for in-search approximation (meters) |
 | `comm_sigma` | `100.0` | Gaussian taper scale for exact comm weighting (meters) |
 | `comm_interval` | `100.0` | Arc-distance between synchronized comm checkpoints (meters) |
-| `comm_fusion` | `ci` | Inter-agent fusion rule: `ci` (Covariance Intersection — sound, consistent under unknown cross-correlation) or `kf` (legacy weighted information-filter add — overconfident) |
 
 ### Static obstacles
 
@@ -188,7 +186,7 @@ A scenario bundles **landmarks + obstacles + start/goal**. All of them are defin
 | `dual` | (0,0) → (1000,0) | 2 landmarks at (700, 200) / (750, −250) + a box and an uncertain-location triangle. Off-axis placement creates incentive to deviate from shortest path |
 | `clustered` | (0,0) → (1000,0) | 3 landmarks near (700, −200); no obstacles. All fixes come from one region |
 | `shoreline` | (0,0) → (1000,0) | 5 landmarks along y ≈ −200…−300; no obstacles. Cross-track observability |
-| `two_routes` | (0,0) → (1200,0) | A central island splits the corridor: short blind route (south) vs longer landmark-rich route (north). Feeds the Pareto front two genuinely different trade-offs |
+| `two_routes` | (0,0) → (1200,0) | A central island splits the corridor: short blind route (south) vs longer landmark-rich route (north) — two genuinely different distance/uncertainty trade-offs |
 | `gauntlet` | (0,0) → (1200,0) | Three staggered walls force a down-up-down weave, with a landmark in each gap. Tightest curvature test |
 | `behind_wall` | (0,0) → (1000,0) | The only landmark sits ~300 m off-route below a 500 m wall; a fix requires going around an end |
 | `maze` | (0,0) → (1200,0) | 13 obstacles: three full-height walls, each with two gaps at different rows, plus five chamber plugs so no chamber has a straight shot. Two homotopies with two landmarks each — a shorter northern one and a longer southern weave. Densest obstacle field |
@@ -214,13 +212,10 @@ O(n³), so the run never starts. `config/hardware/main.yaml` is the worked
 example (`hex_width_m: 4.0`, `corridor_halfwidth_m: 12.0`,
 `corridor_y_max_m: 13.0` → the same 9 rows the defaults give).
 
-## A* collection modes
+## A* stopping rule
 
-**`:threshold`** — stops on the first feasible path below `unc_radius_threshold`. Fast; produces a single main solution.
-
-**`:limit`** — runs until `astar_iteration_limit` and collects the full Pareto front (non-dominated on distance vs. uncertainty). Slower but reveals the full solution space; generates one optimized path per Pareto seed.
-
-Interaction with `continue_astar_on_infeasible`: only relevant for `:threshold` mode. In `:limit` mode the flag is ignored.
+The joint A* stops on the first feasible path below `unc_radius_threshold`,
+or gives up at `astar_iteration_limit` expansions. One seed per run.
 
 ## Ablation: `straight_cont`
 
@@ -273,14 +268,8 @@ Each run produces a timestamped directory `results/<yyyy-mm-dd_HH-MM-SS>/` conta
 | `main_ctrls.csv` | B-spline control points for the main solution |
 | `comm_events.csv` | Comm fusion events (when `track_comm_events: true`) |
 
-When `astar_mode: limit`, additional Pareto-seed files per seed `N`:
-
-| File | Description |
-|---|---|
-| `fig_pareto_discrete.png` | Pareto front (distance vs. uncertainty) |
-| `pareto_<N>fig_compare_discrete_continuous_<len>.png` | Discrete vs. continuous for each Pareto seed |
-| `fig_pareto_continuous_overlay.png` | All refined Pareto paths overlaid |
-| `pareto_<N>_ctrls.csv` | Control points for each Pareto seed |
+`discrete_only` skips the refinement stage, so instead of the compare figure it
+writes `fig_discrete_spline.png` — the unrefined seed spline it ships.
 
 
 
