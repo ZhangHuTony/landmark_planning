@@ -19,14 +19,19 @@
 #     thinner than the 86.6 m row spacing can be stepped straight over.
 #   * A landmark only helps within `visibility_range` (100 m default) of a row.
 
-function random_landmark_cov()
+function random_landmark_cov(rng)
     # SPD covariance with randomized anisotropy/correlation.
-    sx = 0.80 + 0.55 * rand()
-    sy = 0.60 + 0.35 * rand()
-    ρ = 0.45 * (2 * rand() - 1)
+    sx = 0.80 + 0.55 * rand(rng)
+    sy = 0.60 + 0.35 * rand(rng)
+    ρ = 0.45 * (2 * rand(rng) - 1)
     cxy = ρ * sx * sy
     return [sx^2 cxy; cxy sy^2]
 end
+# The preset SCENARIOS below draw from the global stream that generate_plan.jl
+# seeds with Random.seed!(42); generate_scenario passes its own local RNG so a
+# generated scenario does not depend on what else consumed that stream.
+# default_rng() is exactly what bare rand() uses, so presets are unchanged.
+random_landmark_cov() = random_landmark_cov(Random.default_rng())
 
 # Obstacles are built with `build_obstacle(verts)` — ordered CONVEX polygon
 # vertices, either winding. Pass `Σo=` only when the obstacle's *location* is
@@ -229,14 +234,111 @@ function manual_scenario()
             goal  = parse_xy(String(CFG["goal"]),  "goal"))
 end
 
+# ── Random scenario generation (`landmark_scenario: random`) ──
+# A corridor scenario drawn from four numbers, for statistical benchmarking
+# (run_constraint_sweep.jl) rather than the hand-tuned presets above.
+#
+# Every draw comes from a LOCAL RNG seeded by `seed`, never the global stream,
+# so a scenario is reproducible from (seed, goal_dist, n_landmarks,
+# n_obstacles) alone — independent of generate_plan.jl's hardcoded
+# Random.seed!(42) and of whatever else consumed that stream first.
+
+# n convex obstacles (3–6 sides) in the corridor, non-overlapping and clear of
+# both endpoints. Convexity is GUARANTEED, not hoped for: `build_obstacle`
+# errors on a non-convex or degenerate polygon, so vertices are placed at
+# evenly-spaced angles on a rotated ellipse with jitter strictly under half the
+# angular spacing. Points taken in angular order on a convex curve are always
+# convex, and the jitter bound keeps any two vertices apart (a zero-length edge
+# is also a `build_obstacle` error).
+#
+# The semi-axis ranges are deliberately wide: a barrier spanning less than
+# ~150 m does not cover both hex column parities and gets stepped around
+# trivially (see the corridor-geometry note at the top of this file), so some
+# obstacles have to be big enough to actually redirect a route.
+#
+# ponytail: near-duplicate of `gen_obstacles` in test_obstacle_robustness.jl.
+# That one is rectangles-only and hardcodes the 0→1000 corridor, and its RNG
+# stream pins that harness's reproducible output — generalizing it would move
+# every obstacle it has ever placed, so it is deliberately left alone.
+function random_convex_obstacles(n::Int, rng, goal_x::Float64)
+    obs   = Obstacle[]
+    boxes = NTuple{4,Float64}[]           # placed AABBs, for the overlap test
+    tries = 0
+    while length(obs) < n && tries < 20000
+        tries += 1
+        k  = rand(rng, 3:6)               # triangle … hexagon
+        a  = 25.0 + 85.0 * rand(rng)      # semi-axes, polygon-local
+        b  = 20.0 + 40.0 * rand(rng)
+        φ  = 2π * rand(rng)               # rotation, so long axis can lie either way
+        cx = goal_x * (0.12 + 0.76 * rand(rng))
+        cy = -240.0 + 480.0 * rand(rng)
+
+        # Clear of start and goal. Centre distance against the circumradius is
+        # conservative (the polygon is inscribed in the a×b ellipse).
+        r_out = max(a, b)
+        (hypot(cx, cy) < 90.0 + r_out || hypot(cx - goal_x, cy) < 90.0 + r_out) && continue
+
+        step  = 2π / k
+        verts = Tuple{Float64,Float64}[]
+        for i in 0:k-1
+            θ = i * step + (0.7 * step) * (rand(rng) - 0.5)   # |jitter| < 0.35·step
+            px = a * cos(θ); py = b * sin(θ)
+            push!(verts, (cx + px * cos(φ) - py * sin(φ),
+                          cy + px * sin(φ) + py * cos(φ)))
+        end
+
+        xs = first.(verts); ys = last.(verts)
+        box = (minimum(xs), minimum(ys), maximum(xs), maximum(ys))
+        any(r -> !(box[3] + 12.0 < r[1] || box[1] - 12.0 > r[3] ||
+                   box[4] + 12.0 < r[2] || box[2] - 12.0 > r[4]), boxes) && continue
+
+        push!(obs, build_obstacle(verts))
+        push!(boxes, box)
+    end
+    length(obs) == n || @warn "placed only $(length(obs))/$n obstacles (corridor saturated)"
+    return obs
+end
+
+function generate_scenario(; seed::Int, goal_dist::Real,
+                             n_landmarks::Int, n_obstacles::Int)
+    # build_hex_graph indexes sensor_landmarks[1] unconditionally, and landmark
+    # 1's covariance is Σ₀ for every agent — an empty field is a BoundsError,
+    # not an easy scenario.
+    n_landmarks >= 1 || error("generate_scenario needs n_landmarks >= 1, got $(n_landmarks)")
+    rng = Random.MersenneTwister(seed)
+    D   = Float64(goal_dist)
+
+    # Landmarks are pushed OFF the direct start→goal line on purpose: that is
+    # what makes a fix cost a detour, which is the whole trade-off under test.
+    # The ±[60, 320] m band is bounded at both ends by the sensor model —
+    # reachable hex rows stop near ±260 m and detection is a logistic with a
+    # 100 m plateau, so past ~330 m a landmark contributes nothing (p ≈ 1e-26
+    # at 250 m off-corridor); inside 60 m the fix is free from the direct route.
+    lms = Landmark[]
+    for _ in 1:n_landmarks
+        x = D * (0.12 + 0.76 * rand(rng))
+        y = (rand(rng) < 0.5 ? -1.0 : 1.0) * (60.0 + 260.0 * rand(rng))
+        push!(lms, Landmark(x, y, random_landmark_cov(rng)))
+    end
+
+    return (landmarks = lms,
+            obstacles = random_convex_obstacles(n_obstacles, rng, D),
+            start = (0.0, 0.0), goal = (D, 0.0))
+end
+
 function build_scenario(name::Symbol)
-    sc = if name === :manual
+    sc = if name === :random
+        generate_scenario(seed        = Int(CFG["scenario_seed"]),
+                          goal_dist   = Float64(CFG["scenario_goal_dist"]),
+                          n_landmarks = Int(CFG["scenario_n_landmarks"]),
+                          n_obstacles = Int(CFG["scenario_n_obstacles"]))
+    elseif name === :manual
         manual_scenario()
     elseif haskey(SCENARIOS, name)
         SCENARIOS[name]()
     else
         error("Unknown landmark_scenario: $name. Known: " *
-              join(sort(string.(keys(SCENARIOS))), ", ") * ", manual.")
+              join(sort(string.(keys(SCENARIOS))), ", ") * ", manual, random.")
     end
     # ENV override, used by test_obstacle_robustness.jl / check_true_collisions.jl
     # to sweep generated obstacle fields over a scenario without editing config.

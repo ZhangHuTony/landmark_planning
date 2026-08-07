@@ -62,6 +62,9 @@ function plan_straight_line(scenario, graph::LandmarkGraph, output_dir::String)
         fmt4(x) = isfinite(x) ? string(round(x, digits=4)) : "null"
         fmt3(x) = isfinite(x) ? string(round(x, digits=3)) : "null"
         write(io, "main:\n")
+        # Two-key contract shared with every other planner (see hexspline_cl.jl).
+        write(io, "  primary_length: $(fmt3(primary_len))\n")
+        write(io, "  primary_unc: $(fmt4(primary_unc))\n")
         write(io, "  continuous_primary_length: $(fmt3(primary_len))\n")
         write(io, "  continuous_uncertainties: [$(fmt4(primary_unc))]\n")
     end

@@ -15,6 +15,10 @@
 #     Overridable per run with the SCENARIO env var.
 #   `manual` instead defines a scenario inline, right here — set start, goal,
 #   landmarks and obstacles (see the encodings below); anything omitted is empty.
+#   `random` generates one from the four scenario_* keys below (start is always
+#   (0,0), goal (goal_dist,0)). Driven per-run by run_constraint_sweep.jl, but
+#   usable by hand: SCENARIO=random julia generate_plan.jl. Reproducible from
+#   those four numbers alone — it does NOT use generate_plan.jl's global seed.
 landmark_scenario: behind_wall
 num_agents: 2
 algorithms: discrete_only, straight_cont, hexspline_cl
@@ -24,6 +28,13 @@ algorithms: discrete_only, straight_cont, hexspline_cl
 #   landmarks: "x,y" sep by '|', optional location covariance after '@' as
 #     "sxx,sxy,syx,syy" (omitted ⇒ a random SPD covariance).
 #   obstacles: same encoding as below (CONVEX polygons).
+# Generated scenario knobs — read ONLY when landmark_scenario: random.
+# scenario_n_landmarks must be >= 1 (landmark 1's covariance is Σ₀).
+# scenario_seed: 1001
+# scenario_goal_dist: 1000.0
+# scenario_n_landmarks: 2
+# scenario_n_obstacles: 2
+
 # start: 0,0
 # goal: 1000,0
 # landmarks: 700,200 | 750,-250 @ 1.2,0,0,0.8
