@@ -61,10 +61,13 @@ function plan_straight_line(scenario, graph::LandmarkGraph, output_dir::String)
     open(joinpath(output_dir, "results.yaml"), "w") do io
         fmt4(x) = isfinite(x) ? string(round(x, digits=4)) : "null"
         fmt3(x) = isfinite(x) ? string(round(x, digits=3)) : "null"
+        # Full precision for the two contract keys, rounding for the display rows —
+        # a harness compares these against a 1e-6 tolerance (see hexspline_cl.jl).
+        fmtx(x) = isfinite(x) ? repr(x) : "null"
         write(io, "main:\n")
         # Two-key contract shared with every other planner (see hexspline_cl.jl).
-        write(io, "  primary_length: $(fmt3(primary_len))\n")
-        write(io, "  primary_unc: $(fmt4(primary_unc))\n")
+        write(io, "  primary_length: $(fmtx(primary_len))\n")
+        write(io, "  primary_unc: $(fmtx(primary_unc))\n")
         write(io, "  continuous_primary_length: $(fmt3(primary_len))\n")
         write(io, "  continuous_uncertainties: [$(fmt4(primary_unc))]\n")
     end

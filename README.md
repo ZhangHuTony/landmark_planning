@@ -202,6 +202,29 @@ landmarks: 700,200 | 750,-250 @ 1.2,0,0,0.8
 obstacles: 200,-150; 260,-150; 260,-100; 200,-100 | 400,60; 460,60; 430,120 @ 4,0,0,4
 ```
 
+**Generating one randomly.** Set `landmark_scenario: random` and give four
+numbers; start is always `(0,0)` and goal `(scenario_goal_dist, 0)`. Driven
+per-run by `run_constraint_sweep.jl`, but usable by hand
+(`SCENARIO=random julia generate_plan.jl`).
+
+```yaml
+landmark_scenario: random
+scenario_seed: 1001            # the scenario is a pure function of these four
+scenario_goal_dist: 1000.0
+scenario_n_landmarks: 2        # must be >= 1: landmark 1's covariance is Σ₀
+scenario_n_obstacles: 2
+```
+
+Landmarks land at `x ∈ [0.12D, 0.88D]`, `|y| ∈ [60, 320]` m — bounded by the
+sensor model at both ends. Past ~330 m off-corridor a landmark is effectively
+undetectable (see the visibility sigmoid below); inside 60 m it is already
+covered from the direct route, so there is no detour trade-off left to measure.
+Obstacles are 3–6 sided convex polygons, non-overlapping, clear of both
+endpoints. Every draw comes from a local RNG seeded by `scenario_seed`, so the
+geometry does **not** depend on `generate_plan.jl`'s global `Random.seed!(42)`.
+Check the generator with `julia test_scenario_generation.jl`, and eyeball a
+sample with `julia test_scenario_generation.jl --preview 12`.
+
 **Corridor limits.** `build_hex_graph` pads ±`corridor_halfwidth_m` about y=0, drops rows above `corridor_y_max_m`, and lands rows on multiples of `1.5·hex_r`, so at the defaults (`hex_width_m: 100`, `corridor_halfwidth_m: 260`, `corridor_y_max_m: 300`) the reachable rows are y ∈ {−433.0, −346.4, −259.8, −173.2, −86.6, 0, 86.6, 173.2, 259.8}. A wall meant to *block* a route must cover a whole row: hex edges are sampled only at `obstacle_edge_samples` points, so a wall thinner than the 86.6 m row spacing can be stepped over. Node **x** depends on row parity — rows {−346.4, −173.2, 0, 173.2} sit at x ≡ 0 (mod 100), rows {−433, −259.8, −86.6, 86.6, 259.8} at x ≡ 50 — so a *vertical* wall must span ≥150 m in x to cover one column of each parity, or it is stepped around on the offset row (see `maze`).
 
 `corridor_halfwidth_m` and `corridor_y_max_m` are in **metres and do not derive
@@ -255,6 +278,64 @@ both of which the discrete search exists to solve:
 
 Reproduce with `SCENARIO=<name> julia generate_plan.jl` after setting
 `algorithms: straight_cont`.
+
+## Monte Carlo constraint sweep
+
+`run_constraint_sweep.jl` measures **what a tightening localization constraint
+costs in path length**, over randomly generated scenarios. Per scenario:
+
+1. **Reference** — `hexspline_cl`, 1 agent, `unc_radius_threshold: 1e9` (no
+   constraint). A\* accepts the first goal pop, so this is the *shortest* path.
+   Gives `L_ref` and `U_ref`, the uncertainty that path accumulates.
+2. **Ladder** — `unc_radius_threshold = pct/100 · U_ref` for pct = 100, 90, 80 …
+   At each level every configured method runs and reports `primary_length / L_ref`.
+3. Stops once every method has failed at `pct_patience` consecutive levels — the
+   levels that trigger the stop are still run and still logged.
+
+```bash
+julia run_constraint_sweep.jl                       # new sweep, timestamped tag
+julia run_constraint_sweep.jl --tag mysweep         # named; RESUMES if it exists
+julia run_constraint_sweep.jl --tag mysweep --summarize-only
+julia run_constraint_sweep.jl --sweep path/to/other_sweep.yaml
+```
+
+Config lives in **`config/mc/`** — a self-contained snapshot of `config/`, so
+`config/` stays free for interactive work and editing it mid-sweep cannot change
+what is being measured. The trade-off is drift: retune the physical/sensor model
+in `config/main.yaml` and you must mirror it into `config/mc/main.yaml`.
+`config/mc/sweep.yaml` holds the sweep's own knobs (scenario count and ranges,
+ladder, methods, `save_figures`/`save_csv`, timeout, workers).
+
+**Adding a baseline is one config line, never code.** Methods are
+`label@key=value,... | ...`, each key a config override:
+
+```yaml
+methods: hexspline_cl@algorithms=hexspline_cl,num_agents=2 | straight_cont@algorithms=straight_cont,num_agents=2
+```
+
+The harness requires exactly **two** keys from a planner's `results.yaml` —
+`primary_length` and `primary_unc` — and treats everything else it finds there
+as pass-through, emitting each key as an extra CSV column. So `trials.csv` has
+18 columns for `hexspline_cl` and 14 for `straight_line`, and there is no
+algorithm-specific logic in the sweep at all. That is why `trials.csv` lives
+per-method rather than at the root.
+
+```
+results/constraint_sweep/<tag>/
+  summary.csv scenarios.csv SUMMARY.md fig_length_ratio.png sweep.log
+  reference/<scenario>/                 the unconstrained 1-agent run
+  <method>/trials.csv                   columns vary per algorithm
+  <method>/<scenario>_p<pct>/           results.yaml, config/, run.log
+                                        figures/ + csv/ only if save_* is on
+```
+
+**Reading a failure.** `fail_reason` is one of `timeout`, `error`,
+`no_solution`, `recovery_failed`, `unc_violated`, `obstacle_breach`. A
+`no_solution` is **not** proof of infeasibility: `joint_astar` exits identically
+whether the threshold is unreachable or the iteration budget ran out. Compare
+`astar_iterations` against `astar_iteration_limit` in `config/mc/hexspline_cl.yaml`
+(400000, cut down from the interactive 1600000) — equality means the budget was
+the binding constraint, not the geometry.
 
 ## Outputs
 

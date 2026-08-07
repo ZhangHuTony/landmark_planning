@@ -580,6 +580,12 @@ function joint_astar(graph::LandmarkGraph,
         iter_count_sa = 0
         t0 = time()
 
+        # Anytime incumbent: the lowest-uncertainty goal candidate seen so far. Only
+        # consulted if the search exhausts its budget without one under the threshold
+        # (see the return below) -- a feasible goal still returns the instant it pops,
+        # so the common case pays nothing for this.
+        best_path_sa = Int[]; best_dist_sa = 0.0; best_unc_sa = Inf
+
         # Node-level Pareto frontier with SOUND covariance dominance.
         # Keep labels (distance, covariance) and only prune when an existing
         # label is better in distance and covariance PSD order.
@@ -620,7 +626,14 @@ function joint_astar(graph::LandmarkGraph,
                     return [path], [exact_dists[1]], exact_unc, iter_count_sa
                 end
 
-                println("\n  [Constraint A*] Goal popped but infeasible under exact eval: unc=$(round(exact_unc, digits=4))")
+                # Over threshold, but the barrier can still trade length for uncertainty
+                # from here -- record it as a fallback seed. seed_spline_clear stays a
+                # HARD gate: obstacle clearance and the support cap are topological, and
+                # no local perturbation of the spline re-routes around a wall.
+                if exact_unc < best_unc_sa && seed_spline_clear([path], graph, lms)
+                    best_path_sa = path; best_dist_sa = exact_dists[1]; best_unc_sa = exact_unc
+                    println("\n  [Constraint A*] Incumbent seed at iter $iter_count_sa: dist=$(round(exact_dists[1], digits=3)), unc=$(round(exact_unc, digits=4)) > $(round(unc_threshold, digits=4))")
+                end
                 continue
             end
 
@@ -673,8 +686,14 @@ function joint_astar(graph::LandmarkGraph,
         end
 
         println()   # release the status-bar line
-        println("  [Constraint A*] No feasible single-agent solution found")
-        return [Int[]], [0.0], Inf, iter_count_sa
+        if isempty(best_path_sa)
+            println("  [Constraint A*] No feasible single-agent solution found")
+            return [Int[]], [0.0], Inf, iter_count_sa
+        end
+        println("  [Constraint A*] Budget exhausted with no seed under threshold; " *
+                "handing best incumbent to the optimizer: dist=$(round(best_dist_sa, digits=3)), " *
+                "unc=$(round(best_unc_sa, digits=4)) > $(round(unc_threshold, digits=4))")
+        return [best_path_sa], [best_dist_sa], best_unc_sa, iter_count_sa
     end
 
     # ── Initial state: all agents at node 1 (start) ──────────────────────────
@@ -700,6 +719,10 @@ function joint_astar(graph::LandmarkGraph,
     enqueue!(pq, 1, (init_f, init_unc, support_idle_score(init_dists)))
 
     iter_count         = 0
+
+    # Anytime incumbent, as in the single-agent branch above: lowest-uncertainty goal
+    # candidate seen, returned only if the budget runs out before a feasible one.
+    best_paths_j = Vector{Int}[]; best_dists_j = Float64[]; best_unc_j = Inf
 
     # Safe dominance frontier keyed by (joint nodes, exact visited signature).
     # This only compares states with identical future action sets.
@@ -825,8 +848,11 @@ function joint_astar(graph::LandmarkGraph,
                     println("  [Constraint A*] Animation saved to $debug_gif_path (iters $(animate_start_iter)-$(min(iter_count, animate_start_iter + animate_limit - 1)))")
                 end
                 return agent_paths, exact_dists, exact_unc, iter_count
-            else
-                #println("  [Constraint A*] Goal popped but infeasible under exact eval: unc=$(round(exact_unc, digits=4)) > $(round(unc_threshold, digits=4))")
+            elseif exact_unc < best_unc_j && seed_spline_clear(agent_paths, graph, lms)
+                # Fallback seed for the optimizer -- see the single-agent branch above.
+                # seed_spline_clear stays hard here too.
+                best_paths_j = agent_paths; best_dists_j = exact_dists; best_unc_j = exact_unc
+                println("\n  [Constraint A*] Incumbent seed at iter $iter_count: dist=$(round(exact_dists[primary], digits=3)), unc=$(round(exact_unc, digits=4)) > $(round(unc_threshold, digits=4))")
             end
             continue
         end
@@ -959,8 +985,14 @@ function joint_astar(graph::LandmarkGraph,
 
     # ── No feasible goal reached ──────────────────────────────────────────────
     println()   # release the status-bar line
-    println("  [Constraint A*] No feasible solution found")
-    return [Int[] for _ in 1:na], zeros(na), Inf, iter_count
+    if isempty(best_paths_j)
+        println("  [Constraint A*] No feasible solution found")
+        return [Int[] for _ in 1:na], zeros(na), Inf, iter_count
+    end
+    println("  [Constraint A*] Budget exhausted with no seed under threshold; " *
+            "handing best incumbent to the optimizer: dist=$(round(best_dists_j[primary], digits=3)), " *
+            "unc=$(round(best_unc_j, digits=4)) > $(round(unc_threshold, digits=4))")
+    return best_paths_j, best_dists_j, best_unc_j, iter_count
 end
 
 
@@ -1175,11 +1207,12 @@ function optimize_continuous(paths::Vector{Vector{Int}}, graph::LandmarkGraph, l
     # feasible-only gate arms permanently. Still ONE phase and one objective — the
     # tangent-extended barrier already dominates path length ~4 orders of magnitude
     # while violated, so it recovers first and shortens after, on its own.
-    # Under the discrete seed the gate certifies the seed, so this is true from the
-    # start and the loop below is bit-for-bit the feasible-only optimizer it was.
+    # When A* returned a seed under the threshold this is true from the start and the
+    # loop below is bit-for-bit the feasible-only optimizer it was; when it returned
+    # its best incumbent instead, recovery runs first, as for straight_cont.
     reached_feasible = is_feasible(init_slacks)
     if !reached_feasible
-        @warn "Seed is infeasible (min_slack=$(min_slack(init_slacks)), ε=$(CONT_RESTORE_MARGIN)); the barrier will try to recover it before shortening. Expected for the straight_cont ablation; a gated discrete seed should never land here."
+        @warn "Seed is infeasible (min_slack=$(min_slack(init_slacks)), ε=$(CONT_RESTORE_MARGIN)); the barrier will try to recover it before shortening. Expected for the straight_cont ablation, and for a discrete seed that A* returned as its best incumbent after exhausting its budget."
     elseif !is_interior(init_slacks, CONT_RESTORE_MARGIN)
         @warn "Seed is feasible but not strictly interior (min_slack=$(min_slack(init_slacks)), ε=$(CONT_RESTORE_MARGIN)); the barrier is past its knee and steps will be small."
     end
@@ -1187,6 +1220,13 @@ function optimize_continuous(paths::Vector{Vector{Int}}, graph::LandmarkGraph, l
     # Barrier optimizer (simplified reuse of in-file logic but using cont_threshold)
     adam_m = zeros(total_free_cont); adam_v = zeros(total_free_cont)
     best_feasible_flat = nothing; best_feasible_len = Inf; best_feasible_unc = Inf
+    # Incumbent for the recovery regime, mirroring best_feasible_flat: the LEAST
+    # violating iterate seen while still outside. Seeded with the seed itself, so a
+    # failed recovery can never ship something further out than what it started
+    # from — the last iterate is just wherever the barrier happened to stop, and on
+    # a flat uncertainty landscape (`single`: landmark 250 m off-corridor, detection
+    # ~1e-26) the other rows push the path around and it drifts.
+    best_recover_flat = copy(flat); best_recover_slack = min_slack(init_slacks)
     prev_len = init_len
 
     # ── Objective — length under a tangent-extended log barrier ───────────────
@@ -1229,12 +1269,13 @@ function optimize_continuous(paths::Vector{Vector{Int}}, graph::LandmarkGraph, l
         for iter in 1:stage_iters
             total_iter += 1
             obj0, _ = spline_barrier_objective(flat, barrier_mu)
-            # Probe width tracks the regime, not a separate phase: while infeasible
-            # the uncertainty gradient is first-order zero at a straight-line seed,
-            # so a 1e-4 m probe reads only quadratic remainder and the step is
-            # numerically zero. Reverts to CONT_OPT_H the moment feasibility is
-            # reached — which is iteration 1 for a gated discrete seed, so that
-            # pipeline never sees CONT_RECOVER_H at all.
+            # Probe width tracks the regime, not a separate phase. Reverts to
+            # CONT_OPT_H the moment feasibility is reached — which is iteration 1
+            # for a gated discrete seed, so that pipeline never sees
+            # CONT_RECOVER_H at all. The two are equal at today's defaults; the
+            # split is kept because the regimes are genuinely different (see
+            # config/hexspline_cl.yaml for why the recovery probe was widened to
+            # 1 m and why holding μ made that unnecessary).
             h_fd = reached_feasible ? CONT_OPT_H : CONT_RECOVER_H
             grad = zeros(total_free_cont)
             for k in 1:total_free_cont
@@ -1288,6 +1329,9 @@ function optimize_continuous(paths::Vector{Vector{Int}}, graph::LandmarkGraph, l
             if feasible2 && len2 < best_feasible_len
                 best_feasible_len = len2; best_feasible_unc = unc2; best_feasible_flat = copy(flat)
             end
+            if !feasible2 && min_slack(slacks2) > best_recover_slack
+                best_recover_slack = min_slack(slacks2); best_recover_flat = copy(flat)
+            end
             # Length-stationarity means "converged" only while length is what is
             # being minimized. During recovery the objective is dominated by the
             # barrier tangent and length can sit still for several iterations while
@@ -1298,15 +1342,25 @@ function optimize_continuous(paths::Vector{Vector{Int}}, graph::LandmarkGraph, l
             end
             prev_len = len2
         end
-        barrier_mu *= CONT_BARRIER_DECAY
+        # μ decays only from INSIDE the feasible set — that is what the decay
+        # ladder is for: μ→0 walks an interior point onto the constrained optimum.
+        # Outside, μ is the entire restoring force: below the knee the tangent's
+        # gradient is μ/δ, so at δ=1e-3 the ladder's last stages (μ≈2e-4) push with
+        # 0.2 against a path-length gradient of O(1) — the barrier switches off
+        # mid-recovery and the optimizer starts BUYING violation to shorten. Seen
+        # directly on the sweep's s002: unc slack drifting −0.534 → −0.572 over the
+        # last 600 iterations while length fell 623.5 → 622.0.
+        # No-op for a gated discrete seed, which is feasible at iteration 0.
+        reached_feasible && (barrier_mu *= CONT_BARRIER_DECAY)
     end
 
     # best_feasible_flat is unset when no FEASIBLE step was ever accepted: either the
     # first line search stalled outright, or the seed was infeasible and recovery
-    # never made it in. `flat` is then the last iterate — the untouched seed in the
-    # first case, the lowest-objective violating point in the second. Never an
-    # "optimized but violating" point passed off as a solution; the status says which.
-    selected_flat = isnothing(best_feasible_flat) ? flat : best_feasible_flat
+    # never made it in. best_recover_flat covers both — it is the seed until some
+    # iterate violates by less, so what ships is the least-violating point the run
+    # ever saw. Never an "optimized but violating" point passed off as a solution;
+    # the status says which.
+    selected_flat = isnothing(best_feasible_flat) ? best_recover_flat : best_feasible_flat
     opt_len, opt_unc, opt_wpts, opt_covs, opt_curvs, opt_max_curv, opt_ctrls, opt_support_lens = eval_continuous(selected_flat)
 
     # Status of what is actually being returned, so a caller (and results.yaml) can
@@ -1448,11 +1502,17 @@ function _plan_hexspline(scenario, graph::LandmarkGraph, output_dir::String;
         println("\n  Running joint discrete A* (threshold=$(round(search_unc_threshold, digits=4)))... (max_iters=$(ASTAR_ITERATION_LIMIT))")
         println("  Stops on the first feasible candidate under the threshold.")
         ppaths, pdists, punc, disc_iter = joint_astar(graph, landmarks, search_unc_threshold, NUM_AGENTS)
+        # Recorded BEFORE the failure return, so results.yaml reports the search
+        # effort either way. A* exits identically whether the threshold is
+        # provably unreachable or the iteration budget simply ran out, so
+        # astar_iterations == ASTAR_ITERATION_LIMIT is the only thing that tells
+        # a budget-limited failure from an infeasible one -- and reporting 0 on
+        # every failure made that indistinguishable.
+        discrete_iter = disc_iter
         if length(ppaths) != NUM_AGENTS || any(isempty, ppaths)
             println("  ✗ No feasible path found by A*")
             return [Int[] for _ in 1:(NUM_AGENTS - 1)], Int[], Inf
         end
-        discrete_iter = disc_iter
 
         support_paths = pad_support_paths_to_primary(ppaths[1:NUM_AGENTS-1], ppaths[NUM_AGENTS])
         return support_paths, ppaths[NUM_AGENTS], pdists[NUM_AGENTS]
@@ -1496,28 +1556,13 @@ function _plan_hexspline(scenario, graph::LandmarkGraph, output_dir::String;
         println("  ├─ Communication: every $(COMM_INTERVAL)m, sigmoid taper range=$(COMM_RANGE)m width=$(COMM_WIDTH)m")
         println("  └─ All agents' uncertainties benefit from synchronized Kalman fusion at checkpoints")
 
-        if seed_mode == :discrete && CONTINUE_ASTAR_ON_INFEASIBLE && unc_exceeds_threshold(primary_goal_unc, disc_unc_threshold, UNC_FEAS_TOL)
-            println("\n  Seed exceeded relaxed discrete threshold (goal_unc=$(round(primary_goal_unc, digits=4)) > threshold=$(round(disc_unc_threshold, digits=4))).")
-            println("  Continuing A* under relaxed threshold...")
-            next_support_paths, next_primary_path, next_primary_dist = run_discrete_seed_search(disc_unc_threshold)
-
-            if isempty(next_primary_path)
-                println("  ✗ Relaxed-threshold A* did not find a feasible seed.")
-                paths = Vector{Vector{Int}}()
-                dists = Float64[]
-                uncs = Float64[]
-                final_global_cov = Matrix{Float64}[]
-                primary_goal_unc = Inf
-            else
-                support_paths = next_support_paths
-                primary_path = next_primary_path
-                primary_dist = next_primary_dist
-                paths = vcat(support_paths, [primary_path])
-                final_global_cov, dists = evaluate_full_paths(paths, graph, landmarks, NUM_AGENTS)
-                uncs = [unc_radius(final_global_cov[a]) for a in 1:NUM_AGENTS]
-                primary_goal_unc = uncs[end]
-                println("  ✓ Continued A* found relaxed-feasible seed: goal_unc=$(round(primary_goal_unc, digits=4))")
-            end
+        # A seed above the threshold is now an expected handoff, not a failure: A*
+        # returns its best incumbent when the budget runs out and the barrier below
+        # attempts recovery, exactly as it already does for the straight_cont seed.
+        # Feasibility is decided once, on the REFINED spline (refinement_status /
+        # min_slack), which is the only stage whose numbers are reported anyway.
+        if seed_mode == :discrete && unc_exceeds_threshold(primary_goal_unc, UNC_RADIUS_THRESHOLD, UNC_FEAS_TOL)
+            println("\n  Seed is above threshold (goal_unc=$(round(primary_goal_unc, digits=4)) > $(round(UNC_RADIUS_THRESHOLD, digits=4))); the continuous barrier will attempt recovery.")
         end
     end
 
@@ -1727,6 +1772,14 @@ function _plan_hexspline(scenario, graph::LandmarkGraph, output_dir::String;
         fmt4(x) = isfinite(x) ? string(round(x, digits=4)) : "null"
         fmt3(x) = isfinite(x) ? string(round(x, digits=3)) : "null"
         fmtlist(v) = isempty(v) ? "[]" : "[" * join(fmt4.(v), ", ") * "]"
+        # FULL precision, for the values something MACHINE-READS and compares against
+        # a tolerance. fmt4's worst-case error is 5e-5, fifty times UNC_FEAS_TOL
+        # (1e-6) — so a run the optimizer certified feasible at min_slack=+9e-6 was
+        # rounded up past its own threshold and then re-judged "unc_violated" by
+        # run_constraint_sweep.jl's classify(). It also corrupted the ladder itself:
+        # every threshold is pct/100 · U_ref, and U_ref is read back out of THIS
+        # field in the reference run. Rounding is for the human-facing rows below.
+        fmtx(x) = isfinite(x) ? repr(x) : "null"
 
         write(io, "main:\n")
         # The two-key contract every planner honours, batch harnesses read, and
@@ -1735,10 +1788,21 @@ function _plan_hexspline(scenario, graph::LandmarkGraph, output_dir::String;
         # no continuous phase (or one that doesn't exist yet) reports through
         # the same field instead of an awkwardly-named `continuous_*`. Both are
         # null exactly when no solution was returned.
-        write(io, "  primary_length: $(fmt3(isempty(solutions) ? NaN : solutions[1].primary_length))\n")
-        write(io, "  primary_unc: $(fmt4(isempty(solutions) ? NaN : solutions[1].primary_unc))\n")
+        write(io, "  primary_length: $(fmtx(isempty(solutions) ? NaN : solutions[1].primary_length))\n")
+        write(io, "  primary_unc: $(fmtx(isempty(solutions) ? NaN : solutions[1].primary_unc))\n")
         write(io, "  astar_iterations: $(converged_iter)\n")
         write(io, "  discrete_uncertainties: $(fmtlist(isempty(paths) ? Float64[] : uncs))\n")
+        # The primary's SEED uncertainty, full precision, for the same machine-read
+        # reason as primary_unc: run_constraint_sweep.jl anchors its ladder here.
+        # It has to, because unc_radius_threshold gates the discrete A* (the
+        # exact_unc check at the goal pop), not the refined spline — so a ladder
+        # anchored on primary_unc asks the search to certify on the polyline a
+        # bound only the spline ever met, and the reference's own seed is rejected
+        # at pct=100. Usually ≥ primary_unc, since the polyline is longer than the
+        # spline it seeds and so dead-reckons more — but NOT guaranteed: with the
+        # constraint inactive the barrier purely shortens, and shortening can move
+        # off a landmark (sweep s006: 5.8567 discrete vs 5.8603 refined).
+        write(io, "  primary_disc_unc: $(fmtx(isempty(paths) || isempty(uncs) ? NaN : uncs[end]))\n")
         write(io, "  continuous_primary_length: $(fmt3(main_cont_len))\n")
         write(io, "  continuous_uncertainties: $(fmtlist(main_cont_uncs))\n")
         # What the returned trajectory actually is: a certified solution, or a
@@ -1746,7 +1810,7 @@ function _plan_hexspline(scenario, graph::LandmarkGraph, output_dir::String;
         # optimized result in the manifest.
         if !isnothing(main_refine)
             write(io, "  refinement_status: $(main_refine.status)\n")
-            write(io, "  refinement_min_slack: $(fmt4(main_refine.min_slack))\n")
+            write(io, "  refinement_min_slack: $(fmtx(main_refine.min_slack))\n")
         end
     end
 

@@ -1,3 +1,13 @@
+# Sweep tuning for hexspline_cl (and its straight_cont / discrete_only aliases).
+# Snapshot of config/hexspline_cl.yaml -- see the drift note in config/mc/main.yaml.
+#
+# astar_iteration_limit is the ONE deliberate difference: a sweep runs hundreds
+# of plans, and a tightening constraint makes each search longer, so the budget
+# is cut from the interactive 1600000. That makes every recorded failure mean
+# "not found within budget", never "proven infeasible" -- results.yaml's
+# astar_iterations is carried into trials.csv so budget-limited failures stay
+# distinguishable. Raise this if too many rows come back at the ceiling.
+
 # Parameters used only by the hexspline_cl planner (joint discrete A* +
 # continuous B-spline refinement). Merged with config/main.yaml at load time.
 
@@ -21,7 +31,14 @@ prune_by_primary_uncertainty: false
 prune_by_support_uncertainty: false
 
 # A* parameters
-astar_iteration_limit: 1600000
+# 150k, down from 1e6. Measured on sweep 2026-08-07_15-46-03: the most expensive
+# run that ever SUCCEEDED used 37,852 expansions, while every failure ran the
+# full 1e6 and cost ~200 s against ~21 s for a success. Failures therefore set
+# the sweep's wall clock, and 1e6 bought nothing above ~4x the observed success
+# ceiling. Re-check this if goal_dist_max is raised — the joint state space grows
+# fast in D, and this number is calibrated to the 600-800 m band, not to the
+# paper's long scenarios.
+astar_iteration_limit: 150000
 straight_cont_primary_wpts: 11
 support_idle_penalty: 30.0
 support_plot_offset_m: 3.0
@@ -31,26 +48,12 @@ cont_opt_iters: 1000
 cont_opt_lr: 0.5
 cont_opt_h: 1.0e-4
 #   cont_recover_h — finite-difference step used ONLY while the iterate is still
-#     infeasible (see `reached_feasible`), in METRES. Same single objective and
-#     same loop as cont_opt_h — only the probe width differs. Irrelevant to the
-#     discrete pipeline, whose seed is feasible from iteration 1.
-#     WAS 1.0, on the reasoning that the terminal-uncertainty gradient vanishes to
-#     first order at a straight-line configuration (moving an interior control
-#     point perpendicular to a straight path changes arc length only to second
-#     order), so a 1e-4 probe reads nothing but the O(h) quadratic remainder — and
-#     measured, h=1e-4 and h=1e-2 both left a straight seed completely stuck.
-#     That measurement was confounded by the barrier's μ decaying during recovery.
-#     The quadratic remainder was never below the float noise floor on its own: it
-#     enters the objective through the barrier tangent, whose gain is μ/δ, so at
-#     the μ≈1e-4 the old schedule had reached by mid-recovery the signal WAS noise.
-#     With μ now held at cont_barrier_start while infeasible (gain 20/1e-3 = 2e4),
-#     the fine probe sees it, and sees it more sharply than a 1 m probe can near
-#     the constraint boundary. Re-measured, straight_cont, final min_slack,
-#     h=1.0 → h=1e-4:  single −2.150 → −1.908, clustered −2.284 → −2.031,
-#     shoreline −2.399 → −2.150, two_routes −3.945 → −3.684, and the sweep's
-#     s002 at p100 −0.057 (fail) → +0.0016 (RECOVERED). gauntlet stays feasible
-#     either way; maze is hopeless either way. Kept as a knob rather than deleted
-#     so the old regime is one edit away.
+#     infeasible (see `reached_feasible`), in METRES. WAS 1.0; see the full A/B in
+#     config/hexspline_cl.yaml. Short version: the 1 m probe was chosen because a
+#     1e-4 probe left a straight seed stuck, but that was an artifact of the
+#     barrier's μ decaying during recovery — the fine probe's signal reaches the
+#     objective with gain μ/δ, and the old schedule drove μ to ~1e-4 mid-recovery.
+#     With μ now held while infeasible the fine probe wins nearly everywhere.
 cont_recover_h: 1.0e-4
 cont_adam_b1: 0.9
 cont_adam_b2: 0.999

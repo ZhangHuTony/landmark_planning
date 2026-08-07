@@ -1,0 +1,94 @@
+# ==========================================================================
+# Constraint-sweep knobs — read ONLY by run_constraint_sweep.jl
+# ==========================================================================
+# Never merged into any planner's CFG: load_config merges main.yaml plus
+# <algorithm>.yaml, and no algorithm is called "sweep". The planner-facing
+# base config is the rest of config/mc/.
+#
+# The experiment, per random scenario:
+#   1. run the REFERENCE  — hexspline_cl, 1 agent, no uncertainty constraint.
+#      Gives L_ref (the shortest path) and U_ref (the uncertainty of that path's
+#      DISCRETE seed — the stage unc_radius_threshold actually gates; the
+#      refined value is logged beside it as U_ref_cont).
+#   2. walk the constraint down: unc_radius_threshold = pct/100 * U_ref
+#   3. at each level run every method; record primary_length / L_ref
+# ==========================================================================
+
+# How many scenarios, and the seed they are drawn from. A scenario is fully
+# reproducible from its seed: scenario_seed_base + i.
+n_scenarios: 5
+scenario_seed_base: 1067
+
+# Random scenario ranges (see generate_scenario in src/scenario_generation.jl).
+# goal_dist drives cost hardest: hex columns grow linearly with it, the graph
+# build is O(n^3) in node count, and the joint A* state space is worse.
+# The draw is over whole hex columns inside [min, max] — the goal has to sit on a
+# cell centre, or the discrete A* certifies its uncertainty at the goal CELL while
+# the shipped spline runs on to the true goal. So these bound the range; the step
+# is hex_width_m and is not configurable.
+# 600-800 m = 6, 7 or 8 hex columns. Capped at 800 because hexspline_cl's joint
+# A* stopped finding solutions inside its budget past ~900 m (sweep
+# 2026-08-07_15-46-03: every s004/s005 run at D=1000-1100 exhausted 1e6
+# expansions and reported IMPOSSIBLE for thresholds that were provably feasible).
+# The long scenarios belong in the paper's hand-built set, run without a budget.
+goal_dist_min: 600.0
+goal_dist_max: 800.0
+# >= 2: with a single landmark there is nowhere useful to detour TO, so the whole
+# feasible band collapses. Sweep 2026-08-07_15-46-03 s003 had one landmark and
+# 1.5% of range between the straight line and the best anyone achieved — a 10%
+# ladder steps clean over it and measures nothing.
+n_landmarks_min: 2
+n_landmarks_max: 4
+# Capped at 3: extra obstacles do not create decisions, they create
+# infeasibility. Sweep 2026-08-07_15-46-03 s001 drew 7 and no route survived the
+# spline-vs-obstacle check, so the reference run failed and the scenario was
+# discarded after paying ~19 s for it. Obstacle placement is biased toward the
+# direct line (see random_convex_obstacles), so a handful is enough to make the
+# corridor an actual left-or-right decision most of the time.
+n_obstacles_min: 1
+n_obstacles_max: 3
+
+# Constraint ladder. pct_patience stops a scenario after that many CONSECUTIVE
+# levels at which every method failed — the levels that trigger the stop are
+# still run and still logged, so the failure tail is never silently truncated.
+# Set 0 to always walk the full ladder.
+pct_start: 100
+pct_step: 10
+# Floor at 30, not 50: the interesting number is where each method finally gives
+# out, and pct_patience already stops a scenario two levels after everything
+# fails — so a deeper floor costs nothing on the easy scenarios and buys
+# resolution on the hard ones. Levels above the binding point are cheap anyway
+# (a slack constraint is found in ~900 A* expansions, ~21 s); they flatten the
+# top of the curve, which is the honest shape.
+pct_floor: 90
+pct_patience: 1
+
+# Methods under test: label@key=value,key=value | ...
+# (the same | @ , idiom as the landmarks:/obstacles: encodings). Every key is a
+# config override applied on top of config/mc/. The label names the output
+# folder and must be unique; `algorithms` must name exactly one planner. A bare
+# name with no @ means "that algorithm at the base config's defaults".
+# Adding a future baseline is a line here — the harness contains no
+# algorithm-specific logic whatsoever.
+methods: hexspline_cl@algorithms=hexspline_cl,num_agents=2 | straight_cont@algorithms=straight_cont,num_agents=2
+# other baselines, ready to uncomment (append with a leading `|` on the line above):
+#   discrete_only@algorithms=discrete_only,num_agents=2
+#   straight_line@algorithms=straight_line,num_agents=2
+#   hexspline_1@algorithms=hexspline_cl,num_agents=1
+
+# Debugging: keep the per-run figures / CSVs for every scenario at every
+# constraint level, under <sweep>/<label>/<scenario>_p<pct>/. Off by default —
+# a 20-scenario sweep is several hundred runs and thousands of PNGs.
+save_figures: true
+save_csv: false
+
+# Hard wall-clock kill per subprocess. A killed run is recorded as a
+# fail_reason of `timeout`, not silently dropped.
+run_timeout_s: 900
+
+# Methods within one constraint level run concurrently (levels stay sequential
+# because the early stop depends on their outcome), so the useful ceiling is
+# the number of methods.
+workers: 4
+
+outroot: results/constraint_sweep

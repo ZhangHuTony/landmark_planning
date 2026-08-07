@@ -271,7 +271,14 @@ function random_convex_obstacles(n::Int, rng, goal_x::Float64)
         b  = 20.0 + 40.0 * rand(rng)
         φ  = 2π * rand(rng)               # rotation, so long axis can lie either way
         cx = goal_x * (0.12 + 0.76 * rand(rng))
-        cy = -240.0 + 480.0 * rand(rng)
+        # Triangular on [-240, 240] (difference of two uniforms), peaked on the
+        # direct start→goal line instead of flat across the corridor. An obstacle
+        # sitting ON the line is the case worth sampling: getting past it is a
+        # left-or-right choice, and a local optimizer seeded with the straight
+        # line cannot cross to the other side once it has picked. Flat placement
+        # produced that by luck in roughly a third of scenarios; this makes it
+        # ~60%, without capping the range or special-casing any scenario.
+        cy = 240.0 * (rand(rng) - rand(rng))
 
         # Clear of start and goal. Centre distance against the circumradius is
         # conservative (the polygon is inscribed in the a×b ellipse).
@@ -310,14 +317,27 @@ function generate_scenario(; seed::Int, goal_dist::Real,
 
     # Landmarks are pushed OFF the direct start→goal line on purpose: that is
     # what makes a fix cost a detour, which is the whole trade-off under test.
-    # The ±[60, 320] m band is bounded at both ends by the sensor model —
-    # reachable hex rows stop near ±260 m and detection is a logistic with a
-    # 100 m plateau, so past ~330 m a landmark contributes nothing (p ≈ 1e-26
-    # at 250 m off-corridor); inside 60 m the fix is free from the direct route.
+    #
+    # The inner edge is 200 m, not the 60 m it used to be, and the number comes
+    # straight out of the sensor model rather than taste. visibility_width is 2.5
+    # against a visibility_range of 100, so detection is effectively a hard wall
+    # at 100 m: p(105 m) = 0.12, p(110 m) = 0.018. Two free rides followed:
+    #   * |y| <= 100  — the PRIMARY sees it from the direct line, no detour at all.
+    #   * |y| <= 200  — the SUPPORT sees it while sitting 100 m off the line, which
+    #                   is exactly comm_range, so it keeps fusing with a primary
+    #                   that never left the straight path.
+    # Sweep 2026-08-07_16-46-28 is what this is fixing: s001 drew landmarks at
+    # -83.7/-99.8 and s003 at -83.9, and on both straight_cont held ratio 1.0000
+    # from p100 all the way to p30 — it never had to move. s005 (all landmarks
+    # 233-285 m out) is the only scenario where it was forced off the line.
+    # Outer edge 320 m: reachable hex rows stop at ±259.8, and 320 - 259.8 = 60 m
+    # is still well inside the 100 m detection wall.
+    # ponytail: hardcoded because it is derived from visibility_range/comm_range,
+    # which are themselves fixed in config/mc/main.yaml. If those move, this must.
     lms = Landmark[]
     for _ in 1:n_landmarks
         x = D * (0.12 + 0.76 * rand(rng))
-        y = (rand(rng) < 0.5 ? -1.0 : 1.0) * (60.0 + 260.0 * rand(rng))
+        y = (rand(rng) < 0.5 ? -1.0 : 1.0) * (200.0 + 120.0 * rand(rng))
         push!(lms, Landmark(x, y, random_landmark_cov(rng)))
     end
 
