@@ -47,7 +47,9 @@ const SCENARIOS = Dict{Symbol, Function}(
     # One landmark, well off the direct line: minimal detour-vs-uncertainty case.
     :single => () -> (landmarks = Landmark[
                           Landmark(600.0, -250.0, random_landmark_cov())],
-                      obstacles = Obstacle[],
+                      obstacles = Obstacle[                            
+                        build_obstacle([(200.0,60.0), (260.0,60.0), (260.0,-60.0), (200.0,-60.0)])
+                        ],
                       start = (0.0, 0.0), goal = (1000.0, 0.0)),
 
     # Two landmarks on opposite sides — the primary must pick a side, or the

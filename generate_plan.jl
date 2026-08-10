@@ -18,10 +18,13 @@ include(joinpath(_ROOT, "src", "scenario_generation.jl"))
 include(joinpath(_ROOT, "src", "covariance.jl"))
 include(joinpath(_ROOT, "src", "viz.jl"))
 include(joinpath(_ROOT, "src", "analysis.jl"))
-# Include each engine source once. Alias planners (straight_cont, discrete_only)
-# resolve to hexspline_cl.jl, which defines their plan_* entry points too.
-for src in unique(engine_of.(ALGORITHMS))
-    include(joinpath(_ROOT, "planners", "$(src).jl"))
+# Include each engine source once, then any planner that ships its own file on
+# top of an engine. Alias planners with no source of their own (straight_cont,
+# discrete_only) resolve to hexspline_cl.jl, which defines their plan_* entry
+# points too; `greedy` has its own file and is included after the engine it calls.
+for src in unique(vcat(engine_of.(ALGORITHMS), ALGORITHMS))
+    path = joinpath(_ROOT, "planners", "$(src).jl")
+    isfile(path) && include(path)
 end
 
 const OUTPUT_DIR = get(ENV, "OUTPUT_DIR", joinpath("results", Dates.format(now(), "yyyy-mm-dd_HH-MM-SS")))
