@@ -1,0 +1,2 @@
+scenario_id,pct,threshold,method,algorithm,num_agents,success,fail_reason,primary_length,primary_unc,length_ratio,wall_s,wall_ratio,astar_iterations,continuous_primary_length,continuous_uncertainties,discrete_uncertainties,primary_disc_unc
+s001,100,7.9062,discrete_only,discrete_only,2,true,,944.9551276110654,6.921190598227208,1.0448,33.2,1.8547,108104,944.955,"[4.882, 6.9212]","[4.882, 6.6845]",6.684528430049467

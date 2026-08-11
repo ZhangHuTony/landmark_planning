@@ -1,0 +1,2 @@
+scenario_id,pct,threshold,method,algorithm,num_agents,success,fail_reason,primary_length,primary_unc,length_ratio,wall_s,wall_ratio,astar_iterations,continuous_primary_length,continuous_uncertainties,discrete_uncertainties,primary_disc_unc,refinement_min_slack,refinement_status
+s001,100,7.9062,straight_cont,straight_cont,2,false,recovery_failed,713.9866675943671,8.475748404482198,,19.9,1.1085,0,713.987,"[8.275, 8.4757]","[7.7303, 7.7303]",7.730260802906696,-43.507224655308534,recovery_failed

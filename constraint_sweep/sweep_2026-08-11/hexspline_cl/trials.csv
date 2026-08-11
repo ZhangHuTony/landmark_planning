@@ -1,0 +1,2 @@
+scenario_id,pct,threshold,method,algorithm,num_agents,success,fail_reason,primary_length,primary_unc,length_ratio,wall_s,wall_ratio,astar_iterations,continuous_primary_length,continuous_uncertainties,discrete_uncertainties,primary_disc_unc,refinement_min_slack,refinement_status
+s001,100,7.9062,hexspline_cl,hexspline_cl,2,true,,905.0937052767976,7.531598022633662,1.0007,35.5,1.9829,108104,905.094,"[4.1434, 7.5316]","[4.882, 6.6845]",6.684528430049467,3.4178501695514285e-9,optimized

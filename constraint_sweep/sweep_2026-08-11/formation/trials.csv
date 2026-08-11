@@ -1,0 +1,2 @@
+scenario_id,pct,threshold,method,algorithm,num_agents,success,fail_reason,primary_length,primary_unc,length_ratio,wall_s,wall_ratio,astar_iterations,continuous_primary_length,continuous_uncertainties,discrete_uncertainties,formation_arc_drift,formation_offsets,primary_disc_unc,refinement_min_slack,refinement_status
+s001,100,7.9062,formation,formation,2,true,,963.7491417313176,6.998177678046918,1.0656,18.2,1.0169,124,963.749,"[6.9894, 6.9982]","[6.8748, 6.5253]",[82.2876],[-1],6.525265853126272,0.011116061105839266,optimized

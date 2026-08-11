@@ -1,0 +1,20 @@
+── constraint sweep sweep_2026-08-11 ──
+  methods: hexspline_cl, straight_cont, discrete_only, greedy, formation, sequential
+  ladder:  100%   patience=1   method_patience=1   timeout=900s
+  scenarios: drawing until 1 references succeed (guard: 200 draws)
+  output:  /home/tonyzhang/projects/landmark_planning/constraint_sweep/sweep_2026-08-11
+  s001: D=700 L=4 O=5  L_ref=904.4 U_ref=7.906  (17.9s)  [1/1]
+    s001 p100  greedy            ok   ratio=1.0452   18.1s
+    s001 p100  straight_cont     FAIL recovery_failed   19.9s
+    s001 p100  discrete_only     ok   ratio=1.0448   33.2s
+    s001 p100  hexspline_cl      ok   ratio=1.0007   35.5s
+    s001 p100  formation         ok   ratio=1.0656   18.2s
+    s001 p100  sequential        ok   ratio=0.9662   18.2s
+── done: /home/tonyzhang/projects/landmark_planning/constraint_sweep/sweep_2026-08-11 ──
+── constraint sweep sweep_2026-08-11 ──
+  methods: hexspline_cl, straight_cont, discrete_only, greedy, formation, sequential
+  ladder:  100%   patience=1   method_patience=1   timeout=900s
+  scenarios: drawing until 1 references succeed (guard: 200 draws)
+  output:  /home/tonyzhang/projects/landmark_planning/constraint_sweep/sweep_2026-08-11
+  s001: resumed  D=700 L=4 O=5  L_ref=904.4 U_ref=7.906
+── done: /home/tonyzhang/projects/landmark_planning/constraint_sweep/sweep_2026-08-11 ──

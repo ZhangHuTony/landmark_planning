@@ -1,0 +1,7 @@
+method,pct,n_total,n_success,success_rate,mean_length_ratio,median_length_ratio,mean_wall_s,median_wall_s,mean_wall_ratio,median_wall_ratio
+hexspline_cl,100,1,1,1.000,1.0007,1.0007,35.5,35.5,1.983,1.983
+straight_cont,100,1,0,0.000,,,,,,
+discrete_only,100,1,1,1.000,1.0448,1.0448,33.2,33.2,1.855,1.855
+greedy,100,1,1,1.000,1.0452,1.0452,18.1,18.1,1.012,1.012
+formation,100,1,1,1.000,1.0656,1.0656,18.2,18.2,1.017,1.017
+sequential,100,1,1,1.000,0.9662,0.9662,18.2,18.2,1.016,1.016
