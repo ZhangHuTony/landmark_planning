@@ -23,7 +23,7 @@
 # it toward the total silently shrank the sample (sweep 2026-08-10_18-17-16 asked
 # for 50 and measured 42). Rejected draws are still recorded in scenarios.csv
 # with empty L_ref/U_ref, so a resume skips them instead of retrying.
-n_scenarios: 5
+n_scenarios: 1
 scenario_seed_base: 1067
 # Runaway guard for that loop: if references keep failing, stop here rather than
 # drawing forever. Hit only when the geometry ranges make most scenarios
@@ -64,14 +64,14 @@ n_obstacles_max: 5
 # still run and still logged, so the failure tail is never silently truncated.
 # Set 0 to always walk the full ladder.
 pct_start: 100
-pct_step: 10
+pct_step: 5
 # Floor at 30, not 50: the interesting number is where each method finally gives
 # out, and pct_patience already stops a scenario two levels after everything
 # fails — so a deeper floor costs nothing on the easy scenarios and buys
 # resolution on the hard ones. Levels above the binding point are cheap anyway
 # (a slack constraint is found in ~900 A* expansions, ~21 s); they flatten the
 # top of the curve, which is the honest shape.
-pct_floor: 50
+pct_floor: 100
 pct_patience: 1
 # Per-METHOD early stop: after this many CONSECUTIVE failures, a method stops
 # being retried at stricter levels for that scenario, even while other methods
@@ -118,4 +118,4 @@ run_timeout_s: 900
 # the number of methods.
 workers: 4
 
-outroot: results/constraint_sweep
+outroot: constraint_sweep
