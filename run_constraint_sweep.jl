@@ -12,11 +12,28 @@
 #      U_ref > U_ref_cont always, and pct=100 means "constrain the search to
 #      exactly what the unconstrained reference's own search certified".
 #   2. Walk the constraint down: threshold = pct/100 * U_ref for
-#      pct = 100, 90, 80 ... and at each level run every configured method.
-#   3. Record primary_length / L_ref, plus whether a solution was found.
+#      pct = 100, 90, 80 ... and at each level run every method still in play.
+#   3. Record primary_length / L_ref and wall_s / wall_ref, plus whether a
+#      solution was found.
 #
-# Reported per (method, pct): mean length ratio over successes, and
-# n_success / n_total.
+# Reported per (method, pct): mean length ratio over successes, mean wall-clock
+# ratio over successes, and n_success / n_total.
+#
+# ── What does NOT count ──
+# n_scenarios counts scenarios whose REFERENCE succeeded; the sweep keeps drawing
+# until it has that many. A scenario with no reference has no L_ref to normalise
+# against and contributes no rows, so counting it just shrinks the sample.
+#
+# ── Two early stops, both recorded rather than omitted ──
+# `pct_patience`    — every method failed at N consecutive levels: abandon the
+#                     scenario, remaining levels logged `not_run_below_stop`.
+# `method_patience` — ONE method failed N times running: drop just that method
+#                     for this scenario even while others keep succeeding,
+#                     remaining levels logged `not_run_after_fail`.
+# Both rest on success being monotone in the constraint, which holds for ~99% of
+# method×scenario pairs (see method_patience in sweep.yaml for the exceptions and
+# why they exist). Skipped levels are written as explicit failure rows so
+# summarize() keeps the full scenario count in its denominator.
 #
 # ── Why subprocesses ──
 # src/config.jl freezes every knob into a module-level `const` at include time,
@@ -243,7 +260,7 @@ end
 
 const CORE_COLS = ["scenario_id", "pct", "threshold", "method", "algorithm", "num_agents",
                    "success", "fail_reason", "primary_length", "primary_unc",
-                   "length_ratio", "wall_s"]
+                   "length_ratio", "wall_s", "wall_ratio"]
 
 function write_table(path::String, rows::Vector{Dict{String,String}}, core::Vector{String})
     extras = isempty(rows) ? String[] :
@@ -283,16 +300,28 @@ function summarize(root::String, methods::Vector{Method})
             at = filter(r -> parse(Int, r["pct"]) == pct, rows)
             ok = filter(r -> r["success"] == "true", at)
             ratios = [parse(Float64, r["length_ratio"]) for r in ok if !isempty(r["length_ratio"])]
+            # Time to a SOLUTION: successes only, so a method is not flattered by
+            # its own fast failures. `not_run_after_fail` rows carry wall_s 0.0 and
+            # are failures, so they never reach these.
+            num(rs, k) = Float64[x for x in (tryparse(Float64, get(r, k, "")) for r in rs)
+                                 if x !== nothing]
+            walls  = num(ok, "wall_s")
+            wratio = num(ok, "wall_ratio")
             push!(out, Dict(
                 "method" => m.label, "pct" => string(pct),
                 "n_total" => string(length(at)), "n_success" => string(length(ok)),
                 "success_rate" => @sprintf("%.3f", length(ok) / length(at)),
                 "mean_length_ratio"   => isempty(ratios) ? "" : @sprintf("%.4f", mean(ratios)),
-                "median_length_ratio" => isempty(ratios) ? "" : @sprintf("%.4f", median(ratios))))
+                "median_length_ratio" => isempty(ratios) ? "" : @sprintf("%.4f", median(ratios)),
+                "mean_wall_s"         => isempty(walls)  ? "" : @sprintf("%.1f", mean(walls)),
+                "median_wall_s"       => isempty(walls)  ? "" : @sprintf("%.1f", median(walls)),
+                "mean_wall_ratio"     => isempty(wratio) ? "" : @sprintf("%.3f", mean(wratio)),
+                "median_wall_ratio"   => isempty(wratio) ? "" : @sprintf("%.3f", median(wratio))))
         end
     end
     cols = ["method", "pct", "n_total", "n_success", "success_rate",
-            "mean_length_ratio", "median_length_ratio"]
+            "mean_length_ratio", "median_length_ratio",
+            "mean_wall_s", "median_wall_s", "mean_wall_ratio", "median_wall_ratio"]
     write_table(joinpath(root, "summary.csv"), out, cols)
 
     open(joinpath(root, "SUMMARY.md"), "w") do io
@@ -303,12 +332,22 @@ function summarize(root::String, methods::Vector{Method})
         println(io, "where U_ref is the uncertainty of that reference path's DISCRETE seed — the")
         println(io, "stage the threshold gates. scenarios.csv logs the refined U_ref_cont beside it.")
         println(io, "Means are over SUCCESSFUL runs only, so read them next to n_success/n_total.\n")
-        println(io, "| method | constraint % | success | rate | mean ratio | median ratio |")
-        println(io, "|---|---|---|---|---|---|")
+        println(io, "`wall_ratio` = this run's wall clock / the reference run's, the time cost in")
+        println(io, "the same currency as length_ratio. Both are whole subprocesses, so each")
+        println(io, "carries the same fixed overhead (Julia startup + graph build + refinement,")
+        println(io, "~17.7 s on the 600-800 m band) — that floor largely divides out, but it does")
+        println(io, "compress the ratio, so a method at 2.0x is doing far more than 2x the search.")
+        println(io, "`fail_reason` distinguishes a real failure from `not_run_after_fail` (method")
+        println(io, "dropped after method_patience failures) and `not_run_below_stop`.\n")
+        println(io, "| method | constraint % | success | rate | mean ratio | median ratio | mean wall | mean wall ratio |")
+        println(io, "|---|---|---|---|---|---|---|---|")
+        dash(v) = isempty(v) ? "—" : v
         for r in out
             println(io, "| $(r["method"]) | $(r["pct"])% | $(r["n_success"])/$(r["n_total"]) | " *
-                        "$(r["success_rate"]) | $(isempty(r["mean_length_ratio"]) ? "—" : r["mean_length_ratio"]) | " *
-                        "$(isempty(r["median_length_ratio"]) ? "—" : r["median_length_ratio"]) |")
+                        "$(r["success_rate"]) | $(dash(r["mean_length_ratio"])) | " *
+                        "$(dash(r["median_length_ratio"])) | " *
+                        "$(isempty(r["mean_wall_s"]) ? "—" : r["mean_wall_s"] * " s") | " *
+                        "$(dash(r["mean_wall_ratio"])) |")
         end
     end
 
@@ -327,9 +366,11 @@ function plot_summary(root::String, methods::Vector{Method}, rows::Vector{Dict{S
     top = plot(ylabel="mean length / L_ref", legend=:topleft, grid=:y, gridalpha=0.25,
                framestyle=:box, titlefontsize=10, xlims=xl, xticks=all_pcts,
                title="Path-length cost of the localization constraint")
-    bot = plot(xlabel="constraint level (% of the unconstrained reference uncertainty U_ref)",
-               ylabel="success rate", legend=false, grid=:y, gridalpha=0.25,
+    mid = plot(ylabel="success rate", legend=false, grid=:y, gridalpha=0.25,
                framestyle=:box, ylims=(-0.05, 1.05), xlims=xl, xticks=all_pcts)
+    bot = plot(xlabel="constraint level (% of the unconstrained reference uncertainty U_ref)",
+               ylabel="mean wall / reference", legend=false, grid=:y, gridalpha=0.25,
+               framestyle=:box, xlims=xl, xticks=all_pcts)
     for (i, m) in enumerate(methods)
         mine = sort(filter(r -> r["method"] == m.label, rows), by = r -> parse(Int, r["pct"]))
         isempty(mine) && continue
@@ -340,14 +381,18 @@ function plot_summary(root::String, methods::Vector{Method}, rows::Vector{Dict{S
         # NaN, not a dropped point: a level where every run failed has no ratio,
         # and joining across it would draw a line through data that isn't there.
         ratio(p) = (v = get(by_pct[p], "mean_length_ratio", ""); isempty(v) ? NaN : parse(Float64, v))
+        wall(p) = (v = get(by_pct[p], "mean_wall_ratio", ""); isempty(v) ? NaN : parse(Float64, v))
         plot!(top, pcts, ratio.(pcts),
               color=clr, lw=2, marker=mrk, ms=5, markerstrokewidth=0, label=m.label)
-        plot!(bot, pcts, [parse(Float64, by_pct[p]["success_rate"]) for p in pcts],
+        plot!(mid, pcts, [parse(Float64, by_pct[p]["success_rate"]) for p in pcts],
+              color=clr, lw=2, marker=mrk, ms=5, markerstrokewidth=0, label=m.label)
+        plot!(bot, pcts, wall.(pcts),
               color=clr, lw=2, marker=mrk, ms=5, markerstrokewidth=0, label=m.label)
     end
     hline!(top, [1.0], color=:gray70, ls=:dash, lw=1, label="reference (ratio 1.0)")
+    hline!(bot, [1.0], color=:gray70, ls=:dash, lw=1, label=false)
     out = joinpath(root, "fig_length_ratio.png")
-    savefig(plot(top, bot, layout=grid(2, 1, heights=[0.62, 0.38]), size=(900, 700),
+    savefig(plot(top, mid, bot, layout=grid(3, 1, heights=[0.44, 0.28, 0.28]), size=(900, 950),
                  xflip=true, left_margin=6Plots.mm, bottom_margin=5Plots.mm), out)
     println("  → $(out)")
 end
@@ -396,6 +441,7 @@ function main()
     save_csv  = Bool(get(SWEEP, "save_csv", false))
     timeout   = Float64(SWEEP["run_timeout_s"])
     patience  = Int(SWEEP["pct_patience"])
+    method_patience = Int(get(SWEEP, "method_patience", 1))
     pcts      = collect(Int(SWEEP["pct_start"]):-Int(SWEEP["pct_step"]):Int(SWEEP["pct_floor"]))
 
     # Resume: previously completed (scenario, pct) rows are kept and skipped.
@@ -407,10 +453,30 @@ function main()
 
     say("── constraint sweep $(TAG) ──")
     say("  methods: $(join((m.label for m in METHODS), ", "))")
-    say("  ladder:  $(join(pcts, ", "))%   patience=$(patience)   timeout=$(Int(timeout))s")
+    say("  ladder:  $(join(pcts, ", "))%   patience=$(patience)   " *
+        "method_patience=$(method_patience)   timeout=$(Int(timeout))s")
+    say("  scenarios: drawing until $(Int(SWEEP["n_scenarios"])) references succeed " *
+        "(guard: $(Int(get(SWEEP, "max_scenario_draws", 4 * Int(SWEEP["n_scenarios"])))) draws)")
     say("  output:  $(ROOT)")
 
-    for i in 1:Int(SWEEP["n_scenarios"])
+    # Draw until n_scenarios have a USABLE reference, rather than drawing exactly
+    # n_scenarios and losing the ones whose reference failed. A failed reference
+    # yields no L_ref/U_ref, so there is nothing to normalise against and the
+    # scenario contributes no rows at all — counting it toward the total silently
+    # shrank the sample (this sweep asked for 50 and measured 42). sid stays tied
+    # to the DRAW index, not the accepted count, so `seed = base + i` is still
+    # recoverable from a scenario_id and rejected draws keep their slot.
+    want  = Int(SWEEP["n_scenarios"])
+    cap   = Int(get(SWEEP, "max_scenario_draws", 4 * want))
+    accepted = 0
+    i = 0
+    while accepted < want
+        i += 1
+        if i > cap
+            say("  ! stopped after $(cap) draws with only $(accepted)/$(want) usable " *
+                "scenarios — references are failing more often than the guard allows")
+            break
+        end
         sid  = @sprintf("s%03d", i)
         seed = Int(SWEEP["scenario_seed_base"]) + i
         p    = sample_scenario_params(seed)
@@ -421,6 +487,10 @@ function main()
             ref = scen_done[sid]
             L_ref = tryparse(Float64, ref["L_ref"]); U_ref = tryparse(Float64, ref["U_ref"])
             (L_ref === nothing || U_ref === nothing) && (say("  $(sid): previously rejected, skipping"); continue)
+            # Sweeps written before wall_ref existed have no such column; a missing
+            # value disables the ratio for that scenario instead of erroring.
+            wall_ref = something(tryparse(Float64, get(ref, "wall_ref", "")), NaN)
+            accepted += 1
             say("  $(sid): resumed  D=$(Int(p.D)) L=$(p.nl) O=$(p.no)  L_ref=$(round(L_ref,digits=1)) U_ref=$(round(U_ref,digits=3))")
         else
             rdir = joinpath(ROOT, "reference", sid)
@@ -451,23 +521,38 @@ function main()
                        "n_obstacles" => string(p.no),
                        "L_ref" => L_ref === nothing ? "" : @sprintf("%.3f", L_ref),
                        "U_ref" => U_ref === nothing ? "" : repr(U_ref),
-                       "U_ref_cont" => (v = getnum(res, "primary_unc"); v === nothing ? "" : repr(v)))
+                       "U_ref_cont" => (v = getnum(res, "primary_unc"); v === nothing ? "" : repr(v)),
+                       # The yardstick for wall_ratio on every trial below. Same
+                       # subprocess shape as a method run (Julia startup + graph
+                       # build + refinement), so the ~17.7 s fixed overhead is in
+                       # both numerator and denominator and largely divides out.
+                       "wall_ref" => @sprintf("%.1f", r.wall))
+            wall_ref = r.wall
             push!(scen_rows, row)
             write_table(joinpath(ROOT, "scenarios.csv"), scen_rows,
                         ["scenario_id","seed","goal_dist","n_landmarks","n_obstacles",
-                         "L_ref","U_ref","U_ref_cont"])
+                         "L_ref","U_ref","U_ref_cont","wall_ref"])
             if L_ref === nothing || U_ref === nothing || !isfinite(L_ref) || !isfinite(U_ref) || U_ref <= 0
                 # No shortest path ⇒ nothing to normalise against. Recorded with
                 # empty L_ref/U_ref so a resume skips it instead of retrying.
-                say("  $(sid): REFERENCE FAILED (rc=$(r.rc) killed=$(r.killed)) — scenario skipped")
+                say("  $(sid): REFERENCE FAILED (rc=$(r.rc) killed=$(r.killed)) — " *
+                    "scenario skipped, does NOT count toward n_scenarios")
                 continue
             end
+            accepted += 1
             say("  $(sid): D=$(Int(p.D)) L=$(p.nl) O=$(p.no)  L_ref=$(round(L_ref,digits=1)) " *
-                "U_ref=$(round(U_ref,digits=3))  ($(round(r.wall,digits=1))s)")
+                "U_ref=$(round(U_ref,digits=3))  ($(round(r.wall,digits=1))s)  [$(accepted)/$(want)]")
         end
 
         # ── Ladder ──
         consec_allfail = 0
+        # Per-method failure streak. A method that has failed `method_patience`
+        # times in a row stops being retried at stricter levels for THIS scenario,
+        # regardless of how the other methods are doing — the constraint only gets
+        # harder going down, so retrying is almost always spending minutes to
+        # re-derive the same failure. "Almost": see method_patience in sweep.yaml
+        # for the ~1% of pairs that do recover, and the mechanism behind it.
+        consec_fail = Dict(m.label => 0 for m in METHODS)
         for pct in pcts
             threshold = pct / 100 * U_ref
             todo = [m for m in METHODS if !((sid, string(pct)) in done[m.label])]
@@ -499,7 +584,13 @@ function main()
                         "num_agents" => get(m.overrides, "num_agents", "?"),
                         "success" => string(ok), "fail_reason" => why,
                         "length_ratio" => (ok && L !== nothing) ? @sprintf("%.4f", L / L_ref) : "",
-                        "wall_s" => @sprintf("%.1f", r.wall)))
+                        "wall_s" => @sprintf("%.1f", r.wall),
+                        # Time cost in the same currency as length_ratio: this run's
+                        # wall clock over the reference's. Recorded for FAILURES too
+                        # — an expensive failure is the interesting kind, and the
+                        # summary averages successes only.
+                        "wall_ratio" => isfinite(wall_ref) && wall_ref > 0 ?
+                                        @sprintf("%.4f", r.wall / wall_ref) : ""))
                     lock(lk) do
                         push!(trials[m.label], row)
                         push!(done[m.label], (sid, string(pct)))
@@ -508,6 +599,41 @@ function main()
                         say("    $(sid) p$(pct)  $(rpad(m.label,16))  " *
                             (ok ? "ok   ratio=$(row["length_ratio"])" : "FAIL $(why)") *
                             "   $(row["wall_s"])s")
+                    end
+                end
+            end
+
+            # ── Per-method drop ──
+            # Written as explicit rows at the moment of the drop, for every level
+            # still below, rather than tracked in a separate "dropped" set: the
+            # `todo` filter above already skips anything in `done`, so recording
+            # the rows IS the exclusion, and there is no second piece of state that
+            # can disagree with the CSV. Same denominator argument as the
+            # all-methods stop below — the levels must appear as failures, not go
+            # missing, or summarize() divides by the easy scenarios only.
+            if method_patience > 0
+                rest = pcts[findfirst(==(pct), pcts)+1:end]
+                for m in METHODS
+                    haskey(outcomes, m.label) || continue
+                    consec_fail[m.label] = outcomes[m.label] ? 0 : consec_fail[m.label] + 1
+                    (consec_fail[m.label] < method_patience || isempty(rest)) && continue
+                    newly = 0
+                    for q in rest
+                        (sid, string(q)) in done[m.label] && continue
+                        push!(trials[m.label], Dict(
+                            "scenario_id" => sid, "pct" => string(q),
+                            "threshold" => @sprintf("%.4f", q / 100 * U_ref),
+                            "method" => m.label, "algorithm" => m.algorithm,
+                            "num_agents" => get(m.overrides, "num_agents", "?"),
+                            "success" => "false", "fail_reason" => "not_run_after_fail",
+                            "length_ratio" => "", "wall_s" => "0.0", "wall_ratio" => ""))
+                        push!(done[m.label], (sid, string(q)))
+                        newly += 1
+                    end
+                    if newly > 0
+                        write_table(joinpath(ROOT, m.label, "trials.csv"), trials[m.label], CORE_COLS)
+                        say("    $(sid): $(m.label) failed $(consec_fail[m.label])x in a row " *
+                            "(through $(pct)%) — dropped, $(newly) stricter level(s) recorded unrun")
                     end
                 end
             end

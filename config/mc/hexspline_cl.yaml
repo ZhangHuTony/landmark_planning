@@ -38,7 +38,22 @@ prune_by_support_uncertainty: false
 # ceiling. Re-check this if goal_dist_max is raised — the joint state space grows
 # fast in D, and this number is calibrated to the 600-800 m band, not to the
 # paper's long scenarios.
-astar_iteration_limit: 150000
+# 150k -> 1.5M. At 150k the budget, not the problem, decided the result: on sweep
+# 2026-08-10_18-17-16 every one of hexspline_cl's 137 failures hit the cap
+# exactly (48 no_solution + 89 recovery_failed, zero failures with budget left),
+# and 26% of its SUCCESSES were budget-exhausted too. The verdicts were provably
+# false: ci_omega_det clamps omega to [0,1] with omega=1 returning cov_a
+# unchanged, so CI fusion can never raise det and the 2-agent feasible set is a
+# strict superset of the 1-agent one — yet pct=100, where the reference's own
+# single-agent path is feasible by construction, returned no_solution 48 times.
+# Re-running s004 p100 unchanged except for this cap found a solution at
+# iteration 572,554 with length ratio 1.036, against formation's 1.836 on the
+# same scenario the sweep had scored as a formation win.
+#
+# 1.5M is ~2.6x the deepest solution actually observed. It is a MEMORY bound now
+# rather than a time bound (every expansion pushes a State); wall_s in trials.csv
+# is the honest cost signal.
+astar_iteration_limit: 500000
 straight_cont_primary_wpts: 11
 support_idle_penalty: 30.0
 support_plot_offset_m: 3.0

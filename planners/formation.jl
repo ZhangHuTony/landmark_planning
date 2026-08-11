@@ -1,48 +1,70 @@
 # ==========================================================================
-# formation: baseline where the team flies as a rigid-ish formation.
+# formation: baseline that separates routing from support placement entirely.
 #
-#   Primary : a normal uncertainty-constrained A* over the hex graph — the same
-#             search hexspline_cl runs, just not a joint one.
-#   Supports: no freedom of their own. Each holds a fixed slot in the primary's
-#             BODY frame (one hex out, at a 60° multiple off its heading), so
-#             the whole team is determined by the primary's node alone.
+#   Primary  : the ordinary single-agent hexspline search — joint_astar with
+#              na=1, held to the same unc_radius_threshold as every other
+#              planner. It plans as if it were alone.
+#   Supports : added AFTERWARDS, by walking the finished primary path once.
+#              Each holds a slot in the primary's BODY frame (one hex out, at a
+#              60° multiple off its heading) and starts on the primary's own node.
 #
-# That is what makes this cheap: the supports are a deterministic function of
-# the primary's (cell, heading), so the search stays single-agent-sized while
-# still certifying the TEAM's fused uncertainty rather than the primary's alone.
+# There is no joint search and no formation state inside the search, which is
+# what makes this the cheapest planner here: one single-agent A*, then a linear
+# placement walk. It is a baseline for "route selfishly, then bring help".
 #
-# ── Why the formation deforms through turns ──────────────────────────────────
-# A rigid offset cannot survive a turn. Measured on this graph, the support on
-# the outside of a turn would have to cover 2× the primary's step (1.73× for the
-# ±2 slots, and the inside support would have to stand still). That is real
-# formation geometry — but this model has no speed: `apply_synchronized_
-# propagation!` puts comm checkpoints every COMM_INTERVAL of ARC LENGTH and
-# advances every agent to the same arc, so distance travelled *is* time. A
-# support that covered 100 m extra is therefore rewound 100 m at the next
-# checkpoint, landing ~141 m from the primary — and comm_weight(141 m) = 7.5e-8,
-# far under COMM_WEIGHT_MIN, so the pair silently stops communicating for the
-# rest of the run.
+# ── Placement policy, per support per step ───────────────────────────────────
+# Pick a TARGET, then move exactly one hex toward it.
+#   target = the slot, whenever the slot is legal (on the graph and clear of
+#            every obstacle at the support's belief);
+#          = the primary's own cell when the slot is IN VIOLATION. There is
+#            always such a cell, which is why the primary can plan alone without
+#            ever stranding a support.
+#   step   = the target itself when it is reachable within the ±60° turn limit
+#            (the steady state on any straight stretch), otherwise the admissible
+#            cell closest to it. The latter is what a turn looks like: the outside
+#            slot is two hexes away mid-turn, so the support lags one step and
+#            re-forms once the primary straightens.
 #
-# So the support always steps exactly ONE hex, to whichever neighbouring cell
-# sits closest to its ideal slot. Arc lengths stay identical to the primary's,
-# every comm checkpoint fuses at full geometric weight, and the formation simply
-# lags mid-turn and re-forms afterwards. Nothing in src/covariance.jl changes.
+# ── Why steps are one hex ────────────────────────────────────────────────────
+# `apply_synchronized_propagation!` puts comm checkpoints every COMM_INTERVAL of
+# ARC LENGTH and advances every agent to the same arc, so in this model distance
+# travelled *is* time. A support that covered 100 m extra gets rewound 100 m at
+# the next checkpoint, landing ~141 m from the primary — and comm_weight(141 m)
+# = 7.5e-8, under COMM_WEIGHT_MIN, so the pair silently stops communicating for
+# the rest of the run. An earlier version let the violation fallback jump
+# straight to the primary's cell, up to 173 m in one step; on obstacle-dense
+# sweep scenarios that accumulated 200 m and 530 m of arc drift and failed the
+# runs. Closing on the same target one hex at a time arrives just as surely, a
+# step later, and desynchronises nothing. `formation_arc_drift` reports any
+# residual.
+#
+# The ±60° turn limit is the same vehicle model the hex graph imposes on the
+# primary by construction. Without it a support may pick any of the six
+# neighbours, including a 120° pivot — measured at κ=0.0416 against
+# MAX_CURVATURE=0.025, a hard constraint row, which failed whole runs in
+# refinement on formations that had already been certified.
 # ==========================================================================
 
 # Body-frame slots, in 60° units off the primary's heading: +1 = 60° left,
 # -1 = 60° right, ±2 = 120°, 3 = directly behind. Slot 0 is the primary's own
-# cell, so it is not offerable. One slot per support, primary excluded.
-const FORMATION_OFFSETS = [parse(Int, strip(s)) for s in split(String(CFG["formation_offsets"]), ",")]
+# cell, so it is not offerable. One slot per support, in agent order.
+# Defaulted rather than required: with one support the planner picks the slot
+# itself, so this key is dead for the common 2-agent case — and a hard CFG lookup
+# made the planner un-runnable against any config folder that had not been told
+# about it yet (run_constraint_sweep.jl copies config/mc/, a separate snapshot:
+# missing file ⇒ KeyError at include time, before a single run starts).
+const FORMATION_OFFSETS = [parse(Int, strip(s))
+                           for s in split(String(get(CFG, "formation_offsets", "1,-1,2,-2,3")), ",")]
 
 # ── Cell lookup ──────────────────────────────────────────────────────────────
-# The supports are placed by POSITION (a cell centre one hex away), but
-# optimize_continuous consumes node indices, so positions have to map back to
-# nodes. build_hex_graph does not export its (cell, heading) index, and six
-# heading states share a centre anyway — any of them carries the right position.
+# Supports are placed by POSITION (a cell centre one hex away) but
+# optimize_continuous consumes node indices, so positions map back to nodes.
+# build_hex_graph does not export its (cell, heading) index, and six heading
+# states share a centre anyway — any of them carries the right position.
 #
 # Keyed on position quantised to 1 m, with the 8 surrounding keys inserted too:
-# cell centres are ≥86.6 m apart so a 1 m halo cannot collide, and it removes
-# the quantisation-boundary risk of an exact key (a computed offset lands within
+# cell centres are ≥86.6 m apart so a 1 m halo cannot collide, and it removes the
+# quantisation-boundary risk of an exact key (a computed offset lands within
 # ~1e-12 m of the true centre, which a bare round() can still push into the
 # neighbouring bucket).
 hexkey(x::Float64, y::Float64) = (round(Int, x), round(Int, y))
@@ -60,10 +82,9 @@ function build_hex_lookup(graph::LandmarkGraph)
     return at
 end
 
-# The six geometric neighbours of every route node, precomputed once — the
-# support's step is chosen from these, so this must not be a scan inside the
-# search loop. Neighbours of a hex centre are exactly one hex away at 60°
-# intervals, independent of the axial parity bookkeeping in graph.jl.
+# The six geometric neighbours of every route node, precomputed once. Neighbours
+# of a hex centre are exactly one hex away at 60° intervals, independent of the
+# axial parity bookkeeping in graph.jl.
 function build_formation_neighbors(graph::LandmarkGraph, at::Dict{Tuple{Int,Int}, Int})
     nbrs = [Int[] for _ in 1:graph.n]
     for i in 1:graph.n
@@ -75,8 +96,8 @@ function build_formation_neighbors(graph::LandmarkGraph, at::Dict{Tuple{Int,Int}
         end
     end
     # The start node carries start_pos, not its cell's centre, so if start_pos is
-    # off-centre the ring above finds nothing. Fall back to the route nodes
-    # nearest to each of the six directions. Runs once, at setup.
+    # off-centre the ring above finds nothing there. Fall back to the route nodes
+    # nearest each of the six directions. Runs once, at setup.
     if isempty(nbrs[1])
         x = graph.landmarks[1].x; y = graph.landmarks[1].y
         route_mask, _ = node_role_masks(graph)
@@ -94,54 +115,13 @@ function build_formation_neighbors(graph::LandmarkGraph, at::Dict{Tuple{Int,Int}
     return nbrs
 end
 
-# Heading index (0-5) the primary is travelling in on the edge from → to. The
-# hex graph moves an agent along its NEW heading, so this recovers exactly the
-# heading its destination node encodes — without needing build_hex_graph's index.
+# Heading index (0-5) of the step from → to. The hex graph moves an agent along
+# its NEW heading, so for a primary edge this recovers exactly the heading its
+# destination node encodes — without needing build_hex_graph's internal index.
 @inline function step_heading(graph::LandmarkGraph, from::Int, to::Int)
     dx = graph.landmarks[to].x - graph.landmarks[from].x
     dy = graph.landmarks[to].y - graph.landmarks[from].y
     return mod(round(Int, atan(dy, dx) / (pi / 3)), 6)
-end
-
-# One support's next node: the neighbour of `cur` closest to its ideal slot.
-# Always exactly one hex, so arc length tracks the primary's exactly (see the
-# header).
-#
-# The tie-break is load-bearing, not decoration. Whenever the ideal slot is more
-# than one hex away (i.e. through every turn), the two neighbours flanking it are
-# EXACTLY equidistant from it — 73.2 m each — and one of them is the primary's own
-# cell. Breaking that tie toward the primary collapses the formation onto the
-# leader and it never recovers, because from on top of the primary the tie recurs
-# every step (measured: separation 0-15 m over a whole run, where 100 m was
-# intended). So ties go to the candidate FARTHEST from the primary: that is what
-# "hold the formation" means when the slot itself is unreachable. On straights the
-# ideal slot IS reachable, distance-to-ideal is 0 for exactly one neighbour, and
-# this row never runs. Distances are rounded first so a 1-ULP spread cannot
-# masquerade as a preference and skip the row.
-function formation_step(graph::LandmarkGraph, nbrs::Vector{Vector{Int}}, cur::Int,
-                        ideal::Tuple{Float64,Float64}, prim::Tuple{Float64,Float64})
-    best = 0; best_key = (Inf, Inf, typemax(Int))
-    for u in nbrs[cur]
-        ux = graph.landmarks[u].x; uy = graph.landmarks[u].y
-        key = (round(hypot(ux - ideal[1], uy - ideal[2]), digits=6),
-               -round(hypot(ux - prim[1], uy - prim[2]),  digits=6),   # then keep separation
-               u)
-        key < best_key && (best_key = key; best = u)
-    end
-    return best == 0 ? cur : best
-end
-
-# Nearest routing node to an arbitrary point. Only used to seat the supports in
-# their opening slots, so a linear scan is fine — it runs (num_agents-1) times.
-function nearest_route_node(graph::LandmarkGraph, x::Float64, y::Float64)
-    route_mask, _ = node_role_masks(graph)
-    best = 1; bestd = Inf
-    for i in 1:(graph.n - 1)
-        route_mask[i] || continue
-        d = hypot(graph.landmarks[i].x - x, graph.landmarks[i].y - y)
-        d < bestd && (bestd = d; best = i)
-    end
-    return best
 end
 
 # Where support `a` wants to be once the primary sits at `pnode` heading `h`.
@@ -151,164 +131,143 @@ end
             graph.landmarks[pnode].y + HEX_WIDTH_M * sin(θ))
 end
 
-# Advance the whole formation one step: primary `v` → `u`, supports follow.
-function formation_advance(graph::LandmarkGraph, nbrs::Vector{Vector{Int}},
-                           v::Int, u::Int, snodes::Vector{Int}, offsets::Vector{Int})
-    h = step_heading(graph, v, u)
-    prim = (graph.landmarks[u].x, graph.landmarks[u].y)
-    return [formation_step(graph, nbrs, snodes[a],
-                           formation_slot(graph, u, h, offsets[a]), prim)
-            for a in eachindex(snodes)]
+@inline turn_ok(d::Int, head::Int) = abs(mod(d - head + 3, 6) - 3) <= 1
+
+# Is stepping cur → u legal for a support: within ±60° of its heading, and clear
+# of every obstacle at the belief it would carry on arrival?
+function support_move_ok(graph::LandmarkGraph, lms::Vector{Landmark}, cur::Int, u::Int,
+                         head::Int, cov::Matrix{Float64})
+    turn_ok(step_heading(graph, cur, u), head) || return false
+    isempty(OBSTACLES) && return true
+    p0 = graph.landmarks[cur]; p1 = graph.landmarks[u]
+    ncov = edge_cov_continuous(cur, u, graph, lms, cov)
+    return segment_obstacle_free((p0.x, p0.y), (p1.x, p1.y), ncov)
 end
 
-# ==========================================================================
-# Formation A*: single-agent-sized search that certifies the TEAM's uncertainty
-# ==========================================================================
-# Same shape as joint_astar's na==1 fast path (weighted f, node-level Pareto
-# frontier under sound covariance dominance, obstacle filter on every edge,
-# exact re-evaluation at goal pops) — the difference is that each state carries
-# one covariance per agent and the supports ride along deterministically. The
-# frontier is keyed on the whole formation, not just the primary's node, because
-# two routes reaching the same cell can leave the supports in different places.
-struct FormState
-    node    :: Int
-    snodes  :: Vector{Int}
-    dist    :: Float64
-    covs    :: Vector{Matrix{Float64}}   # primary last, matching every other stage
-    parent  :: Int
-    visited :: BitVector
-end
-
-function formation_astar(graph::LandmarkGraph, lms::Vector{Landmark},
-                         unc_threshold::Float64, na::Int,
-                         offsets::Vector{Int}, nbrs::Vector{Vector{Int}})
-    goal = graph.n
-    is_goal_cell = falses(graph.n)
-    for v in 1:(graph.n - 1)
-        goal in graph.neighbors[v] && (is_goal_cell[v] = true)
+# Is the slot a place the support may legally stand? Returns its node, or 0 when
+# the slot is IN VIOLATION — off the corridor graph, or not clear of every
+# obstacle at the belief the support carries. This is a position test, distinct
+# from "can I reach it this step": a slot can be perfectly valid and still be two
+# hexes away mid-turn, which is deformation, not violation.
+function slot_node_if_clear(graph::LandmarkGraph, at::Dict{Tuple{Int,Int}, Int},
+                            slot::Tuple{Float64,Float64}, cov::Matrix{Float64})
+    node = get(at, hexkey(slot[1], slot[2]), 0)
+    node == 0 && return 0
+    for obs in OBSTACLES
+        clears_obstacle(slot[1], slot[2], cov, obs, OBSTACLE_Z, AGENT_RADIUS) || return 0
     end
-    w_astar = 1.0 + PRIMARY_EPSILON
-    ns = na - 1
+    return node
+end
 
-    # Supports launch ALREADY IN SLOT, not on top of the primary. Forming up from
-    # co-located costs more than the two steps it looks like: from the primary's own
-    # cell the ideal slot is two hexes off, which is exactly the tied case in
-    # formation_step, so a degenerate start makes the formation fight to separate on
-    # every subsequent step instead of just holding. The initial heading is the one
-    # build_hex_graph gave the start node, so slot geometry matches the first move.
+# One support's next cell. Returns (node, heading).
+#
+# Target selection is the whole policy: hold the slot when the slot is legal,
+# fall back to the primary's own cell when it is in violation. Then move ONE hex
+# toward whichever target that is — taking it directly if it is reachable this
+# step, deforming toward it if it is not (which is what every turn looks like).
+#
+# The "one hex" part is not a detail. Jumping straight to a target 173 m away
+# breaks the arc-length lockstep that keeps comm checkpoints paired, and measured
+# on obstacle-dense sweep scenarios that produced 200 m and 530 m of arc drift and
+# failed the runs outright. Approaching the same target at one hex per step
+# reaches it just as surely, a step later, without desynchronising anything.
+function choose_support_cell(graph::LandmarkGraph, lms::Vector{Landmark},
+                             nbrs::Vector{Vector{Int}}, at::Dict{Tuple{Int,Int}, Int},
+                             cur::Int, head::Int, cov::Matrix{Float64},
+                             slot::Tuple{Float64,Float64}, pnode::Int)
+    slot_node = slot_node_if_clear(graph, at, slot, cov)
+    hold   = slot_node != 0                      # false ⇒ slot in violation, head for the primary
+    tnode  = hold ? slot_node : pnode
+    target = hold ? slot : (graph.landmarks[pnode].x, graph.landmarks[pnode].y)
+
+    # Reachable directly? Then take it — this is the "prioritize the slot when it
+    # is available" case, and the steady state on any straight stretch.
+    # ADJACENCY IS PART OF REACHABLE. The slot is measured from the PRIMARY's new
+    # cell, so it can sit two hexes from where the support currently stands, and a
+    # turn check alone happily accepts that: step_heading is defined for any pair
+    # of nodes, so a 200 m hop reads as a legal 0° turn. That is exactly how the
+    # support ended up making 200 m steps and accruing arc drift.
+    if tnode != cur && tnode in nbrs[cur] && support_move_ok(graph, lms, cur, tnode, head, cov)
+        return tnode, step_heading(graph, cur, tnode)
+    end
+
+    # Otherwise close on the target one hex at a time.
+    # The secondary row is load-bearing while holding a slot: mid-turn the slot is
+    # two hexes off and the two neighbours flanking it are EXACTLY equidistant from
+    # it (73.2 m each), one of which is the primary's own cell. Breaking that tie
+    # toward the primary collapses the formation onto the leader and it never
+    # recovers, because from on top of the primary the tie recurs every step
+    # (measured: 0-15 m separation for a whole run where 100 m was intended). So
+    # while holding, ties go to the candidate FARTHEST from the primary; while
+    # falling back, they go to the nearest, since closing on the leader is the
+    # point. Rounded first so a 1-ULP spread cannot pre-empt the row.
+    px = graph.landmarks[pnode].x; py = graph.landmarks[pnode].y
+    pick(relax_obstacles::Bool, relax_turn::Bool) = begin
+        best = 0; best_key = (Inf, Inf, typemax(Int))
+        for u in nbrs[cur]
+            u == cur && continue
+            if !relax_turn
+                turn_ok(step_heading(graph, cur, u), head) || continue
+            end
+            if !relax_obstacles && !support_move_ok(graph, lms, cur, u, head, cov)
+                continue
+            end
+            ux = graph.landmarks[u].x; uy = graph.landmarks[u].y
+            dp = round(hypot(ux - px, uy - py), digits=6)
+            key = (round(hypot(ux - target[1], uy - target[2]), digits=6),
+                   hold ? -dp : dp,
+                   u)
+            key < best_key && (best_key = key; best = u)
+        end
+        best
+    end
+
+    # Last resorts, in order of what hurts least: an obstacle-blocked step is
+    # re-checked and reported by the continuous stage, and a hard turn shows up on
+    # the curvature row — but standing still desynchronises the comm schedule for
+    # the whole remaining route, which nothing downstream can detect or repair.
+    for (ro, rt) in ((false, false), (true, false), (true, true))
+        b = pick(ro, rt)
+        b != 0 && return b, step_heading(graph, cur, b)
+    end
+    return cur, head
+end
+
+# Walk the finished primary path once, placing every support step by step.
+# Covariance is threaded here (dead reckoning + landmark fusion, no inter-agent
+# fusion) purely so the obstacle test above sees a real belief rather than a
+# fixed prior; the authoritative numbers come from evaluate_full_paths after.
+function place_supports(graph::LandmarkGraph, lms::Vector{Landmark},
+                        nbrs::Vector{Vector{Int}}, at::Dict{Tuple{Int,Int}, Int},
+                        primary_path::Vector{Int}, offsets::Vector{Int})
+    ns = length(offsets)
     h0 = nearest_heading_to_goal((graph.landmarks[1].x, graph.landmarks[1].y),
-                                 (graph.landmarks[goal].x, graph.landmarks[goal].y))
-    snodes0 = [nearest_route_node(graph, formation_slot(graph, 1, h0, offsets[a])...)
-               for a in 1:ns]
+                                 (graph.landmarks[graph.n].x, graph.landmarks[graph.n].y))
+    paths = [Int[1] for _ in 1:ns]          # supports start on the primary's node
+    heads = fill(h0, ns)
+    covs  = [copy(lms[1].cov) for _ in 1:ns]
 
-    init_visited = falses(graph.n); init_visited[1] = true
-    states = FormState[FormState(1, snodes0, 0.0,
-                                 [copy(lms[1].cov) for _ in 1:na], -1, init_visited)]
-
-    pq = PriorityQueue{Int, Tuple{Float64, Float64}}()
-    enqueue!(pq, 1, (w_astar * graph.shortest_paths[1, goal], unc_radius(states[1].covs[na])))
-
-    frontier = Dict{Tuple{Int, Tuple{Vararg{Int}}}, Vector{Tuple{Float64, Matrix{Float64}}}}()
-    frontier[(1, Tuple(states[1].snodes))] = [(0.0, copy(states[1].covs[na]))]
-
-    # Anytime incumbent, consulted only if the budget runs out with nothing under
-    # the threshold — the barrier can still trade length for uncertainty from it.
-    best_paths = Vector{Vector{Int}}(); best_dist = 0.0; best_unc = Inf
-    iter = 0; t0 = time()
-
-    rebuild(si) = begin
-        prim = Int[]; sups = [Int[] for _ in 1:ns]
-        p = si
-        while p != -1
-            pushfirst!(prim, states[p].node)
-            for a in 1:ns; pushfirst!(sups[a], states[p].snodes[a]); end
-            p = states[p].parent
-        end
-        vcat(sups, [prim])
-    end
-
-    while !isempty(pq) && iter < ASTAR_ITERATION_LIMIT
-        si = dequeue!(pq)
-        S = states[si]
-        iter += 1
-        astar_progress(iter, ASTAR_ITERATION_LIMIT, t0)
-
-        if is_goal_cell[S.node]
-            paths = rebuild(si)
-            exact_covs, exact_dists = evaluate_full_paths(paths, graph, lms, na)
-            exact_unc = unc_radius(exact_covs[na])
-            if unc_within_threshold(exact_unc, unc_threshold, UNC_FEAS_TOL)
-                if !seed_spline_clear(paths, graph, lms)
-                    continue    # spline breaches an obstacle / the support cap
-                end
-                println()
-                println("  ✓ FEASIBLE FORMATION at iter $(iter): dist=$(round(exact_dists[na], digits=3)), unc=$(round(exact_unc, digits=4))")
-                return paths, exact_dists[na], exact_unc, iter
-            end
-            if exact_unc < best_unc && seed_spline_clear(paths, graph, lms)
-                best_paths = paths; best_dist = exact_dists[na]; best_unc = exact_unc
-            end
-            continue
-        end
-
-        for u in graph.neighbors[S.node]
-            S.visited[u] && continue
-            u == goal && continue                # terminal marker, reached via is_goal_cell
-
-            snew  = formation_advance(graph, nbrs, S.node, u, S.snodes, offsets)
-            nodes = vcat(snew, [u])
-            nd    = S.dist + graph.distance[S.node, u]
-
-            ncovs = Vector{Matrix{Float64}}(undef, na)
-            for a in 1:ns
-                ncovs[a] = edge_cov_continuous(S.snodes[a], snew[a], graph, lms, S.covs[a])
-            end
-            ncovs[na] = edge_cov_continuous(S.node, u, graph, lms, S.covs[na])
-
-            # Every agent steps exactly one hex, so all arc distances are equal and
-            # apply_joint_step_comms' synchronisation gate is satisfied by construction
-            # — which is the whole reason the formation deforms instead of stretching.
-            ncovs = apply_joint_step_comms(ncovs, nodes, fill(nd, na), graph)
-
-            if !isempty(OBSTACLES)
-                blocked = false
-                for a in 1:ns
-                    p0 = graph.landmarks[S.snodes[a]]; p1 = graph.landmarks[snew[a]]
-                    if !segment_obstacle_free((p0.x, p0.y), (p1.x, p1.y), ncovs[a])
-                        blocked = true; break
-                    end
-                end
-                if !blocked
-                    p0 = graph.landmarks[S.node]; p1 = graph.landmarks[u]
-                    blocked = !segment_obstacle_free((p0.x, p0.y), (p1.x, p1.y), ncovs[na])
-                end
-                blocked && continue
-            end
-
-            key = (u, Tuple(snew))
-            labels = get(frontier, key, Tuple{Float64, Matrix{Float64}}[])
-            any(od <= nd + 1e-9 && cov_dominates(ocov, ncovs[na]) for (od, ocov) in labels) && continue
-            kept = [(od, ocov) for (od, ocov) in labels
-                    if !(nd <= od + 1e-9 && cov_dominates(ncovs[na], ocov))]
-            push!(kept, (nd, copy(ncovs[na])))
-            frontier[key] = kept
-
-            nvis = copy(S.visited); nvis[u] = true
-            push!(states, FormState(u, snew, nd, ncovs, si, nvis))
-            enqueue!(pq, length(states),
-                     (nd + w_astar * graph.shortest_paths[u, goal], unc_radius(ncovs[na])))
+    for k in 2:length(primary_path)
+        v = primary_path[k-1]; u = primary_path[k]
+        h = step_heading(graph, v, u)
+        for a in 1:ns
+            cur = paths[a][end]
+            nxt, nh = choose_support_cell(graph, lms, nbrs, at, cur, heads[a], covs[a],
+                                          formation_slot(graph, u, h, offsets[a]), u)
+            covs[a] = edge_cov_continuous(cur, nxt, graph, lms, covs[a])
+            push!(paths[a], nxt); heads[a] = nh
         end
     end
+    return paths
+end
 
-    println()
-    if isempty(best_paths)
-        println("  [Formation A*] No feasible formation found ($(iter) iterations)")
-        return Vector{Vector{Int}}(), 0.0, Inf, iter
-    end
-    println("  [Formation A*] Budget exhausted with no formation under threshold; " *
-            "handing best incumbent to the optimizer: dist=$(round(best_dist, digits=3)), " *
-            "unc=$(round(best_unc, digits=4)) > $(round(unc_threshold, digits=4))")
-    return best_paths, best_dist, best_unc, iter
+# How far each support's arc length ends up from the primary's. Zero unless a
+# support had to take the rung-3 fallback (see the header): comm checkpoints are
+# arc-indexed, so drift here is drift in WHEN agents talk, not just where.
+function formation_arc_drift(graph::LandmarkGraph, paths::Vector{Vector{Int}})
+    arclen(p) = sum(graph.distance[p[i-1], p[i]] for i in 2:length(p); init=0.0)
+    prim = arclen(paths[end])
+    return [arclen(paths[a]) - prim for a in 1:(length(paths) - 1)]
 end
 
 function plan_formation(scenario, graph::LandmarkGraph, output_dir::String)
@@ -329,58 +288,64 @@ function plan_formation(scenario, graph::LandmarkGraph, output_dir::String)
         "formation_offsets has $(length(FORMATION_OFFSETS)) slot(s) but num_agents=$(NUM_AGENTS) " *
         "needs $(ns). Add slots to config/formation.yaml (60° units; 0 is the primary's own cell).")
 
-    # With ONE support there is a single slot to pick, and picking it wrong is the
-    # planner's worst failure mode: a support held on the side away from every
-    # landmark contributes nothing but a halved comm weight. So search both lateral
-    # slots and keep the better — one extra search, and it removes the coin-flip.
-    # With 2+ supports the roster is a config decision: the slots interact (they
-    # share comm range with each other, not just the primary) and the combinatorics
-    # are 5·4·… , so config/formation.yaml is taken as given rather than searched.
-    rosters = ns == 1 ? [[1], [-1]] : [FORMATION_OFFSETS[1:ns]]
-
     println("\n── FORMATION PLANNING ──")
-    println("  Supports step one hex per move, so arc length — and therefore comm timing — tracks the primary exactly.")
-    println(ns == 1 ? "  One support: searching both lateral slots (+1 = 60° left, -1 = 60° right) and keeping the better." :
+    println("  Primary: single-agent hexspline A* (threshold $(UNC_RADIUS_THRESHOLD)); supports added afterwards.")
+
+    # ── Primary plans alone ──
+    ppaths, _, _, iters = joint_astar(graph, landmarks, UNC_RADIUS_THRESHOLD, 1)
+    if isempty(ppaths) || isempty(ppaths[1])
+        println("  ✗ No route to the goal for the primary.")
+        write_no_solution(iters)
+        return NamedTuple[]
+    end
+    primary_path = ppaths[1]
+
+    # ── Supports added on top ──
+    # With ONE support there is a single slot to pick and picking it wrong is the
+    # worst failure mode (a support held away from every landmark contributes
+    # nothing but a halved comm weight). Placement is a linear walk over a path
+    # that is already fixed, so trying both lateral slots is nearly free — unlike
+    # before, the primary is NOT re-searched per slot. With 2+ supports the roster
+    # is a config decision: the slots interact and the combinatorics are 5·4·… .
+    rosters = ns == 1 ? [[1], [-1]] : [FORMATION_OFFSETS[1:ns]]
+    println(ns == 1 ? "  One support: trying both lateral slots (+1 = 60° left, -1 = 60° right)." :
                       "  Body-frame slots (60° units off the primary's heading): $(rosters[1])")
 
     at   = build_hex_lookup(graph)
     nbrs = build_formation_neighbors(graph, at)
 
-    # Rank on the DISCRETE seed, then refine only the winner: refinement is the
-    # expensive stage and it writes the run's figures, so doing it per candidate
-    # would cost a full barrier solve per slot and leave the losers' figures
-    # overwritten anyway. Feasible beats infeasible; among feasible the shorter
-    # primary wins (that is the objective the barrier minimises); among infeasible
-    # the lower uncertainty wins (closest to recoverable).
-    offsets = Int[]; paths = Vector{Vector{Int}}(); iters = 0
-    best_rank = (typemax(Int), Inf)
+    offsets = Int[]; paths = Vector{Vector{Int}}(); best_rank = (typemax(Int), Inf, Inf)
     for roster in rosters
-        p, d, u, it = formation_astar(graph, landmarks, UNC_RADIUS_THRESHOLD,
-                                      NUM_AGENTS, roster, nbrs)
-        iters += it        # total search effort across every slot tried
-        isempty(p) && continue
+        cand = vcat(place_supports(graph, landmarks, nbrs, at, primary_path, roster), [primary_path])
+        covs, dists = evaluate_full_paths(cand, graph, landmarks, NUM_AGENTS)
+        u = unc_radius(covs[NUM_AGENTS])
         ok = unc_within_threshold(u, UNC_RADIUS_THRESHOLD, UNC_FEAS_TOL)
-        rank = (ok ? 0 : 1, ok ? d : u)
-        length(rosters) > 1 && println("  Slot $(roster): dist=$(round(d, digits=1)), " *
-                                       "unc=$(round(u, digits=4)) $(ok ? "✓" : "✗")")
+        # Feasible beats infeasible; then shorter (the barrier's objective); then
+        # lower uncertainty. That last row is not a formality — every roster reuses
+        # the SAME primary path, so lengths tie exactly and ranking on length alone
+        # would leave the choice to float noise (measured: it picked unc 9.49 over
+        # 8.88). Length is rounded so a 1-ULP spread cannot pre-empt it.
+        rank = (ok ? 0 : 1, ok ? round(dists[NUM_AGENTS], digits=6) : 0.0, u)
+        length(rosters) > 1 && println("  Slot $(roster): unc=$(round(u, digits=4)) $(ok ? "✓" : "✗")")
         if rank < best_rank
-            best_rank = rank; paths = p; offsets = roster
+            best_rank = rank; paths = cand; offsets = roster
         end
-    end
-    if isempty(paths)
-        write_no_solution(iters)
-        return NamedTuple[]
     end
     length(rosters) > 1 && println("  → Chose slot $(offsets)")
 
     seed_covs, seed_dists = evaluate_full_paths(paths, graph, landmarks, NUM_AGENTS)
     uncs = [unc_radius(seed_covs[a]) for a in 1:NUM_AGENTS]
+    drift = formation_arc_drift(graph, paths)
     for a in 1:ns
-        println("  Support $a (slot $(offsets[a])): dist=$(round(seed_dists[a], digits=1))m, goal_unc=$(round(uncs[a], digits=4))m")
+        println("  Support $a (slot $(offsets[a])): dist=$(round(seed_dists[a], digits=1))m, " *
+                "goal_unc=$(round(uncs[a], digits=4))m, arc drift vs primary=$(round(drift[a], digits=1))m")
     end
     println("  Primary : dist=$(round(seed_dists[end], digits=1))m, goal_unc=$(round(uncs[end], digits=4))m " *
             "(threshold $(UNC_RADIUS_THRESHOLD) " *
             "$(unc_within_threshold(uncs[end], UNC_RADIUS_THRESHOLD, UNC_FEAS_TOL) ? "✓" : "✗"))")
+    any(d -> abs(d) > COMM_INTERVAL / 2, drift) && println(
+        "  ! A support drifted more than half a comm interval from the primary's arc; " *
+        "checkpoints no longer pair them where the formation puts them.")
 
     let
         agent_positions = [[(graph.landmarks[i].x, graph.landmarks[i].y) for i in p] for p in paths]
@@ -428,6 +393,7 @@ function plan_formation(scenario, graph::LandmarkGraph, output_dir::String)
         write(io, "  refinement_status: $(refine.status)\n")
         write(io, "  refinement_min_slack: $(fmtx(refine.min_slack))\n")
         write(io, "  formation_offsets: [$(join(offsets, ", "))]\n")
+        write(io, "  formation_arc_drift: $(fmtlist(drift))\n")
     end
 
     return [(id=0, ctrls=opt_ctrls, primary_length=opt_len, primary_unc=opt_unc)]

@@ -308,6 +308,33 @@ function random_convex_obstacles(n::Int, rng, goal_x::Float64)
     return obs
 end
 
+# ── The landmark band, DERIVED from the sensor model rather than hardcoded ───
+# This used to be a literal 200.0 + 120.0 carrying a comment saying it was really
+# a function of visibility_range/comm_range and had to be retuned by hand if
+# those moved. They just moved, so it is computed now and cannot fall out of
+# sync.
+#
+# The band is aimed at the gap between what the two planner families can reach
+# laterally from the direct line:
+#
+#   formation  : formation_slot() places its support at exactly HEX_WIDTH_M, so
+#                its reach is hex_width + visibility_range and does NOT grow with
+#                comm_range. At the defaults: 100 + 100 = 200 m.
+#   joint search: free to put the support anywhere still in comm, i.e. two hexes
+#                out while comm_range = 2*hex_width. Reach 2*100 + 100 = 300 m.
+#
+# Landmarks land in (200, 380]: a joint search can service the near half with the
+# primary still on the line, while a one-hex formation must drag the primary out
+# for every one of them — and after the alternating-sides draw below, that cost
+# recurs at every landmark instead of once per scenario.
+#
+# Inside hex_width + visibility_range the fix is free to everybody and measures
+# nothing, which is the failure the old 200 m inner edge was written to fix
+# (sweep 2026-08-07_16-46-28: straight_cont held ratio 1.0000 from p100 to p30
+# because it never had to move). The +30 keeps that guarantee with margin.
+const LM_BAND_INNER = HEX_WIDTH_M + VISIBILITY_RANGE + 30.0
+const LM_BAND_SPAN  = 150.0
+
 function generate_scenario(; seed::Int, goal_dist::Real,
                              n_landmarks::Int, n_obstacles::Int)
     # build_hex_graph indexes sensor_landmarks[1] unconditionally, and landmark
@@ -320,27 +347,30 @@ function generate_scenario(; seed::Int, goal_dist::Real,
     # Landmarks are pushed OFF the direct start→goal line on purpose: that is
     # what makes a fix cost a detour, which is the whole trade-off under test.
     #
-    # The inner edge is 200 m, not the 60 m it used to be, and the number comes
-    # straight out of the sensor model rather than taste. visibility_width is 2.5
-    # against a visibility_range of 100, so detection is effectively a hard wall
-    # at 100 m: p(105 m) = 0.12, p(110 m) = 0.018. Two free rides followed:
-    #   * |y| <= 100  — the PRIMARY sees it from the direct line, no detour at all.
-    #   * |y| <= 200  — the SUPPORT sees it while sitting 100 m off the line, which
-    #                   is exactly comm_range, so it keeps fusing with a primary
-    #                   that never left the straight path.
-    # Sweep 2026-08-07_16-46-28 is what this is fixing: s001 drew landmarks at
-    # -83.7/-99.8 and s003 at -83.9, and on both straight_cont held ratio 1.0000
-    # from p100 all the way to p30 — it never had to move. s005 (all landmarks
-    # 233-285 m out) is the only scenario where it was forced off the line.
-    # Outer edge 320 m: reachable hex rows stop at ±259.8, and 320 - 259.8 = 60 m
-    # is still well inside the 100 m detection wall.
-    # ponytail: hardcoded because it is derived from visibility_range/comm_range,
-    # which are themselves fixed in config/mc/main.yaml. If those move, this must.
+    # The band itself is LM_BAND_INNER/LM_BAND_SPAN above, derived from the sensor
+    # model — see there for why it sits where it does. The free-ride it exists to
+    # prevent: a landmark inside hex_width + visibility_range is seen without
+    # anyone leaving the straight path, and measures nothing (sweep
+    # 2026-08-07_16-46-28: straight_cont held ratio 1.0000 from p100 to p30).
+    # Sides ALTERNATE along x, rather than being an independent coin per landmark.
+    # An i.i.d. coin put every landmark on the SAME side in 29.1% of scenarios
+    # (measured over 6000 draws, results/scenario_generation/). That is a free pass
+    # for any baseline that commits to one support side for the whole route — the
+    # formation planner picks a single body-frame slot up front, so on a one-sided
+    # field it is optimal by construction and can never be caught out. Alternating
+    # makes the useful side flip mid-route, which a slot chosen once cannot track
+    # but a joint search can. Sorted by x because "alternating" is only meaningful
+    # in ROUTE order; the opening side is still a coin, so neither side is favoured.
+    #
+    # This reorders the rng stream, so every seed now yields different geometry:
+    # sweeps recorded before this change are not comparable to ones after it.
+    xs = sort!([D * (0.12 + 0.76 * rand(rng)) for _ in 1:n_landmarks])
+    side = rand(rng) < 0.5 ? -1.0 : 1.0
     lms = Landmark[]
-    for _ in 1:n_landmarks
-        x = D * (0.12 + 0.76 * rand(rng))
-        y = (rand(rng) < 0.5 ? -1.0 : 1.0) * (200.0 + 120.0 * rand(rng))
-        push!(lms, Landmark(x, y, random_landmark_cov(rng)))
+    for x in xs
+        push!(lms, Landmark(x, side * (LM_BAND_INNER + LM_BAND_SPAN * rand(rng)),
+                            random_landmark_cov(rng)))
+        side = -side
     end
 
     return (landmarks = lms,

@@ -34,16 +34,18 @@ split_algorithms(cfg::Dict) = [strip(s) for s in split(String(cfg["algorithms"])
 # .yaml). `straight_cont` (straight-line seed + continuous refinement) and
 # `discrete_only` (A* seed, no continuous stage) are just the hexspline_cl engine
 # run through a different pipeline, so they ship no source of their own at all.
-# `greedy` and `formation` do ship their own source, but call into that engine
-# (joint_astar / optimize_continuous / seed_spline_clear) and are tuned by its
-# .yaml, so they map here too — their files are included after the engine's (see
-# generate_plan.jl). Keys of their own live in config/<name>.yaml alongside.
+# `greedy`, `formation` and `sequential` do ship their own source, but call into
+# that engine (joint_astar / optimize_continuous / seed_spline_clear / State) and
+# are tuned by its .yaml, so they map here too — their files are included after
+# the engine's (see generate_plan.jl). Keys of their own live in
+# config/<name>.yaml alongside.
 # `engine_of(algo)` returns the owning engine (or the algo itself when it has
 # none), used both here (config) and in generate_plan.jl (includes / snapshot).
 const PLANNER_ENGINE = Dict("straight_cont" => "hexspline_cl",
                             "discrete_only" => "hexspline_cl",
                             "greedy"        => "hexspline_cl",
-                            "formation"     => "hexspline_cl")
+                            "formation"     => "hexspline_cl",
+                            "sequential"    => "hexspline_cl")
 engine_of(algo) = get(PLANNER_ENGINE, String(algo), String(algo))
 
 # Reads config/main.yaml, then merges config/<algo>.yaml for each algorithm

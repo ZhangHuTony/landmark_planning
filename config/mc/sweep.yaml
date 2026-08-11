@@ -14,10 +14,21 @@
 #   3. at each level run every method; record primary_length / L_ref
 # ==========================================================================
 
-# How many scenarios, and the seed they are drawn from. A scenario is fully
-# reproducible from its seed: scenario_seed_base + i.
-n_scenarios: 50
+# How many USABLE scenarios, and the seed they are drawn from. A scenario is
+# fully reproducible from its seed: scenario_seed_base + i.
+#
+# n_scenarios counts scenarios whose REFERENCE run succeeded — the sweep keeps
+# drawing until it has that many. A failed reference yields no L_ref/U_ref, so
+# nothing can be normalised against it and the scenario is dead weight; counting
+# it toward the total silently shrank the sample (sweep 2026-08-10_18-17-16 asked
+# for 50 and measured 42). Rejected draws are still recorded in scenarios.csv
+# with empty L_ref/U_ref, so a resume skips them instead of retrying.
+n_scenarios: 5
 scenario_seed_base: 1067
+# Runaway guard for that loop: if references keep failing, stop here rather than
+# drawing forever. Hit only when the geometry ranges make most scenarios
+# unsolvable, which is itself the thing worth knowing.
+max_scenario_draws: 200
 
 # Random scenario ranges (see generate_scenario in src/scenario_generation.jl).
 # goal_dist drives cost hardest: hex columns grow linearly with it, the graph
@@ -45,23 +56,39 @@ n_landmarks_max: 4
 # discarded after paying ~19 s for it. Obstacle placement is biased toward the
 # direct line (see random_convex_obstacles), so a handful is enough to make the
 # corridor an actual left-or-right decision most of the time.
-n_obstacles_min: 1
-n_obstacles_max: 3
+n_obstacles_min: 3
+n_obstacles_max: 5
 
 # Constraint ladder. pct_patience stops a scenario after that many CONSECUTIVE
 # levels at which every method failed — the levels that trigger the stop are
 # still run and still logged, so the failure tail is never silently truncated.
 # Set 0 to always walk the full ladder.
 pct_start: 100
-pct_step: 5
+pct_step: 10
 # Floor at 30, not 50: the interesting number is where each method finally gives
 # out, and pct_patience already stops a scenario two levels after everything
 # fails — so a deeper floor costs nothing on the easy scenarios and buys
 # resolution on the hard ones. Levels above the binding point are cheap anyway
 # (a slack constraint is found in ~900 A* expansions, ~21 s); they flatten the
 # top of the curve, which is the honest shape.
-pct_floor: 30
+pct_floor: 50
 pct_patience: 1
+# Per-METHOD early stop: after this many CONSECUTIVE failures, a method stops
+# being retried at stricter levels for that scenario, even while other methods
+# keep succeeding. 0 disables it. The skipped levels are recorded as
+# `not_run_after_fail` rather than omitted, so denominators stay the full
+# scenario count (same reasoning as not_run_below_stop below).
+#
+# This rests on success being monotone in the constraint, which is ALMOST true:
+# measured on sweep 2026-08-10_18-17-16, only 2 of 210 method×scenario pairs
+# (~1%) recovered at a stricter level after failing at a looser one — greedy
+# s019 (80% → 55%) and formation s021 (95% → 85%), both `recovery_failed`, never
+# the discrete search. The mechanism is real, not noise: the threshold prunes
+# the SEARCH (prune_by_primary_uncertainty), so a tighter bound can return a
+# different, more conservative seed that refines where the looser bound's
+# shorter one did not — and for formation it also re-ranks the slot choice.
+# Set 2 to buy those back at roughly double the failure-tail cost.
+method_patience: 1
 
 # Methods under test: label@key=value,key=value | ...
 # (the same | @ , idiom as the landmarks:/obstacles: encodings). Every key is a
@@ -70,7 +97,7 @@ pct_patience: 1
 # name with no @ means "that algorithm at the base config's defaults".
 # Adding a future baseline is a line here — the harness contains no
 # algorithm-specific logic whatsoever.
-methods: hexspline_cl@algorithms=hexspline_cl,num_agents=2 | straight_cont@algorithms=straight_cont,num_agents=2 | discrete_only@algorithms=discrete_only,num_agents=2
+methods: hexspline_cl@algorithms=hexspline_cl,num_agents=2 | straight_cont@algorithms=straight_cont,num_agents=2 | discrete_only@algorithms=discrete_only,num_agents=2 | greedy@algorithms=greedy,num_agents=2 | formation@algorithms=formation,num_agents=2 | sequential@algorithms=sequential,num_agents=2
 # other baselines, ready to uncomment (append with a leading `|` on the line above):
 #   discrete_only@algorithms=discrete_only,num_agents=2
 #   straight_line@algorithms=straight_line,num_agents=2

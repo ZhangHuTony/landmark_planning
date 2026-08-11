@@ -52,11 +52,17 @@ function greedy_support_rollout(primary_path::Vector{Int}, graph::LandmarkGraph,
     for k in 2:length(primary_path)
         # Only successors this support has not already occupied — the same cycle
         # guard joint_astar carries on each agent (`S.visited[agent][u] && continue`).
-        options = [[u for u in graph.neighbors[paths[a][end]] if !visited[a][u]] for a in 1:ns]
+        # `graph.n` is excluded: it is the terminal goal MARKER, not a cell. Every
+        # goal-adjacent state has an edge into it and it has none out, so a support
+        # that stepped there had zero successors on the next move and stalled the
+        # whole run — the primary's own path stops at the goal-adjacent cell and
+        # never enters it either (seed_control_points pins the goal position instead).
+        options = [[u for u in graph.neighbors[paths[a][end]] if !visited[a][u] && u != graph.n]
+                   for a in 1:ns]
         for a in 1:ns
             if isempty(options[a])
-                println("  ✗ Support $a stalled at step $k: every ±60° successor of node " *
-                        "$(paths[a][end]) is already visited.")
+                println("  ✗ Support $a stalled at step $k: no unvisited ±60° successor of " *
+                        "node $(paths[a][end]).")
                 return nothing
             end
         end

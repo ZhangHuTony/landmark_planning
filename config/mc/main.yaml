@@ -66,11 +66,29 @@ landmark_sensor_noise: 0.038
 comm_sensor_noise: 0.038
 bearing_noise_ratio: 2.2
 comm_radius: 300.0
+# comm_range is 2x hex_width_m ON PURPOSE. At 1x (the old 100.0) exactly ONE ring
+# of hex cells sat inside comm range, so the support's entire useful position set
+# was the 6 cells adjacent to the primary — and formation.jl enumerates 2 of them
+# and picks the better. That made a rigid one-hex formation near-optimal by
+# construction and left the joint search paying ~540x the state-space cost for
+# freedom the parameters did not grant. At 2x, rings 1 AND 2 are usable (18
+# cells) and WHICH one to use becomes a real decision.
+#
+# This asymmetry is the point: formation_slot() places its support at exactly
+# HEX_WIDTH_M by construction, so formation's lateral reach is pinned at
+# hex_width + visibility = 200 m no matter what comm_range says. A joint search
+# can put the support two hexes out and reach 300 m. Landmarks are drawn into
+# that gap (see generate_scenario).
+#
+# The widths were 2.5 m against a 100 m range — a step function, so range was a
+# wall with nothing to trade against. At 20/15 both are gradients, and "further
+# out but holding a fix" can beat "close but blind" — a trade a search exploits
+# and a fixed rule cannot.
 visibility_range: 100.0
-visibility_width: 2.5
+visibility_width: 15.0
 comm_interval: 100.0
-comm_range: 100.0
-comm_width: 2.5
+comm_range: 200.0
+comm_width: 20.0
 comm_weight_min: 1.0e-4
 comm_interval_dist: 5.0
 
@@ -98,8 +116,15 @@ min_turn_radius_m: 40.0
 #   config/hardware/main.yaml for the 4 m version.
 hex_width_m: 100.0
 hex_padding: 2
-corridor_halfwidth_m: 260.0
-corridor_y_max_m: 300.0
+# 260 -> 350: at 260 the reachable rows stopped at +/-259.8 and HALF of all
+# generated landmarks already sat outside the corridor entirely (measured over
+# 6000 draws, results/scenario_generation/). A support cannot diverge to service
+# an outer landmark and rejoin if the graph has nowhere to diverge TO. 350 puts
+# rows at +/-346.4, enough to reach within visibility_range of the new band's
+# outer edge. Costs ~7 -> 9 rows, nodes ~545 -> ~700, joint state space ~1.65x —
+# paid for by method_patience and the raised iteration cap (see sweep.yaml).
+corridor_halfwidth_m: 350.0
+corridor_y_max_m: 440.0
 
 # Static obstacles — RISK/enforcement knobs only. The obstacle *geometry* is part
 # of the scenario (src/scenario_generation.jl), not config. Chance-constrained
