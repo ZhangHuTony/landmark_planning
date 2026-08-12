@@ -1,0 +1,48 @@
+Landmark scenario: random — 4 landmarks, 5 obstacles, start (0.0, 0.0) → goal (600.0, 0.0)
+Hex graph: 653 nodes (648 heading-states + 4 sensors + goal), radius=57.73502691896258m, directed_edges=1704, grid=11x15, start_cell=(1, 7), goal_cell=(7, 7), start_heading=0
+
+── FORMATION PLANNING ──
+  Primary: single-agent hexspline A* (threshold 4.57899918); supports added afterwards.
+
+  ✓ FEASIBLE SOLUTION at iter 67: dist=886.603, unc=4.579
+  [Constraint A*] Single-agent complete: 67 iterations, final_dist=886.603
+  One support: trying both lateral slots (+1 = 60° left, -1 = 60° right).
+  Slot [1]: unc=4.579 ✓
+  Slot [-1]: unc=3.9848 ✓
+  → Chose slot [-1]
+  Support 1 (slot -1): dist=850.0m, goal_unc=3.5476m, arc drift vs primary=-36.6m
+  Primary : dist=886.6m, goal_unc=3.9848m (threshold 4.57899918 ✓)
+
+=== Continuous Spline Optimization (threshold=4.579) ===
+  Initial (discrete→spline): prim_len=888.587, unc=3.8334
+  Barrier stage 1/15: μ=20.0
+  Barrier stage 2/15: μ=7.0
+  Barrier stage 3/15: μ=2.45
+  Barrier stage 4/15: μ=0.8575
+  Barrier stage 5/15: μ=0.3001
+  Barrier stage 6/15: μ=0.105
+  → Converged at iter 339 (Δlen=0.000503)
+  Barrier stage 7/15: μ=0.0368
+  → Converged at iter 340 (Δlen=0.000772)
+  Barrier stage 8/15: μ=0.0129
+  → Converged at iter 352 (Δlen=0.000137)
+  Barrier stage 9/15: μ=0.0045
+  → Converged at iter 377 (Δlen=0.000434)
+  Barrier stage 10/15: μ=0.0016
+  → Converged at iter 378 (Δlen=0.000549)
+  Barrier stage 11/15: μ=0.0006
+  [Spline barrier] line search stalled; stopping at stage 11
+  Barrier stage 12/15: μ=0.0002
+  [Spline barrier] line search stalled; stopping at stage 12
+  Barrier stage 13/15: μ=0.0001
+  [Spline barrier] line search stalled; stopping at stage 13
+  Barrier stage 14/15: μ=0.0
+  [Spline barrier] line search stalled; stopping at stage 14
+  Barrier stage 15/15: μ=0.0
+  [Spline barrier] line search stalled; stopping at stage 15
+  Final: prim_len=835.718, unc=3.2568, threshold=4.579, status=optimized, min_slack=0.0
+  Obstacle re-verification: mean path clears all obstacles ✓
+Fig combined (main) saved: Discrete Len=888.59 → Continuous Len=835.72
+Fig uncertainty profile (main) saved: /home/tonyzhang/projects/landmark_planning/constraint_sweep/sweep_2026-08-11/formation/s025_p100/formation/figures/main_unc_profile.png
+
+[formation] produced 1 solution(s) -> /home/tonyzhang/projects/landmark_planning/constraint_sweep/sweep_2026-08-11/formation/s025_p100/formation

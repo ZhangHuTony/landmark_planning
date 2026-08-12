@@ -1,0 +1,72 @@
+┌ Warning: Seed is infeasible (min_slack=-4.614943729439128, ε=0.001); the barrier will try to recover it before shortening. Expected for the straight_cont ablation, and for a discrete seed that A* returned as its best incumbent after exhausting its budget.
+└ @ Main ~/projects/landmark_planning/planners/hexspline_cl.jl:1215
+Landmark scenario: random — 3 landmarks, 3 obstacles, start (0.0, 0.0) → goal (800.0, 0.0)
+Hex graph: 796 nodes (792 heading-states + 3 sensors + goal), radius=57.73502691896258m, directed_edges=2112, grid=13x15, start_cell=(1, 7), goal_cell=(9, 7), start_heading=0
+Conditional ε-bound: ε_sample=1.1443, w=1.0, ε_total=1.1443
+  Bound form (conditional): L_returned ≤ (1+ε_total) L* with assumptions documented in comments.
+
+── MULTI-AGENT PLANNING (Synchronized Kalman) ──
+
+  seed_mode=:straight — skipping discrete search and using direct start→goal seed
+
+✓ Multi-agent solution with synchronized Kalman fusion:
+  Support agent 1: node=796, dist=800.0m, goal_unc=8.2274m
+  Primary agent: node=796, dist=800.0m, goal_unc=8.2274m
+  ├─ Communication: every 100.0m, sigmoid taper range=200.0m width=20.0m
+  └─ All agents' uncertainties benefit from synchronized Kalman fusion at checkpoints
+
+--- Final Results ---
+Support agent 1 : [1, 796]  dist=800.0  goal_unc=8.2274  ✗  (Kalman-fused)
+Primary agent : [1, 796]  dist=800.0  goal_unc=8.2274  threshold=3.571303549 ✗ not met  (Kalman-fused)
+
+=== Kalman Filtering Summary ===
+All 2 agents performing synchronized Kalman filtering:
+  • Dead-reckoning propagation: DIR=0.05/m, PERP=0.016666666666666666/m
+  • Landmark fusion: Information filter (Joseph form) at every waypoint
+  • SYNCHRONIZED inter-agent communication: every 100.0m of travel
+  • Tapered sigmoid weighting: range=200.0m, width=20.0m (soft plateau + rolloff)
+  • Bidirectional Kalman fusion: all agent pairs within range at each checkpoint
+  • Measurement model: bearing-angle sensor with noise=0.038, ratio=2.2
+  └─ Support agents: goal_unc=8.2274m (improved by inter-agent fusion)
+  └─ Primary agent: goal_unc=8.2274m (direct path with landmark updates)
+Converged at iteration : 0
+Figure path-role mapping: supports = paths[1:1], primary = paths[2]
+Discrete evaluation: prim_len=800.0, unc=8.2274
+Fig 1 saved.
+
+=== Continuous Spline Optimization (threshold=3.5713) ===
+  Initial (discrete→spline): prim_len=800.0, unc=8.1862
+  Barrier stage 1/15: μ=20.0
+  Barrier stage 2/15: μ=20.0
+  Barrier stage 3/15: μ=20.0
+  Barrier stage 4/15: μ=20.0
+    → Recovered into the feasible set at iter 203 (min_slack=0.00024); feasible-only gate now armed
+  → Converged at iter 203 (Δlen=0.000111)
+  Barrier stage 5/15: μ=7.0
+  → Converged at iter 204 (Δlen=0.000215)
+  Barrier stage 6/15: μ=2.45
+  → Converged at iter 205 (Δlen=0.000305)
+  Barrier stage 7/15: μ=0.8575
+  → Converged at iter 206 (Δlen=0.000384)
+  Barrier stage 8/15: μ=0.3001
+  → Converged at iter 207 (Δlen=0.000454)
+  Barrier stage 9/15: μ=0.105
+  → Converged at iter 208 (Δlen=0.000485)
+  Barrier stage 10/15: μ=0.0368
+  [Spline barrier] line search stalled; stopping at stage 10
+  Barrier stage 11/15: μ=0.0129
+  [Spline barrier] line search stalled; stopping at stage 11
+  Barrier stage 12/15: μ=0.0045
+  → Converged at iter 211 (Δlen=0.000497)
+  Barrier stage 13/15: μ=0.0016
+  → Converged at iter 212 (Δlen=0.000518)
+  Barrier stage 14/15: μ=0.0006
+  → Converged at iter 213 (Δlen=0.000527)
+  Barrier stage 15/15: μ=0.0002
+  → Converged at iter 214 (Δlen=0.000531)
+  Final: prim_len=800.106, unc=3.5078, threshold=3.5713, status=optimized, min_slack=0.002215
+  Obstacle re-verification: mean path clears all obstacles ✓
+Fig combined (main) saved: Discrete Len=800.0 → Continuous Len=800.11
+Fig uncertainty profile (main) saved: /home/tonyzhang/projects/landmark_planning/constraint_sweep/sweep_2026-08-11/straight_cont/s088_p045/straight_cont/figures/main_unc_profile.png
+
+[straight_cont] produced 1 solution(s) -> /home/tonyzhang/projects/landmark_planning/constraint_sweep/sweep_2026-08-11/straight_cont/s088_p045/straight_cont

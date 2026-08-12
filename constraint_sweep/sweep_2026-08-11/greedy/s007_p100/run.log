@@ -1,0 +1,46 @@
+┌ Warning: Seed is infeasible (min_slack=-77.4987174280744, ε=0.001); the barrier will try to recover it before shortening. Expected for the straight_cont ablation, and for a discrete seed that A* returned as its best incumbent after exhausting its budget.
+└ @ Main ~/projects/landmark_planning/planners/hexspline_cl.jl:1215
+Landmark scenario: random — 4 landmarks, 3 obstacles, start (0.0, 0.0) → goal (700.0, 0.0)
+Hex graph: 725 nodes (720 heading-states + 4 sensors + goal), radius=57.73502691896258m, directed_edges=1908, grid=12x15, start_cell=(1, 7), goal_cell=(8, 7), start_heading=0
+
+── GREEDY PLANNING ──
+  Primary: shortest obstacle-clear route (single-agent A*, no uncertainty bound)
+
+  [Constraint A*] Goal popped, unc OK, but its B-spline breaches an obstacle; discarded.
+
+  [Constraint A*] Goal popped, unc OK, but its B-spline breaches an obstacle; discarded.
+
+  [Constraint A*] Goal popped, unc OK, but its B-spline breaches an obstacle; discarded.
+
+  [Constraint A*] Goal popped, unc OK, but its B-spline breaches an obstacle; discarded.
+
+  ✓ FEASIBLE SOLUTION at iter 86: dist=850.0, unc=5.9068
+  [Constraint A*] Single-agent complete: 86 iterations, final_dist=850.0
+  Helpers: greedy placement, minimising the primary's uncertainty per step
+  Support 1: dist=850.0m, goal_unc=1.2177m
+  Primary  : dist=850.0m, goal_unc=5.9068m (threshold 5.906794963 ✓)
+
+=== Continuous Spline Optimization (threshold=5.9068) ===
+  Initial (discrete→spline): prim_len=843.295, unc=6.064
+  Barrier stage 1/15: μ=20.0
+  Barrier stage 2/15: μ=20.0
+  Barrier stage 3/15: μ=20.0
+  Barrier stage 4/15: μ=20.0
+  Barrier stage 5/15: μ=20.0
+  Barrier stage 6/15: μ=20.0
+  Barrier stage 7/15: μ=20.0
+  Barrier stage 8/15: μ=20.0
+  Barrier stage 9/15: μ=20.0
+  Barrier stage 10/15: μ=20.0
+  [Spline barrier] line search stalled; stopping at stage 10
+  Barrier stage 11/15: μ=20.0
+  Barrier stage 12/15: μ=20.0
+  Barrier stage 13/15: μ=20.0
+  Barrier stage 14/15: μ=20.0
+  Barrier stage 15/15: μ=20.0
+  Final: prim_len=915.709, unc=5.2618, threshold=5.9068, status=recovery_failed, min_slack=-0.000372
+  Obstacle re-verification: mean path clears all obstacles ✓
+Fig combined (main) saved: Discrete Len=843.3 → Continuous Len=915.71
+Fig uncertainty profile (main) saved: /home/tonyzhang/projects/landmark_planning/constraint_sweep/sweep_2026-08-11/greedy/s007_p100/greedy/figures/main_unc_profile.png
+
+[greedy] produced 1 solution(s) -> /home/tonyzhang/projects/landmark_planning/constraint_sweep/sweep_2026-08-11/greedy/s007_p100/greedy

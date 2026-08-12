@@ -1,0 +1,10 @@
+main:
+  primary_length: 852.1096840863542
+  primary_unc: 3.7984543857804476
+  astar_iterations: 2664
+  discrete_uncertainties: [3.0294, 3.962]
+  primary_disc_unc: 3.9620000393443133
+  continuous_primary_length: 852.11
+  continuous_uncertainties: [2.8424, 3.7985]
+  refinement_status: optimized
+  refinement_min_slack: 7.07571675626073e-8

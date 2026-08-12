@@ -1,0 +1,45 @@
+Landmark scenario: random — 3 landmarks, 3 obstacles, start (0.0, 0.0) → goal (700.0, 0.0)
+Hex graph: 724 nodes (720 heading-states + 3 sensors + goal), radius=57.73502691896258m, directed_edges=1908, grid=12x15, start_cell=(1, 7), goal_cell=(8, 7), start_heading=0
+Conditional ε-bound: ε_sample=1.165, w=1.0, ε_total=1.165
+  Bound form (conditional): L_returned ≤ (1+ε_total) L* with assumptions documented in comments.
+
+── MULTI-AGENT PLANNING (Synchronized Kalman) ──
+
+  Running joint discrete A* (threshold=4.4359)... (max_iters=500000)
+  Stops on the first feasible candidate under the threshold.
+  ✓ Goal reachable from node 1 with distance 700.0
+  [A*] iter 1000/500000 (0.2%)  left=499000  elapsed=2.2s     [A*] iter 2000/500000 (0.4%)  left=498000  elapsed=2.6s     [A*] iter 3000/500000 (0.6%)  left=497000  elapsed=2.6s     [A*] iter 4000/500000 (0.8%)  left=496000  elapsed=2.7s     [A*] iter 5000/500000 (1.0%)  left=495000  elapsed=3.1s     [A*] iter 6000/500000 (1.2%)  left=494000  elapsed=3.2s   
+  [Constraint A*] Incumbent seed at iter 6461: dist=850.0, unc=4.4938 > 4.4359
+
+  [Constraint A*] Incumbent seed at iter 6465: dist=850.0, unc=4.4798 > 4.4359
+
+  ✓ FEASIBLE SOLUTION at iter 6468: dist=850.0, unc=3.8348
+  [Constraint A*] Complete: 6468 iterations, final_dist=850.0
+
+✓ Multi-agent solution with synchronized Kalman fusion:
+  Support agent 1: node=528, dist=850.0m, goal_unc=3.348m
+  Primary agent: node=408, dist=850.0m, goal_unc=3.8348m
+  ├─ Communication: every 100.0m, sigmoid taper range=200.0m width=20.0m
+  └─ All agents' uncertainties benefit from synchronized Kalman fusion at checkpoints
+
+--- Final Results ---
+Support agent 1 : [1, 367, 434, 494, 499, 505, 511, 578, 583, 528]  dist=850.0  goal_unc=3.348  ✓  (Kalman-fused)
+Primary agent : [1, 367, 434, 494, 499, 505, 511, 517, 468, 408]  dist=850.0  goal_unc=3.8348  threshold=4.435873714 ✓ met  (Kalman-fused)
+
+=== Kalman Filtering Summary ===
+All 2 agents performing synchronized Kalman filtering:
+  • Dead-reckoning propagation: DIR=0.05/m, PERP=0.016666666666666666/m
+  • Landmark fusion: Information filter (Joseph form) at every waypoint
+  • SYNCHRONIZED inter-agent communication: every 100.0m of travel
+  • Tapered sigmoid weighting: range=200.0m, width=20.0m (soft plateau + rolloff)
+  • Bidirectional Kalman fusion: all agent pairs within range at each checkpoint
+  • Measurement model: bearing-angle sensor with noise=0.038, ratio=2.2
+  └─ Support agents: goal_unc=3.348m (improved by inter-agent fusion)
+  └─ Primary agent: goal_unc=3.8348m (direct path with landmark updates)
+Converged at iteration : 6468
+Figure path-role mapping: supports = paths[1:1], primary = paths[2]
+Discrete evaluation: prim_len=850.0, unc=3.8348
+Fig 1 saved.
+Discrete-only spline: prim_len=843.295, unc=4.1235
+
+[discrete_only] produced 1 solution(s) -> /home/tonyzhang/projects/landmark_planning/constraint_sweep/sweep_2026-08-11/discrete_only/s081_p100/discrete_only

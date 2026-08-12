@@ -1,0 +1,59 @@
+┌ Warning: Seed is infeasible (min_slack=-12.44125752221751, ε=0.001); the barrier will try to recover it before shortening. Expected for the straight_cont ablation, and for a discrete seed that A* returned as its best incumbent after exhausting its budget.
+└ @ Main ~/projects/landmark_planning/planners/hexspline_cl.jl:1215
+Landmark scenario: random — 3 landmarks, 3 obstacles, start (0.0, 0.0) → goal (800.0, 0.0)
+Hex graph: 796 nodes (792 heading-states + 3 sensors + goal), radius=57.73502691896258m, directed_edges=2112, grid=13x15, start_cell=(1, 7), goal_cell=(9, 7), start_heading=0
+
+── GREEDY PLANNING ──
+  Primary: shortest obstacle-clear route (single-agent A*, no uncertainty bound)
+
+  [Constraint A*] Goal popped, unc OK, but its B-spline breaches an obstacle; discarded.
+
+  [Constraint A*] Goal popped, unc OK, but its B-spline breaches an obstacle; discarded.
+
+  [Constraint A*] Goal popped, unc OK, but its B-spline breaches an obstacle; discarded.
+
+  ✓ FEASIBLE SOLUTION at iter 45: dist=850.0, unc=9.8868
+  [Constraint A*] Single-agent complete: 45 iterations, final_dist=850.0
+  Helpers: greedy placement, minimising the primary's uncertainty per step
+  Support 1: dist=850.0m, goal_unc=8.3633m
+  Primary  : dist=850.0m, goal_unc=8.3899m (threshold 8.898123138 ✓)
+
+=== Continuous Spline Optimization (threshold=8.8981) ===
+  Initial (discrete→spline): prim_len=844.173, unc=8.3658
+  Barrier stage 1/15: μ=20.0
+    → Recovered into the feasible set at iter 23 (min_slack=0.011469); feasible-only gate now armed
+  → Converged at iter 66 (Δlen=0.000919)
+  Barrier stage 2/15: μ=7.0
+  → Converged at iter 68 (Δlen=0.000659)
+  Barrier stage 3/15: μ=2.45
+  → Converged at iter 70 (Δlen=0.000485)
+  Barrier stage 4/15: μ=0.8575
+  → Converged at iter 71 (Δlen=0.000903)
+  Barrier stage 5/15: μ=0.3001
+  → Converged at iter 73 (Δlen=0.000306)
+  Barrier stage 6/15: μ=0.105
+  → Converged at iter 74 (Δlen=0.000566)
+  Barrier stage 7/15: μ=0.0368
+  → Converged at iter 75 (Δlen=0.000782)
+  Barrier stage 8/15: μ=0.0129
+  → Converged at iter 76 (Δlen=0.000959)
+  Barrier stage 9/15: μ=0.0045
+  [Spline barrier] line search stalled; stopping at stage 9
+  Barrier stage 10/15: μ=0.0016
+  [Spline barrier] line search stalled; stopping at stage 10
+  Barrier stage 11/15: μ=0.0006
+  [Spline barrier] line search stalled; stopping at stage 11
+  Barrier stage 12/15: μ=0.0002
+  [Spline barrier] line search stalled; stopping at stage 12
+  Barrier stage 13/15: μ=0.0001
+  [Spline barrier] line search stalled; stopping at stage 13
+  Barrier stage 14/15: μ=0.0
+  [Spline barrier] line search stalled; stopping at stage 14
+  Barrier stage 15/15: μ=0.0
+  → Converged at iter 83 (Δlen=0.000948)
+  Final: prim_len=854.083, unc=8.4125, threshold=8.8981, status=optimized, min_slack=0.011469
+  Obstacle re-verification: mean path clears all obstacles ✓
+Fig combined (main) saved: Discrete Len=844.17 → Continuous Len=854.08
+Fig uncertainty profile (main) saved: /home/tonyzhang/projects/landmark_planning/constraint_sweep/sweep_2026-08-11/greedy/s095_p090/greedy/figures/main_unc_profile.png
+
+[greedy] produced 1 solution(s) -> /home/tonyzhang/projects/landmark_planning/constraint_sweep/sweep_2026-08-11/greedy/s095_p090/greedy

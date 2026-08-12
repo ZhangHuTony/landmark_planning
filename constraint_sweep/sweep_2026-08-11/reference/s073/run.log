@@ -1,0 +1,69 @@
+Landmark scenario: random — 4 landmarks, 4 obstacles, start (0.0, 0.0) → goal (600.0, 0.0)
+Hex graph: 653 nodes (648 heading-states + 4 sensors + goal), radius=57.73502691896258m, directed_edges=1704, grid=11x15, start_cell=(1, 7), goal_cell=(7, 7), start_heading=0
+Conditional ε-bound: ε_sample=1.1925, w=1.0, ε_total=1.1925
+  Bound form (conditional): L_returned ≤ (1+ε_total) L* with assumptions documented in comments.
+
+── MULTI-AGENT PLANNING (Synchronized Kalman) ──
+
+  Running joint discrete A* (threshold=1.0e9)... (max_iters=500000)
+  Stops on the first feasible candidate under the threshold.
+
+  [Constraint A*] Goal popped, unc OK, but its B-spline breaches an obstacle; discarded.
+
+  ✓ FEASIBLE SOLUTION at iter 21: dist=650.0, unc=7.1039
+  [Constraint A*] Single-agent complete: 21 iterations, final_dist=650.0
+
+✓ Multi-agent solution with synchronized Kalman fusion:
+  Primary agent: node=361, dist=650.0m, goal_unc=7.1039m
+  ├─ Communication: every 100.0m, sigmoid taper range=200.0m width=20.0m
+  └─ All agents' uncertainties benefit from synchronized Kalman fusion at checkpoints
+
+--- Final Results ---
+Primary agent : [1, 331, 392, 397, 403, 354, 355, 361]  dist=650.0  goal_unc=7.1039  threshold=1.0e9 ✓ met  (Kalman-fused)
+
+=== Kalman Filtering Summary ===
+All 1 agents performing synchronized Kalman filtering:
+  • Dead-reckoning propagation: DIR=0.05/m, PERP=0.016666666666666666/m
+  • Landmark fusion: Information filter (Joseph form) at every waypoint
+  • SYNCHRONIZED inter-agent communication: every 100.0m of travel
+  • Tapered sigmoid weighting: range=200.0m, width=20.0m (soft plateau + rolloff)
+  • Bidirectional Kalman fusion: all agent pairs within range at each checkpoint
+  • Measurement model: bearing-angle sensor with noise=0.038, ratio=2.2
+  └─ Support agents: goal_unc=7.1039m (improved by inter-agent fusion)
+  └─ Primary agent: goal_unc=7.1039m (direct path with landmark updates)
+Converged at iteration : 21
+Figure path-role mapping: supports = paths[1:0], primary = paths[1]
+Discrete evaluation: prim_len=650.0, unc=7.1039
+Fig 1 saved.
+
+=== Continuous Spline Optimization (threshold=1.0e9) ===
+  Initial (discrete→spline): prim_len=649.657, unc=7.4552
+  Barrier stage 1/15: μ=20.0
+  → Converged at iter 34 (Δlen=0.000901)
+  Barrier stage 2/15: μ=7.0
+  Barrier stage 3/15: μ=2.45
+  Barrier stage 4/15: μ=0.8575
+  Barrier stage 5/15: μ=0.3001
+  Barrier stage 6/15: μ=0.105
+  Barrier stage 7/15: μ=0.0368
+  Barrier stage 8/15: μ=0.0129
+  Barrier stage 9/15: μ=0.0045
+  [Spline barrier] line search stalled; stopping at stage 9
+  Barrier stage 10/15: μ=0.0016
+  [Spline barrier] line search stalled; stopping at stage 10
+  Barrier stage 11/15: μ=0.0006
+  [Spline barrier] line search stalled; stopping at stage 11
+  Barrier stage 12/15: μ=0.0002
+  → Converged at iter 528 (Δlen=0.000641)
+  Barrier stage 13/15: μ=0.0001
+  → Converged at iter 536 (Δlen=0.000853)
+  Barrier stage 14/15: μ=0.0
+  → Converged at iter 537 (Δlen=0.000909)
+  Barrier stage 15/15: μ=0.0
+  → Converged at iter 538 (Δlen=0.000924)
+  Final: prim_len=601.267, unc=7.2059, threshold=1.0e9, status=optimized, min_slack=8.9e-5
+  Obstacle re-verification: mean path clears all obstacles ✓
+Fig combined (main) saved: Discrete Len=649.66 → Continuous Len=601.27
+Fig uncertainty profile (main) saved: /home/tonyzhang/projects/landmark_planning/constraint_sweep/sweep_2026-08-11/reference/s073/hexspline_cl/figures/main_unc_profile.png
+
+[hexspline_cl] produced 1 solution(s) -> /home/tonyzhang/projects/landmark_planning/constraint_sweep/sweep_2026-08-11/reference/s073/hexspline_cl

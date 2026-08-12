@@ -1,0 +1,59 @@
+┌ Warning: Seed is infeasible (min_slack=-20.224901780750997, ε=0.001); the barrier will try to recover it before shortening. Expected for the straight_cont ablation, and for a discrete seed that A* returned as its best incumbent after exhausting its budget.
+└ @ Main ~/projects/landmark_planning/planners/hexspline_cl.jl:1215
+Landmark scenario: random — 2 landmarks, 3 obstacles, start (0.0, 0.0) → goal (600.0, 0.0)
+Hex graph: 651 nodes (648 heading-states + 2 sensors + goal), radius=57.73502691896258m, directed_edges=1704, grid=11x15, start_cell=(1, 7), goal_cell=(7, 7), start_heading=0
+
+── FORMATION PLANNING ──
+  Primary: single-agent hexspline A* (threshold 7.256856838); supports added afterwards.
+
+  [Constraint A*] Incumbent seed at iter 21: dist=650.0, unc=9.0711 > 7.2569
+
+  ✓ FEASIBLE SOLUTION at iter 113: dist=850.0, unc=5.2777
+  [Constraint A*] Single-agent complete: 113 iterations, final_dist=850.0
+  One support: trying both lateral slots (+1 = 60° left, -1 = 60° right).
+  Slot [1]: unc=5.278 ✓
+  Slot [-1]: unc=3.9089 ✓
+  → Chose slot [-1]
+  Support 1 (slot -1): dist=932.3m, goal_unc=4.3029m, arc drift vs primary=82.3m
+  Primary : dist=850.0m, goal_unc=3.9089m (threshold 7.256856838 ✓)
+  ! A support drifted more than half a comm interval from the primary's arc; checkpoints no longer pair them where the formation puts them.
+
+=== Continuous Spline Optimization (threshold=7.2569) ===
+  Initial (discrete→spline): prim_len=839.978, unc=4.28
+  Barrier stage 1/15: μ=20.0
+    → Recovered into the feasible set at iter 19 (min_slack=0.01026); feasible-only gate now armed
+  [Spline barrier] line search stalled; stopping at stage 1
+  Barrier stage 2/15: μ=7.0
+  [Spline barrier] line search stalled; stopping at stage 2
+  Barrier stage 3/15: μ=2.45
+  [Spline barrier] line search stalled; stopping at stage 3
+  Barrier stage 4/15: μ=0.8575
+  [Spline barrier] line search stalled; stopping at stage 4
+  Barrier stage 5/15: μ=0.3001
+  [Spline barrier] line search stalled; stopping at stage 5
+  Barrier stage 6/15: μ=0.105
+  [Spline barrier] line search stalled; stopping at stage 6
+  Barrier stage 7/15: μ=0.0368
+  [Spline barrier] line search stalled; stopping at stage 7
+  Barrier stage 8/15: μ=0.0129
+  [Spline barrier] line search stalled; stopping at stage 8
+  Barrier stage 9/15: μ=0.0045
+  [Spline barrier] line search stalled; stopping at stage 9
+  Barrier stage 10/15: μ=0.0016
+  [Spline barrier] line search stalled; stopping at stage 10
+  Barrier stage 11/15: μ=0.0006
+  [Spline barrier] line search stalled; stopping at stage 11
+  Barrier stage 12/15: μ=0.0002
+  [Spline barrier] line search stalled; stopping at stage 12
+  Barrier stage 13/15: μ=0.0001
+  [Spline barrier] line search stalled; stopping at stage 13
+  Barrier stage 14/15: μ=0.0
+  [Spline barrier] line search stalled; stopping at stage 14
+  Barrier stage 15/15: μ=0.0
+  [Spline barrier] line search stalled; stopping at stage 15
+  Final: prim_len=857.788, unc=4.4417, threshold=7.2569, status=optimized, min_slack=0.01026
+  Obstacle re-verification: mean path clears all obstacles ✓
+Fig combined (main) saved: Discrete Len=839.98 → Continuous Len=857.79
+Fig uncertainty profile (main) saved: /home/tonyzhang/projects/landmark_planning/constraint_sweep/sweep_2026-08-11/formation/s006_p080/formation/figures/main_unc_profile.png
+
+[formation] produced 1 solution(s) -> /home/tonyzhang/projects/landmark_planning/constraint_sweep/sweep_2026-08-11/formation/s006_p080/formation

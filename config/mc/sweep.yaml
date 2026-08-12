@@ -23,7 +23,7 @@
 # it toward the total silently shrank the sample (sweep 2026-08-10_18-17-16 asked
 # for 50 and measured 42). Rejected draws are still recorded in scenarios.csv
 # with empty L_ref/U_ref, so a resume skips them instead of retrying.
-n_scenarios: 1
+n_scenarios: 100
 scenario_seed_base: 1067
 # Runaway guard for that loop: if references keep failing, stop here rather than
 # drawing forever. Hit only when the geometry ranges make most scenarios
@@ -71,7 +71,7 @@ pct_step: 5
 # resolution on the hard ones. Levels above the binding point are cheap anyway
 # (a slack constraint is found in ~900 A* expansions, ~21 s); they flatten the
 # top of the curve, which is the honest shape.
-pct_floor: 100
+pct_floor: 30
 pct_patience: 1
 # Per-METHOD early stop: after this many CONSECUTIVE failures, a method stops
 # being retried at stricter levels for that scenario, even while other methods
@@ -106,7 +106,7 @@ methods: hexspline_cl@algorithms=hexspline_cl,num_agents=2 | straight_cont@algor
 # Debugging: keep the per-run figures / CSVs for every scenario at every
 # constraint level, under <sweep>/<label>/<scenario>_p<pct>/. Off by default —
 # a 20-scenario sweep is several hundred runs and thousands of PNGs.
-save_figures: true
+save_figures: false
 save_csv: false
 
 # Hard wall-clock kill per subprocess. A killed run is recorded as a

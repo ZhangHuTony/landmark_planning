@@ -1,0 +1,41 @@
+Landmark scenario: random — 4 landmarks, 4 obstacles, start (0.0, 0.0) → goal (600.0, 0.0)
+Hex graph: 653 nodes (648 heading-states + 4 sensors + goal), radius=57.73502691896258m, directed_edges=1704, grid=11x15, start_cell=(1, 7), goal_cell=(7, 7), start_heading=0
+Conditional ε-bound: ε_sample=1.1925, w=1.0, ε_total=1.1925
+  Bound form (conditional): L_returned ≤ (1+ε_total) L* with assumptions documented in comments.
+
+── MULTI-AGENT PLANNING (Synchronized Kalman) ──
+
+  Running joint discrete A* (threshold=7.1039)... (max_iters=500000)
+  Stops on the first feasible candidate under the threshold.
+  ✓ Goal reachable from node 1 with distance 600.0
+
+  ✓ FEASIBLE SOLUTION at iter 73: dist=650.0, unc=6.6613
+  [Constraint A*] Complete: 73 iterations, final_dist=650.0
+
+✓ Multi-agent solution with synchronized Kalman fusion:
+  Support agent 1: node=572, dist=650.0m, goal_unc=3.1936m
+  Primary agent: node=361, dist=650.0m, goal_unc=6.6613m
+  ├─ Communication: every 100.0m, sigmoid taper range=200.0m width=20.0m
+  └─ All agents' uncertainties benefit from synchronized Kalman fusion at checkpoints
+
+--- Final Results ---
+Support agent 1 : [1, 331, 337, 343, 404, 458, 518, 572]  dist=650.0  goal_unc=3.1936  ✓  (Kalman-fused)
+Primary agent : [1, 331, 392, 397, 403, 354, 355, 361]  dist=650.0  goal_unc=6.6613  threshold=7.103890979 ✓ met  (Kalman-fused)
+
+=== Kalman Filtering Summary ===
+All 2 agents performing synchronized Kalman filtering:
+  • Dead-reckoning propagation: DIR=0.05/m, PERP=0.016666666666666666/m
+  • Landmark fusion: Information filter (Joseph form) at every waypoint
+  • SYNCHRONIZED inter-agent communication: every 100.0m of travel
+  • Tapered sigmoid weighting: range=200.0m, width=20.0m (soft plateau + rolloff)
+  • Bidirectional Kalman fusion: all agent pairs within range at each checkpoint
+  • Measurement model: bearing-angle sensor with noise=0.038, ratio=2.2
+  └─ Support agents: goal_unc=3.1936m (improved by inter-agent fusion)
+  └─ Primary agent: goal_unc=6.6613m (direct path with landmark updates)
+Converged at iteration : 73
+Figure path-role mapping: supports = paths[1:1], primary = paths[2]
+Discrete evaluation: prim_len=650.0, unc=6.6613
+Fig 1 saved.
+Discrete-only spline: prim_len=649.657, unc=7.1229
+
+[discrete_only] produced 1 solution(s) -> /home/tonyzhang/projects/landmark_planning/constraint_sweep/sweep_2026-08-11/discrete_only/s073_p100/discrete_only

@@ -1,0 +1,74 @@
+Landmark scenario: random — 2 landmarks, 4 obstacles, start (0.0, 0.0) → goal (600.0, 0.0)
+Hex graph: 651 nodes (648 heading-states + 2 sensors + goal), radius=57.73502691896258m, directed_edges=1704, grid=11x15, start_cell=(1, 7), goal_cell=(7, 7), start_heading=0
+Conditional ε-bound: ε_sample=1.1925, w=1.0, ε_total=1.1925
+  Bound form (conditional): L_returned ≤ (1+ε_total) L* with assumptions documented in comments.
+
+── MULTI-AGENT PLANNING (Synchronized Kalman) ──
+
+  Running joint discrete A* (threshold=7.8121)... (max_iters=500000)
+  Stops on the first feasible candidate under the threshold.
+  ✓ Goal reachable from node 1 with distance 600.0
+  [A*] iter 1000/500000 (0.2%)  left=499000  elapsed=2.1s     [A*] iter 2000/500000 (0.4%)  left=498000  elapsed=2.2s   
+  ✓ FEASIBLE SOLUTION at iter 2847: dist=750.0, unc=6.8176
+  [Constraint A*] Complete: 2847 iterations, final_dist=750.0
+
+✓ Multi-agent solution with synchronized Kalman fusion:
+  Support agent 1: node=249, dist=750.0m, goal_unc=6.387m
+  Primary agent: node=362, dist=750.0m, goal_unc=6.8176m
+  ├─ Communication: every 100.0m, sigmoid taper range=200.0m width=20.0m
+  └─ All agents' uncertainties benefit from synchronized Kalman fusion at checkpoints
+
+--- Final Results ---
+Support agent 1 : [1, 331, 289, 228, 181, 182, 188, 194, 249]  dist=750.0  goal_unc=6.387  ✓  (Kalman-fused)
+Primary agent : [1, 331, 289, 290, 241, 242, 303, 308, 362]  dist=750.0  goal_unc=6.8176  threshold=7.812100799 ✓ met  (Kalman-fused)
+
+=== Kalman Filtering Summary ===
+All 2 agents performing synchronized Kalman filtering:
+  • Dead-reckoning propagation: DIR=0.05/m, PERP=0.016666666666666666/m
+  • Landmark fusion: Information filter (Joseph form) at every waypoint
+  • SYNCHRONIZED inter-agent communication: every 100.0m of travel
+  • Tapered sigmoid weighting: range=200.0m, width=20.0m (soft plateau + rolloff)
+  • Bidirectional Kalman fusion: all agent pairs within range at each checkpoint
+  • Measurement model: bearing-angle sensor with noise=0.038, ratio=2.2
+  └─ Support agents: goal_unc=6.387m (improved by inter-agent fusion)
+  └─ Primary agent: goal_unc=6.8176m (direct path with landmark updates)
+Converged at iteration : 2847
+Figure path-role mapping: supports = paths[1:1], primary = paths[2]
+Discrete evaluation: prim_len=750.0, unc=6.8176
+Fig 1 saved.
+
+=== Continuous Spline Optimization (threshold=7.8121) ===
+  Initial (discrete→spline): prim_len=702.643, unc=6.8476
+  Barrier stage 1/15: μ=20.0
+  → Converged at iter 62 (Δlen=0.000351)
+  Barrier stage 2/15: μ=7.0
+  → Converged at iter 63 (Δlen=0.000436)
+  Barrier stage 3/15: μ=2.45
+  → Converged at iter 64 (Δlen=0.000423)
+  Barrier stage 4/15: μ=0.8575
+  [Spline barrier] line search stalled; stopping at stage 4
+  Barrier stage 5/15: μ=0.3001
+  [Spline barrier] line search stalled; stopping at stage 5
+  Barrier stage 6/15: μ=0.105
+  Barrier stage 7/15: μ=0.0368
+  Barrier stage 8/15: μ=0.0129
+  Barrier stage 9/15: μ=0.0045
+  → Converged at iter 300 (Δlen=0.000262)
+  Barrier stage 10/15: μ=0.0016
+  → Converged at iter 301 (Δlen=0.000326)
+  Barrier stage 11/15: μ=0.0006
+  → Converged at iter 302 (Δlen=0.000359)
+  Barrier stage 12/15: μ=0.0002
+  [Spline barrier] line search stalled; stopping at stage 12
+  Barrier stage 13/15: μ=0.0001
+  [Spline barrier] line search stalled; stopping at stage 13
+  Barrier stage 14/15: μ=0.0
+  [Spline barrier] line search stalled; stopping at stage 14
+  Barrier stage 15/15: μ=0.0
+  [Spline barrier] line search stalled; stopping at stage 15
+  Final: prim_len=644.292, unc=7.8121, threshold=7.8121, status=optimized, min_slack=1.0e-6
+  Obstacle re-verification: mean path clears all obstacles ✓
+Fig combined (main) saved: Discrete Len=702.64 → Continuous Len=644.29
+Fig uncertainty profile (main) saved: /home/tonyzhang/projects/landmark_planning/constraint_sweep/sweep_2026-08-11/hexspline_cl/s036_p095/hexspline_cl/figures/main_unc_profile.png
+
+[hexspline_cl] produced 1 solution(s) -> /home/tonyzhang/projects/landmark_planning/constraint_sweep/sweep_2026-08-11/hexspline_cl/s036_p095/hexspline_cl

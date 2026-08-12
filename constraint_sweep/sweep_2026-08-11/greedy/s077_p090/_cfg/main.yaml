@@ -1,0 +1,161 @@
+# ==========================================================================
+# Monte Carlo sweep base config — used ONLY by run_constraint_sweep.jl
+# ==========================================================================
+# A SNAPSHOT of config/main.yaml, deliberately self-contained: config/ stays
+# free for interactive work, and editing it mid-sweep cannot change what the
+# sweep is measuring. The cost of that isolation is drift -- if you retune the
+# physical/sensor model or the graph in config/main.yaml, re-sync it here or
+# the sweep will quietly benchmark stale physics.
+#
+# The keys below marked PER-RUN are placeholders. run_constraint_sweep.jl
+# rewrites them for every subprocess it launches; their values here only
+# matter if you run `julia generate_plan.jl config/mc` by hand.
+#   landmark_scenario / scenario_*   the generated scenario
+#   algorithms / num_agents          the method under test
+#   unc_radius_threshold             the constraint level (pct/100 * U_ref)
+#   emit_figures / emit_csv          flipped on by sweep.yaml's save_* switches
+# ==========================================================================
+
+# Shared config — mission setup, physical/sensor model, graph, output.
+# Values here are visible to every planner (algorithm-specific tuning lives
+# in config/<algorithm>.yaml). All files in config/ are merged into one CFG
+# dict at load time (flat key:value only — see src/config.jl).
+
+# Mission setup
+#   landmark_scenario: names a scenario defined in src/scenario_generation.jl —
+#     landmarks, obstacles AND start/goal all live there, not here. Available:
+#       single | dual | clustered | shoreline   (landmark layouts, baselines)
+#       two_routes    two homotopies: short blind route vs long informative one
+#       gauntlet      staggered walls forcing a down-up-down weave, landmarks in the gaps
+#       behind_wall   the only landmark is hidden behind a wall; detour or no fix
+#       maze          13 obstacles, three double-gapped walls + plugs; two homotopies
+#       long_sparse   1400 m corridor, two sparse landmarks (slowest: big A* space)
+#     Overridable per run with the SCENARIO env var.
+#   `manual` instead defines a scenario inline, right here — set start, goal,
+#   landmarks and obstacles (see the encodings below); anything omitted is empty.
+#   `random` generates one from the four scenario_* keys below (start is always
+#   (0,0), goal (goal_dist,0)). Driven per-run by run_constraint_sweep.jl, but
+#   usable by hand: SCENARIO=random julia generate_plan.jl. Reproducible from
+#   those four numbers alone — it does NOT use generate_plan.jl's global seed.
+landmark_scenario: random
+num_agents: 2
+algorithms: greedy
+
+# Inline scenario geometry — read ONLY when landmark_scenario: manual.
+#   start / goal: "x,y"
+#   landmarks: "x,y" sep by '|', optional location covariance after '@' as
+#     "sxx,sxy,syx,syy" (omitted ⇒ a random SPD covariance).
+#   obstacles: same encoding as below (CONVEX polygons).
+# Generated scenario knobs — read ONLY when landmark_scenario: random.
+# scenario_n_landmarks must be >= 1 (landmark 1's covariance is Σ₀).
+# scenario_seed: 1001
+# scenario_goal_dist: 1000.0
+# scenario_n_landmarks: 2
+# scenario_n_obstacles: 2
+
+# start: 0,0
+# goal: 1000,0
+# landmarks: 700,200 | 750,-250 @ 1.2,0,0,0.8
+# obstacles: 200,-150; 260,-150; 260,-100; 200,-100 | 400,60; 460,60; 430,120 @ 4,0,0,4
+
+# Physical / sensor model
+dir_uncertainty_per_meter: 0.05
+maj_min_unc_ratio: 3
+marker_proportion: 5.0
+landmark_sensor_noise: 0.038
+comm_sensor_noise: 0.038
+bearing_noise_ratio: 2.2
+comm_radius: 300.0
+# comm_range is 2x hex_width_m ON PURPOSE. At 1x (the old 100.0) exactly ONE ring
+# of hex cells sat inside comm range, so the support's entire useful position set
+# was the 6 cells adjacent to the primary — and formation.jl enumerates 2 of them
+# and picks the better. That made a rigid one-hex formation near-optimal by
+# construction and left the joint search paying ~540x the state-space cost for
+# freedom the parameters did not grant. At 2x, rings 1 AND 2 are usable (18
+# cells) and WHICH one to use becomes a real decision.
+#
+# This asymmetry is the point: formation_slot() places its support at exactly
+# HEX_WIDTH_M by construction, so formation's lateral reach is pinned at
+# hex_width + visibility = 200 m no matter what comm_range says. A joint search
+# can put the support two hexes out and reach 300 m. Landmarks are drawn into
+# that gap (see generate_scenario).
+#
+# The widths were 2.5 m against a 100 m range — a step function, so range was a
+# wall with nothing to trade against. At 20/15 both are gradients, and "further
+# out but holding a fix" can beat "close but blind" — a trade a search exploits
+# and a fixed rule cannot.
+visibility_range: 100.0
+visibility_width: 15.0
+comm_interval: 100.0
+comm_range: 200.0
+comm_width: 20.0
+comm_weight_min: 1.0e-4
+comm_interval_dist: 5.0
+
+# Problem constraints — the feasible set itself, shared by every algorithm.
+# These define what a valid plan IS, so they are not one planner's tuning: an
+# ablation is only a fair comparison if it is held to the same constraints as
+# the full pipeline. (The obstacle constraint's knobs are below; the geometry
+# is part of the scenario.) Optimizer knobs that merely decide *how* a planner
+# chases these stay in config/<algorithm>.yaml.
+#   unc_radius_threshold — feasibility bound on primary goal uncertainty, in
+#     metres (det(Σ)^0.25, = σ for isotropic Σ).
+#   unc_feas_tol — slack tolerance on that bound, so a solution sitting exactly
+#     on the threshold is not rejected by floating-point noise.
+#   min_turn_radius_m — vehicle turn radius; the curvature constraint is
+#     κ ≤ 1/min_turn_radius_m.
+unc_radius_threshold: 6.148528442
+unc_feas_tol: 1.0e-6
+min_turn_radius_m: 40.0
+
+# Graph / hex grid
+#   corridor_halfwidth_m / corridor_y_max_m bound the lateral planning space in
+#   METRES; they do not derive from hex_width_m. Row pitch is 1.5·hex_r, so these
+#   two set the row COUNT — at the defaults below, 9 rows. Retune them whenever
+#   hex_width_m changes, or the graph blows up (Floyd-Warshall is O(n³)); see
+#   config/hardware/main.yaml for the 4 m version.
+hex_width_m: 100.0
+hex_padding: 2
+# 260 -> 350: at 260 the reachable rows stopped at +/-259.8 and HALF of all
+# generated landmarks already sat outside the corridor entirely (measured over
+# 6000 draws, results/scenario_generation/). A support cannot diverge to service
+# an outer landmark and rejoin if the graph has nowhere to diverge TO. 350 puts
+# rows at +/-346.4, enough to reach within visibility_range of the new band's
+# outer edge. Costs ~7 -> 9 rows, nodes ~545 -> ~700, joint state space ~1.65x —
+# paid for by method_patience and the raised iteration cap (see sweep.yaml).
+corridor_halfwidth_m: 350.0
+corridor_y_max_m: 440.0
+
+# Static obstacles — RISK/enforcement knobs only. The obstacle *geometry* is part
+# of the scenario (src/scenario_generation.jl), not config. Chance-constrained
+# no-go regions: discrete A* filter + continuous B-spline MINVO constraint;
+# obstacles never touch the covariance/measurement model.
+#   obstacle_delta: risk bound per (agent, obstacle) pair. Union bound:
+#     P(any collision) ≤ Σδ over all P·M pairs, so set δ = Δ/(P·M) for a total
+#     budget Δ. z = Φ⁻¹(1−δ) inflates each face by z·√(aⱼᵀ(Σ+Σₒ)aⱼ).
+#   agent_radius: vehicle radius r_a, inflates every obstacle face outward.
+#   obstacle_edge_samples: samples along each hex edge (1 = destination node
+#     only; 2 = both endpoints; ≥3 adds interior points).
+#   obstacle_continuous: also enforce avoidance in the continuous B-spline stage
+#     (MINVO-hull chance constraint; each segment committed to the face the
+#     discrete seed rounded). false ⇒ discrete-only, no continuous enforcement.
+obstacle_delta: 0.05
+agent_radius: 5.0
+obstacle_edge_samples: 2
+obstacle_continuous: true
+
+# Output
+#   emit_figures / emit_csv gate the two DIAGNOSTIC output kinds wholesale.
+#   results.yaml is never gated — it is the run manifest, and a batch harness
+#   (run_constraint_sweep.jl) reads nothing else. Turn both off for sweeps:
+#   a few hundred runs otherwise render thousands of PNGs nobody opens.
+#   track_comm_events / track_landmark_events select WHICH extra event figures
+#   and CSVs are produced, within whatever emit_* allows.
+emit_figures: false
+emit_csv: false
+track_comm_events: false
+track_landmark_events: false
+scenario_seed: 1144
+scenario_goal_dist: 600.0
+scenario_n_landmarks: 4
+scenario_n_obstacles: 3

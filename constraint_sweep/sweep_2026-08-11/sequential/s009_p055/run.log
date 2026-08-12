@@ -1,0 +1,54 @@
+Landmark scenario: random — 2 landmarks, 5 obstacles, start (0.0, 0.0) → goal (800.0, 0.0)
+Hex graph: 795 nodes (792 heading-states + 2 sensors + goal), radius=57.73502691896258m, directed_edges=2112, grid=13x15, start_cell=(1, 7), goal_cell=(9, 7), start_heading=0
+
+── SEQUENTIAL PLANNING (2 agent(s), one at a time) ──
+  Leg 1 — primary, 1 helper(s) parked at start (bound 8.8725 = 2.0x the 4.436262275 threshold the shipped route is held to):
+
+    ✓ feasible at iter 199: dist=1050.0, unc=7.3168
+  Leg 2 — helper 1 vs the fixed primary trajectory (12 steps, beam 400):
+    → helper 1 placed; primary goal_unc now 5.8416
+  Leg 3 — primary re-planned against the committed helper paths:
+  [A*] iter 1000/500000 (0.2%)  left=499000  elapsed=0.1s     [A*] iter 2000/500000 (0.4%)  left=498000  elapsed=0.1s     [A*] iter 3000/500000 (0.6%)  left=497000  elapsed=0.2s     [A*] iter 4000/500000 (0.8%)  left=496000  elapsed=0.3s     [A*] iter 5000/500000 (1.0%)  left=495000  elapsed=0.5s     [A*] iter 6000/500000 (1.2%)  left=494000  elapsed=0.5s     [A*] iter 7000/500000 (1.4%)  left=493000  elapsed=0.6s     [A*] iter 8000/500000 (1.6%)  left=492000  elapsed=0.7s     [A*] iter 9000/500000 (1.8%)  left=491000  elapsed=0.7s     [A*] iter 10000/500000 (2.0%)  left=490000  elapsed=0.8s     [A*] iter 11000/500000 (2.2%)  left=489000  elapsed=0.8s     [A*] iter 12000/500000 (2.4%)  left=488000  elapsed=0.9s     [A*] iter 13000/500000 (2.6%)  left=487000  elapsed=0.9s     [A*] iter 14000/500000 (2.8%)  left=486000  elapsed=1.0s     [A*] iter 15000/500000 (3.0%)  left=485000  elapsed=1.0s     [A*] iter 16000/500000 (3.2%)  left=484000  elapsed=1.1s     [A*] iter 17000/500000 (3.4%)  left=483000  elapsed=1.1s     [A*] iter 18000/500000 (3.6%)  left=482000  elapsed=1.2s     [A*] iter 19000/500000 (3.8%)  left=481000  elapsed=1.2s     [A*] iter 20000/500000 (4.0%)  left=480000  elapsed=1.3s     [A*] iter 21000/500000 (4.2%)  left=479000  elapsed=1.4s     [A*] iter 22000/500000 (4.4%)  left=478000  elapsed=1.4s     [A*] iter 23000/500000 (4.6%)  left=477000  elapsed=1.5s     [A*] iter 24000/500000 (4.8%)  left=476000  elapsed=1.5s     [A*] iter 25000/500000 (5.0%)  left=475000  elapsed=1.6s     [A*] iter 26000/500000 (5.2%)  left=474000  elapsed=1.6s     [A*] iter 27000/500000 (5.4%)  left=473000  elapsed=1.7s     [A*] iter 28000/500000 (5.6%)  left=472000  elapsed=1.8s     [A*] iter 29000/500000 (5.8%)  left=471000  elapsed=1.8s     [A*] iter 30000/500000 (6.0%)  left=470000  elapsed=1.9s     [A*] iter 31000/500000 (6.2%)  left=469000  elapsed=2.0s     [A*] iter 32000/500000 (6.4%)  left=468000  elapsed=2.0s     [A*] iter 33000/500000 (6.6%)  left=467000  elapsed=2.1s     [A*] iter 34000/500000 (6.8%)  left=466000  elapsed=2.2s     [A*] iter 35000/500000 (7.0%)  left=465000  elapsed=2.3s     [A*] iter 36000/500000 (7.2%)  left=464000  elapsed=2.3s     [A*] iter 37000/500000 (7.4%)  left=463000  elapsed=2.4s     [A*] iter 38000/500000 (7.6%)  left=462000  elapsed=2.5s     [A*] iter 39000/500000 (7.8%)  left=461000  elapsed=2.6s     [A*] iter 40000/500000 (8.0%)  left=460000  elapsed=2.6s     [A*] iter 41000/500000 (8.2%)  left=459000  elapsed=2.7s     [A*] iter 42000/500000 (8.4%)  left=458000  elapsed=2.8s     [A*] iter 43000/500000 (8.6%)  left=457000  elapsed=2.9s     [A*] iter 44000/500000 (8.8%)  left=456000  elapsed=2.9s     [A*] iter 45000/500000 (9.0%)  left=455000  elapsed=2.9s   ┌ Warning: Seed is infeasible (min_slack=-2.091721355677154, ε=0.001); the barrier will try to recover it before shortening. Expected for the straight_cont ablation, and for a discrete seed that A* returned as its best incumbent after exhausting its budget.
+└ @ Main ~/projects/landmark_planning/planners/hexspline_cl.jl:1215
+
+    nothing under the threshold; handing the best incumbent to the barrier: dist=2150.0, unc=4.9089
+    leg 1 route: len=1050.0, unc=5.8416 ✗  |  re-planned: len=2150.0, unc=4.9089 ✗  → keep leg 1
+  Helper 1: dist=1050.0m, goal_unc=4.6117m
+  Primary  : dist=1050.0m, goal_unc=5.8416m (threshold 4.436262275 ✗)
+
+=== Continuous Spline Optimization (threshold=4.4363) ===
+  Initial (discrete→spline): prim_len=1046.325, unc=6.528
+  Barrier stage 1/15: μ=20.0
+  Barrier stage 2/15: μ=20.0
+  Barrier stage 3/15: μ=20.0
+  [Spline barrier] line search stalled; stopping at stage 3
+  Barrier stage 4/15: μ=20.0
+  [Spline barrier] line search stalled; stopping at stage 4
+  Barrier stage 5/15: μ=20.0
+  [Spline barrier] line search stalled; stopping at stage 5
+  Barrier stage 6/15: μ=20.0
+  [Spline barrier] line search stalled; stopping at stage 6
+  Barrier stage 7/15: μ=20.0
+  [Spline barrier] line search stalled; stopping at stage 7
+  Barrier stage 8/15: μ=20.0
+  [Spline barrier] line search stalled; stopping at stage 8
+  Barrier stage 9/15: μ=20.0
+  [Spline barrier] line search stalled; stopping at stage 9
+  Barrier stage 10/15: μ=20.0
+  [Spline barrier] line search stalled; stopping at stage 10
+  Barrier stage 11/15: μ=20.0
+  [Spline barrier] line search stalled; stopping at stage 11
+  Barrier stage 12/15: μ=20.0
+  [Spline barrier] line search stalled; stopping at stage 12
+  Barrier stage 13/15: μ=20.0
+  [Spline barrier] line search stalled; stopping at stage 13
+  Barrier stage 14/15: μ=20.0
+  [Spline barrier] line search stalled; stopping at stage 14
+  Barrier stage 15/15: μ=20.0
+  [Spline barrier] line search stalled; stopping at stage 15
+  Final: prim_len=1004.376, unc=4.7158, threshold=4.4363, status=recovery_failed, min_slack=-0.27955
+  Obstacle re-verification: mean path clears all obstacles ✓
+Fig combined (main) saved: Discrete Len=1046.32 → Continuous Len=1004.38
+Fig uncertainty profile (main) saved: /home/tonyzhang/projects/landmark_planning/constraint_sweep/sweep_2026-08-11/sequential/s009_p055/sequential/figures/main_unc_profile.png
+
+[sequential] produced 1 solution(s) -> /home/tonyzhang/projects/landmark_planning/constraint_sweep/sweep_2026-08-11/sequential/s009_p055/sequential

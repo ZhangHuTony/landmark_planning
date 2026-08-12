@@ -1,0 +1,20 @@
+Landmark scenario: random — 4 landmarks, 3 obstacles, start (0.0, 0.0) → goal (600.0, 0.0)
+Hex graph: 653 nodes (648 heading-states + 4 sensors + goal), radius=57.73502691896258m, directed_edges=1704, grid=11x15, start_cell=(1, 7), goal_cell=(7, 7), start_heading=0
+
+── GREEDY PLANNING ──
+  Primary: shortest obstacle-clear route (single-agent A*, no uncertainty bound)
+
+  [Constraint A*] Goal popped, unc OK, but its B-spline breaches an obstacle; discarded.
+
+  [Constraint A*] Goal popped, unc OK, but its B-spline breaches an obstacle; discarded.
+
+  [Constraint A*] Goal popped, unc OK, but its B-spline breaches an obstacle; discarded.
+
+  [Constraint A*] Goal popped, unc OK, but its B-spline breaches an obstacle; discarded.
+
+  ✓ FEASIBLE SOLUTION at iter 40: dist=750.0, unc=4.1696
+  [Constraint A*] Single-agent complete: 40 iterations, final_dist=750.0
+  Helpers: greedy placement, minimising the primary's uncertainty per step
+  ✗ Supports stalled at step 5: no successor combination clears the support cap and the obstacle filter.
+
+[greedy] produced 0 solution(s) -> /home/tonyzhang/projects/landmark_planning/constraint_sweep/sweep_2026-08-11/greedy/s014_p100/greedy

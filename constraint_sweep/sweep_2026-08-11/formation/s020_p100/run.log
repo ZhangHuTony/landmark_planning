@@ -1,0 +1,59 @@
+┌ Warning: Seed is infeasible (min_slack=-31.70665977055449, ε=0.001); the barrier will try to recover it before shortening. Expected for the straight_cont ablation, and for a discrete seed that A* returned as its best incumbent after exhausting its budget.
+└ @ Main ~/projects/landmark_planning/planners/hexspline_cl.jl:1215
+Landmark scenario: random — 2 landmarks, 3 obstacles, start (0.0, 0.0) → goal (600.0, 0.0)
+Hex graph: 651 nodes (648 heading-states + 2 sensors + goal), radius=57.73502691896258m, directed_edges=1704, grid=11x15, start_cell=(1, 7), goal_cell=(7, 7), start_heading=0
+
+── FORMATION PLANNING ──
+  Primary: single-agent hexspline A* (threshold 6.890660965); supports added afterwards.
+
+  [Constraint A*] Goal popped, unc OK, but its B-spline breaches an obstacle; discarded.
+
+  ✓ FEASIBLE SOLUTION at iter 59: dist=750.0, unc=6.8907
+  [Constraint A*] Single-agent complete: 59 iterations, final_dist=750.0
+  One support: trying both lateral slots (+1 = 60° left, -1 = 60° right).
+  Slot [1]: unc=4.6208 ✓
+  Slot [-1]: unc=6.7877 ✓
+  → Chose slot [1]
+  Support 1 (slot 1): dist=832.3m, goal_unc=5.113m, arc drift vs primary=82.3m
+  Primary : dist=750.0m, goal_unc=4.6208m (threshold 6.890660965 ✓)
+  ! A support drifted more than half a comm interval from the primary's arc; checkpoints no longer pair them where the formation puts them.
+
+=== Continuous Spline Optimization (threshold=6.8907) ===
+  Initial (discrete→spline): prim_len=746.268, unc=5.2927
+  Barrier stage 1/15: μ=20.0
+    → Recovered into the feasible set at iter 49 (min_slack=0.009425); feasible-only gate now armed
+  → Converged at iter 65 (Δlen=0.000826)
+  Barrier stage 2/15: μ=7.0
+  → Converged at iter 67 (Δlen=0.000505)
+  Barrier stage 3/15: μ=2.45
+  → Converged at iter 68 (Δlen=0.000902)
+  Barrier stage 4/15: μ=0.8575
+  → Converged at iter 70 (Δlen=0.000222)
+  Barrier stage 5/15: μ=0.3001
+  → Converged at iter 71 (Δlen=0.000368)
+  Barrier stage 6/15: μ=0.105
+  → Converged at iter 72 (Δlen=0.000447)
+  Barrier stage 7/15: μ=0.0368
+  → Converged at iter 73 (Δlen=0.000462)
+  Barrier stage 8/15: μ=0.0129
+  → Converged at iter 74 (Δlen=0.000419)
+  Barrier stage 9/15: μ=0.0045
+  → Converged at iter 75 (Δlen=0.000322)
+  Barrier stage 10/15: μ=0.0016
+  → Converged at iter 76 (Δlen=0.000175)
+  Barrier stage 11/15: μ=0.0006
+  → Converged at iter 77 (Δlen=1.8e-5)
+  Barrier stage 12/15: μ=0.0002
+  → Converged at iter 78 (Δlen=0.000254)
+  Barrier stage 13/15: μ=0.0001
+  → Converged at iter 79 (Δlen=0.00053)
+  Barrier stage 14/15: μ=0.0
+  → Converged at iter 80 (Δlen=0.000843)
+  Barrier stage 15/15: μ=0.0
+  → Converged at iter 82 (Δlen=0.000377)
+  Final: prim_len=760.672, unc=5.1799, threshold=6.8907, status=optimized, min_slack=0.009425
+  Obstacle re-verification: mean path clears all obstacles ✓
+Fig combined (main) saved: Discrete Len=746.27 → Continuous Len=760.67
+Fig uncertainty profile (main) saved: /home/tonyzhang/projects/landmark_planning/constraint_sweep/sweep_2026-08-11/formation/s020_p100/formation/figures/main_unc_profile.png
+
+[formation] produced 1 solution(s) -> /home/tonyzhang/projects/landmark_planning/constraint_sweep/sweep_2026-08-11/formation/s020_p100/formation

@@ -1,0 +1,69 @@
+Landmark scenario: random — 4 landmarks, 4 obstacles, start (0.0, 0.0) → goal (600.0, 0.0)
+Hex graph: 653 nodes (648 heading-states + 4 sensors + goal), radius=57.73502691896258m, directed_edges=1704, grid=11x15, start_cell=(1, 7), goal_cell=(7, 7), start_heading=0
+
+── FORMATION PLANNING ──
+  Primary: single-agent hexspline A* (threshold 5.271934556); supports added afterwards.
+
+  [Constraint A*] Incumbent seed at iter 50: dist=750.0, unc=8.7866 > 5.2719
+
+  [Constraint A*] Incumbent seed at iter 90: dist=786.603, unc=6.3285 > 5.2719
+
+  [Constraint A*] Incumbent seed at iter 93: dist=786.603, unc=5.8929 > 5.2719
+
+  [Constraint A*] Goal popped, unc OK, but its B-spline breaches an obstacle; discarded.
+
+  [Constraint A*] Goal popped, unc OK, but its B-spline breaches an obstacle; discarded.
+
+  [Constraint A*] Goal popped, unc OK, but its B-spline breaches an obstacle; discarded.
+
+  [Constraint A*] Goal popped, unc OK, but its B-spline breaches an obstacle; discarded.
+
+  [Constraint A*] Goal popped, unc OK, but its B-spline breaches an obstacle; discarded.
+
+  [Constraint A*] Goal popped, unc OK, but its B-spline breaches an obstacle; discarded.
+
+  [Constraint A*] Incumbent seed at iter 185: dist=886.603, unc=5.8215 > 5.2719
+
+  ✓ FEASIBLE SOLUTION at iter 194: dist=886.603, unc=4.9432
+  [Constraint A*] Single-agent complete: 194 iterations, final_dist=886.603
+  One support: trying both lateral slots (+1 = 60° left, -1 = 60° right).
+  Slot [1]: unc=4.3707 ✓
+  Slot [-1]: unc=4.9432 ✓
+  → Chose slot [1]
+  Support 1 (slot 1): dist=850.0m, goal_unc=4.0045m, arc drift vs primary=-36.6m
+  Primary : dist=886.6m, goal_unc=4.3707m (threshold 5.271934556 ✓)
+
+=== Continuous Spline Optimization (threshold=5.2719) ===
+  Initial (discrete→spline): prim_len=888.587, unc=4.2668
+  Barrier stage 1/15: μ=20.0
+  Barrier stage 2/15: μ=7.0
+  Barrier stage 3/15: μ=2.45
+  Barrier stage 4/15: μ=0.8575
+  Barrier stage 5/15: μ=0.3001
+  → Converged at iter 325 (Δlen=0.000451)
+  Barrier stage 6/15: μ=0.105
+  → Converged at iter 372 (Δlen=0.000872)
+  Barrier stage 7/15: μ=0.0368
+  [Spline barrier] line search stalled; stopping at stage 7
+  Barrier stage 8/15: μ=0.0129
+  [Spline barrier] line search stalled; stopping at stage 8
+  Barrier stage 9/15: μ=0.0045
+  [Spline barrier] line search stalled; stopping at stage 9
+  Barrier stage 10/15: μ=0.0016
+  → Converged at iter 424 (Δlen=0.000406)
+  Barrier stage 11/15: μ=0.0006
+  → Converged at iter 435 (Δlen=0.000929)
+  Barrier stage 12/15: μ=0.0002
+  → Converged at iter 439 (Δlen=0.000858)
+  Barrier stage 13/15: μ=0.0001
+  → Converged at iter 441 (Δlen=0.000109)
+  Barrier stage 14/15: μ=0.0
+  [Spline barrier] line search stalled; stopping at stage 14
+  Barrier stage 15/15: μ=0.0
+  [Spline barrier] line search stalled; stopping at stage 15
+  Final: prim_len=833.366, unc=4.4083, threshold=5.2719, status=optimized, min_slack=1.8e-5
+  Obstacle re-verification: mean path clears all obstacles ✓
+Fig combined (main) saved: Discrete Len=888.59 → Continuous Len=833.37
+Fig uncertainty profile (main) saved: /home/tonyzhang/projects/landmark_planning/constraint_sweep/sweep_2026-08-11/formation/s002_p060/formation/figures/main_unc_profile.png
+
+[formation] produced 1 solution(s) -> /home/tonyzhang/projects/landmark_planning/constraint_sweep/sweep_2026-08-11/formation/s002_p060/formation
