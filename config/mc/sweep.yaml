@@ -78,8 +78,18 @@ reject_trivial_spec: straight_cont@algorithms=straight_cont,num_agents=2
 # 2026-08-07_15-46-03: every s004/s005 run at D=1000-1100 exhausted 1e6
 # expansions and reported IMPOSSIBLE for thresholds that were provably feasible).
 # The long scenarios belong in the paper's hand-built set, run without a budget.
+#
+# 800 -> 900, because the step is hex_width_m and that went 100 -> 150. At 150 the
+# range [600, 800] admits only k = 4, 5 — i.e. D in {600, 750} — so EVERY scenario
+# in the sweep was one of two lengths, against three at the old 100 m step. 900
+# restores k = 4, 5, 6 = {600, 750, 900}. The ~900 m ceiling above was measured at
+# hex_width_m: 100, where D=900 cost 792+ heading-states; at 150 that same D is 432
+# (the figure quoted in config/mc/main.yaml's own coarsening note, which already
+# anticipates D=900), i.e. a joint space ~3.4x smaller than the one that ceiling
+# was found on. Watch the D=900 rows: if they cap disproportionately, this is the
+# knob that moves.
 goal_dist_min: 600.0
-goal_dist_max: 800.0
+goal_dist_max: 900.0
 # >= 2: with a single landmark there is nowhere useful to detour TO, so the whole
 # feasible band collapses. Sweep 2026-08-07_15-46-03 s003 had one landmark and
 # 1.5% of range between the straight line and the best anyone achieved — a 10%

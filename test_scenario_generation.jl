@@ -68,10 +68,13 @@ for seed in 1:150
 
     for lm in sc.landmarks
         @assert 0.12D - 1e-9 <= lm.x <= 0.88D + 1e-9 "landmark x=$(lm.x) outside corridor (seed $seed)"
-        # Inner edge 200 m is the point of the band: inside it a landmark is a free
-        # fix (100 m = the primary sees it from the direct line; 200 m = a support
-        # one comm_range off the line sees it), and a free fix measures nothing.
-        @assert 200.0 - 1e-9 <= abs(lm.y) <= 320.0 + 1e-9 "landmark |y|=$(abs(lm.y)) outside the sensible band (seed $seed)"
+        # The inner edge is the point of the band: inside it a landmark is a free fix
+        # (the primary sees it from the direct line, or a support one comm_range off
+        # the line does), and a free fix measures nothing. Asserted against the DERIVED
+        # constants, not literals — LM_BAND_INNER is HEX_WIDTH_M + VISIBILITY_RANGE + 30,
+        # so the hardcoded 200/320 this replaced silently went stale the moment any of
+        # those three moved, and failed for every seed rather than catching a real bug.
+        @assert LM_BAND_INNER - 1e-9 <= abs(lm.y) <= LM_BAND_INNER + LM_BAND_SPAN + 1e-9 "landmark |y|=$(abs(lm.y)) outside band [$(LM_BAND_INNER), $(LM_BAND_INNER + LM_BAND_SPAN)] (seed $seed)"
         # Σ₀ comes from landmarks[1].cov, so a non-SPD draw would poison every agent.
         @assert issymmetric(lm.cov) && det(lm.cov) > 0 && lm.cov[1,1] > 0 "landmark cov not SPD (seed $seed)"
     end

@@ -139,15 +139,38 @@ function build_hex_graph(sensor_landmarks::Vector{Landmark},
     # Center the hex rows around y=0 so the corridor is visually symmetric.
     y0 = -0.5 * (grid_h - 1) * y_step
 
+    # Align the START/GOAL row's cell centres with start_pos[1]. hex_center offsets
+    # ODD rows by hex_w/2, and that row's parity falls out of grid_h — so without
+    # this shift, start (0,0) and goal (D,0) land exactly MIDWAY between two centres
+    # whenever the row is odd, and nearest_cell snaps each half a column away
+    # (measured: 50 m at hex_width_m=100, 75 m at 150, for every goal_dist the sweep
+    # can draw). The discrete A* then certifies uncertainty at a cell hex_w/2 short
+    # of the true goal while seed_control_points ships a spline that runs on to it.
+    # Shifts every row equally: row count, corridor extent and the metre-space
+    # landmark/obstacle placement are untouched.
+    gy_start = clamp(round(Int, (start_pos[2] - y0) / y_step), 0, grid_h - 1)
+    isodd(gy_start) && (x0 -= hex_w / 2)
+
     cells = Tuple{Int,Int}[]
     centers = Dict{Tuple{Int,Int}, Tuple{Float64,Float64}}()
     for gy in 0:grid_h-1
-        # Filter: skip rows above CORRIDOR_Y_MAX_M and skip lowest y row (gy == 0)
+        # Keep routing rows within CORRIDOR_Y_MAX_M of the axis, SYMMETRICALLY.
+        # This was `cy > CORRIDOR_Y_MAX_M || gy == 0`: a one-sided clip above plus an
+        # unexplained skip of the bottom row, which trimmed the two sides by different
+        # amounts and left the corridor lopsided — at hex_width_m=150, rows ran
+        # -519.6 … +389.7, i.e. four rows below the axis and three above, handing the
+        # planner a row of southward freedom it had no northward counterpart for
+        # (90 m below the deepest landmark the band can draw, so it bought nothing).
+        # |cy| makes corridor_y_max_m mean what its name says. Row pitch is unchanged,
+        # so this only DROPS out-of-band rows: 8 rows -> 7 at w=150.
+        # NOTE: corridor_halfwidth_m now only sizes grid_h (how many candidate rows are
+        # generated before clipping); as long as it plus padding reaches beyond
+        # corridor_y_max_m, this filter is what decides the extent.
         cy = y0 + gy * y_step
-        if cy > CORRIDOR_Y_MAX_M || gy == 0
+        if abs(cy) > CORRIDOR_Y_MAX_M
             continue
         end
-        
+
         for gx in 1:(grid_w-2)  # Skip first and last columns (left and right edges)
             cell = (gx, gy)
             centers[cell] = hex_center(gx, gy, x0, y0, hex_r)

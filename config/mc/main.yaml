@@ -169,7 +169,15 @@ corridor_y_max_m: 440.0
 #     discrete seed rounded). false ⇒ discrete-only, no continuous enforcement.
 obstacle_delta: 0.05
 agent_radius: 5.0
-obstacle_edge_samples: 2
+# 2 -> 3, tracking hex_width_m 100 -> 150. A hex edge is now 150 m long, and
+# sampling only its endpoints lets the smoothed seed spline cut the corner far
+# enough to clip an obstacle the discrete polyline cleared. Measured on
+# constraint_sweep/coarse_grid_ab_2026-08-12: at w=140 the s030 single-agent
+# REFERENCE went infeasible for exactly this reason — every goal-reaching seed
+# failed seed_spline_clear, its log wall-to-wall with "Goal popped, unc OK, but
+# its B-spline breaches an obstacle; discarded" — draining the frontier at 10,374
+# expansions rather than hitting any budget.
+obstacle_edge_samples: 3
 obstacle_continuous: true
 
 # Output
