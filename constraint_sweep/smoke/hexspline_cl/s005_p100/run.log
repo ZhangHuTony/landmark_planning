@@ -1,0 +1,76 @@
+Landmark scenario: random — 4 landmarks, 3 obstacles, start (0.0, 0.0) → goal (800.0, 0.0)
+Hex graph: 797 nodes (792 heading-states + 4 sensors + goal), radius=57.73502691896258m, directed_edges=2112, grid=13x15, start_cell=(1, 7), goal_cell=(9, 7), start_heading=0
+Conditional ε-bound: ε_sample=1.1443, w=1.0, ε_total=1.1443
+  Bound form (conditional): L_returned ≤ (1+ε_total) L* with assumptions documented in comments.
+
+── MULTI-AGENT PLANNING (Synchronized Kalman) ──
+
+  Running joint discrete A* (threshold=3.8433)... (max_iters=1000000)
+  Stops on the first feasible candidate under the threshold.
+  ✓ Goal reachable from node 1 with distance 800.0
+  [A*] iter 1000/1000000 (0.1%)  left=999000  elapsed=2.0s     [A*] iter 2000/1000000 (0.2%)  left=998000  elapsed=2.1s     [A*] iter 3000/1000000 (0.3%)  left=997000  elapsed=2.4s     [A*] iter 4000/1000000 (0.4%)  left=996000  elapsed=2.4s     [A*] iter 5000/1000000 (0.5%)  left=995000  elapsed=2.5s     [A*] iter 6000/1000000 (0.6%)  left=994000  elapsed=2.6s     [A*] iter 7000/1000000 (0.7%)  left=993000  elapsed=2.6s     [A*] iter 8000/1000000 (0.8%)  left=992000  elapsed=2.8s     [A*] iter 9000/1000000 (0.9%)  left=991000  elapsed=2.8s     [A*] iter 10000/1000000 (1.0%)  left=990000  elapsed=3.0s     [A*] iter 11000/1000000 (1.1%)  left=989000  elapsed=3.0s     [A*] iter 12000/1000000 (1.2%)  left=988000  elapsed=3.4s     [A*] iter 13000/1000000 (1.3%)  left=987000  elapsed=3.5s     [A*] iter 14000/1000000 (1.4%)  left=986000  elapsed=3.5s     [A*] iter 15000/1000000 (1.5%)  left=985000  elapsed=3.5s     [A*] iter 16000/1000000 (1.6%)  left=984000  elapsed=3.7s     [A*] iter 17000/1000000 (1.7%)  left=983000  elapsed=3.7s     [A*] iter 18000/1000000 (1.8%)  left=982000  elapsed=3.8s     [A*] iter 19000/1000000 (1.9%)  left=981000  elapsed=3.8s     [A*] iter 20000/1000000 (2.0%)  left=980000  elapsed=3.9s     [A*] iter 21000/1000000 (2.1%)  left=979000  elapsed=4.1s     [A*] iter 22000/1000000 (2.2%)  left=978000  elapsed=4.2s     [A*] iter 23000/1000000 (2.3%)  left=977000  elapsed=4.2s     [A*] iter 24000/1000000 (2.4%)  left=976000  elapsed=4.2s     [A*] iter 25000/1000000 (2.5%)  left=975000  elapsed=4.3s     [A*] iter 26000/1000000 (2.6%)  left=974000  elapsed=4.3s     [A*] iter 27000/1000000 (2.7%)  left=973000  elapsed=4.4s     [A*] iter 28000/1000000 (2.8%)  left=972000  elapsed=4.8s     [A*] iter 29000/1000000 (2.9%)  left=971000  elapsed=4.9s     [A*] iter 30000/1000000 (3.0%)  left=970000  elapsed=4.9s     [A*] iter 31000/1000000 (3.1%)  left=969000  elapsed=5.0s     [A*] iter 32000/1000000 (3.2%)  left=968000  elapsed=5.3s     [A*] iter 33000/1000000 (3.3%)  left=967000  elapsed=5.4s     [A*] iter 34000/1000000 (3.4%)  left=966000  elapsed=5.6s     [A*] iter 35000/1000000 (3.5%)  left=965000  elapsed=5.7s   
+  ✓ FEASIBLE SOLUTION at iter 35380: dist=950.0, unc=3.3312
+  [Constraint A*] Complete: 35380 iterations, final_dist=950.0
+
+✓ Multi-agent solution with synchronized Kalman fusion:
+  Support agent 1: node=582, dist=950.0m, goal_unc=0.9691m
+  Primary agent: node=450, dist=950.0m, goal_unc=3.3312m
+  ├─ Communication: every 100.0m, sigmoid taper range=200.0m width=20.0m
+  └─ All agents' uncertainties benefit from synchronized Kalman fusion at checkpoints
+
+--- Final Results ---
+Support agent 1 : [1, 403, 409, 415, 421, 494, 560, 632, 637, 643, 582]  dist=950.0  goal_unc=0.9691  ✓  (Kalman-fused)
+Primary agent : [1, 403, 476, 481, 548, 553, 559, 565, 571, 516, 450]  dist=950.0  goal_unc=3.3312  threshold=3.84325473 ✓ met  (Kalman-fused)
+
+=== Kalman Filtering Summary ===
+All 2 agents performing synchronized Kalman filtering:
+  • Dead-reckoning propagation: DIR=0.05/m, PERP=0.016666666666666666/m
+  • Landmark fusion: Information filter (Joseph form) at every waypoint
+  • SYNCHRONIZED inter-agent communication: every 100.0m of travel
+  • Tapered sigmoid weighting: range=200.0m, width=20.0m (soft plateau + rolloff)
+  • Bidirectional Kalman fusion: all agent pairs within range at each checkpoint
+  • Measurement model: bearing-angle sensor with noise=0.038, ratio=2.2
+  └─ Support agents: goal_unc=0.9691m (improved by inter-agent fusion)
+  └─ Primary agent: goal_unc=3.3312m (direct path with landmark updates)
+Converged at iteration : 35380
+Figure path-role mapping: supports = paths[1:1], primary = paths[2]
+Discrete evaluation: prim_len=950.0, unc=3.3312
+Fig 1 saved.
+
+=== Continuous Spline Optimization (threshold=3.8433) ===
+  Initial (discrete→spline): prim_len=919.679, unc=3.7589
+  Barrier stage 1/15: μ=20.0
+  Barrier stage 2/15: μ=7.0
+  → Converged at iter 68 (Δlen=0.000912)
+  Barrier stage 3/15: μ=2.45
+  → Converged at iter 70 (Δlen=0.000167)
+  Barrier stage 4/15: μ=0.8575
+  [Spline barrier] line search stalled; stopping at stage 4
+  Barrier stage 5/15: μ=0.3001
+  [Spline barrier] line search stalled; stopping at stage 5
+  Barrier stage 6/15: μ=0.105
+  [Spline barrier] line search stalled; stopping at stage 6
+  Barrier stage 7/15: μ=0.0368
+  [Spline barrier] line search stalled; stopping at stage 7
+  Barrier stage 8/15: μ=0.0129
+  [Spline barrier] line search stalled; stopping at stage 8
+  Barrier stage 9/15: μ=0.0045
+  [Spline barrier] line search stalled; stopping at stage 9
+  Barrier stage 10/15: μ=0.0016
+  [Spline barrier] line search stalled; stopping at stage 10
+  Barrier stage 11/15: μ=0.0006
+  → Converged at iter 84 (Δlen=0.000332)
+  Barrier stage 12/15: μ=0.0002
+  → Converged at iter 85 (Δlen=0.000514)
+  Barrier stage 13/15: μ=0.0001
+  → Converged at iter 148 (Δlen=6.6e-5)
+  Barrier stage 14/15: μ=0.0
+  [Spline barrier] line search stalled; stopping at stage 14
+  Barrier stage 15/15: μ=0.0
+  [Spline barrier] line search stalled; stopping at stage 15
+  Final: prim_len=919.741, unc=3.7189, threshold=3.8433, status=optimized, min_slack=0.011667
+  Obstacle re-verification: mean path clears all obstacles ✓
+Fig combined (main) saved: Discrete Len=919.68 → Continuous Len=919.74
+Fig uncertainty profile (main) saved: /home/tony-zhang/Research/landmark_planning/constraint_sweep/smoke/hexspline_cl/s005_p100/hexspline_cl/figures/main_unc_profile.png
+
+[hexspline_cl] produced 1 solution(s) -> /home/tony-zhang/Research/landmark_planning/constraint_sweep/smoke/hexspline_cl/s005_p100/hexspline_cl

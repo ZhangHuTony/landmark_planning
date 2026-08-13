@@ -1,0 +1,84 @@
+── constraint sweep smoke150 ──
+  methods: hexspline_cl, sequential, formation, straight_cont
+  ladder:  100, 90, 80%   patience=1   method_patience=1   timeout=900s
+  scenarios: drawing until 6 references succeed (guard: 30 draws)
+  output:  /home/tony-zhang/Research/landmark_planning/constraint_sweep/smoke150
+  s001: screen ok — straight_cont fails the 100% bound (recovery_failed)
+  s001: D=600 L=4 O=4  L_ref=664.4 U_ref=7.395  (13.4s)  [1/6]
+    s001 p100  sequential        ok   ratio=1.0819   12.6s
+    s001 p100  formation         ok   ratio=1.2513   13.9s
+    s001 p100  straight_cont     FAIL recovery_failed   15.4s
+    s001 p100  hexspline_cl      ok   ratio=1.0454   16.2s
+    s001: straight_cont failed 1x in a row (through 100%) — dropped, 2 stricter level(s) recorded unrun
+    s001 p90  sequential        ok   ratio=1.2207   12.2s
+    s001 p90  formation         ok   ratio=2.9354   14.7s
+    s001 p90  hexspline_cl      ok   ratio=1.2006   15.5s
+    s001 p80  sequential        ok   ratio=1.1929   12.2s
+    s001 p80  formation         ok   ratio=3.1910   14.6s
+    s001 p80  hexspline_cl      ok   ratio=1.1922   15.6s
+  s002: screen ok — straight_cont fails the 100% bound (recovery_failed)
+  s002: D=750 L=4 O=4  L_ref=827.9 U_ref=10.016  (13.4s)  [2/6]
+    s002 p100  sequential        FAIL recovery_failed   14.0s
+    s002 p100  formation         ok   ratio=1.3117   14.1s
+    s002 p100  straight_cont     FAIL recovery_failed   15.6s
+    s002 p100  hexspline_cl      ok   ratio=1.0941   20.4s
+    s002: sequential failed 1x in a row (through 100%) — dropped, 2 stricter level(s) recorded unrun
+    s002: straight_cont failed 1x in a row (through 100%) — dropped, 2 stricter level(s) recorded unrun
+    s002 p90  formation         FAIL recovery_failed   13.3s
+    s002 p90  hexspline_cl      ok   ratio=1.0057   18.7s
+    s002: formation failed 1x in a row (through 90%) — dropped, 1 stricter level(s) recorded unrun
+    s002 p80  hexspline_cl      ok   ratio=1.0016   19.0s
+  s003: TRIVIAL — straight_cont already meets the 100% bound (unc 9.347 <= 11.345, len 908.3) — rejected, does NOT count toward n_scenarios  (14.2s)
+  s004: screen ok — straight_cont fails the 100% bound (recovery_failed)
+  s004: D=900 L=2 O=4  L_ref=972.4 U_ref=9.668  (13.4s)  [3/6]
+    s004 p100  formation         ok   ratio=1.1282   14.0s
+    s004 p100  sequential        ok   ratio=1.0912   14.2s
+    s004 p100  straight_cont     FAIL recovery_failed   15.5s
+    s004 p100  hexspline_cl      ok   ratio=1.0169   17.1s
+    s004: straight_cont failed 1x in a row (through 100%) — dropped, 2 stricter level(s) recorded unrun
+    s004 p90  sequential        ok   ratio=1.0895   13.8s
+    s004 p90  formation         ok   ratio=2.1803   14.2s
+    s004 p90  hexspline_cl      ok   ratio=1.0162   16.6s
+    s004 p80  sequential        ok   ratio=1.0894   13.8s
+    s004 p80  formation         ok   ratio=2.2600   15.9s
+    s004 p80  hexspline_cl      ok   ratio=1.0408   16.6s
+  s005: screen ok — straight_cont fails the 100% bound (recovery_failed)
+  s005: D=900 L=4 O=3  L_ref=963.1 U_ref=6.169  (13.4s)  [4/6]
+    s005 p100  sequential        ok   ratio=1.2377   13.1s
+    s005 p100  formation         ok   ratio=1.2834   14.0s
+    s005 p100  straight_cont     FAIL recovery_failed   16.2s
+    s005 p100  hexspline_cl      ok   ratio=1.0424   36.1s
+    s005: straight_cont failed 1x in a row (through 100%) — dropped, 2 stricter level(s) recorded unrun
+    s005 p90  sequential        ok   ratio=1.2377   12.8s
+    s005 p90  formation         ok   ratio=1.4627   14.5s
+    s005 p90  hexspline_cl      ok   ratio=1.0579   35.8s
+    s005 p80  sequential        ok   ratio=1.2377   13.0s
+    s005 p80  formation         ok   ratio=1.4559   14.9s
+    s005 p80  hexspline_cl      ok   ratio=1.0926   35.0s
+  s006: TRIVIAL — straight_cont already meets the 100% bound (unc 7.993 <= 10.383, len 750.0) — rejected, does NOT count toward n_scenarios  (15.6s)
+  s007: screen ok — straight_cont fails the 100% bound (recovery_failed)
+  s007: D=900 L=2 O=5  L_ref=1080.4 U_ref=9.975  (13.8s)  [5/6]
+    s007 p100  sequential        ok   ratio=1.4454   13.9s
+    s007 p100  formation         ok   ratio=1.5134   14.2s
+    s007 p100  straight_cont     FAIL recovery_failed   17.5s
+    s007 p100  hexspline_cl      FAIL no_solution   145.0s
+    s007: hexspline_cl failed 1x in a row (through 100%) — dropped, 2 stricter level(s) recorded unrun
+    s007: straight_cont failed 1x in a row (through 100%) — dropped, 2 stricter level(s) recorded unrun
+    s007 p90  sequential        ok   ratio=1.4441   13.2s
+    s007 p90  formation         FAIL recovery_failed   13.4s
+    s007: formation failed 1x in a row (through 90%) — dropped, 1 stricter level(s) recorded unrun
+    s007 p80  sequential        ok   ratio=1.4424   12.9s
+  s008: screen ok — straight_cont fails the 100% bound (recovery_failed)
+  s008: D=900 L=3 O=3  L_ref=1041.3 U_ref=6.322  (13.5s)  [6/6]
+    s008 p100  formation         ok   ratio=1.1870   14.2s
+    s008 p100  sequential        ok   ratio=0.9327   14.2s
+    s008 p100  straight_cont     FAIL recovery_failed   15.3s
+    s008 p100  hexspline_cl      ok   ratio=0.8790   16.7s
+    s008: straight_cont failed 1x in a row (through 100%) — dropped, 2 stricter level(s) recorded unrun
+    s008 p90  sequential        ok   ratio=0.9325   13.6s
+    s008 p90  formation         ok   ratio=1.3245   13.8s
+    s008 p90  hexspline_cl      ok   ratio=0.9158   16.8s
+    s008 p80  sequential        ok   ratio=0.9327   13.6s
+    s008 p80  formation         FAIL recovery_failed   13.7s
+    s008 p80  hexspline_cl      ok   ratio=0.9302   15.9s
+── done: /home/tony-zhang/Research/landmark_planning/constraint_sweep/smoke150 ──

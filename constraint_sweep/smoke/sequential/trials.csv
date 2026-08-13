@@ -1,0 +1,13 @@
+scenario_id,pct,threshold,method,algorithm,num_agents,success,fail_reason,primary_length,primary_unc,length_ratio,wall_s,wall_ratio,astar_iterations,continuous_primary_length,continuous_uncertainties,discrete_uncertainties,primary_disc_unc,refinement_min_slack,refinement_status,sequential_leg1_length,sequential_replanned
+s001,100,7.2435,sequential,sequential,2,true,,673.2759500101249,5.439348304710375,1.0180,13.8,0.9172,56,673.276,"[4.5076, 5.4393]","[4.3521, 4.5975]",4.597481106405035,3.4052662412076273e-8,optimized,750.0,false
+s001,90,6.5192,sequential,sequential,2,true,,679.4308475596487,5.313912789227683,1.0273,13.4,0.8908,56,679.431,"[4.4637, 5.3139]","[4.3521, 4.5975]",4.597481106405035,3.865455397780715e-8,optimized,750.0,false
+s001,80,5.7948,sequential,sequential,2,true,,690.9494961370267,5.262452846474531,1.0447,13.6,0.9044,56,690.949,"[4.4428, 5.2625]","[4.3521, 4.5975]",4.597481106405035,8.33297638877517e-9,optimized,750.0,false
+s002,100,8.5710,sequential,sequential,2,false,recovery_failed,875.8723882305533,6.822515335218899,,17.5,1.2428,46405,875.872,"[4.6455, 6.8225]","[5.5182, 6.3667]",6.3666516908755,-29.020926566363126,recovery_failed,850.0,false
+s002,90,7.7139,sequential,sequential,2,false,not_run_after_fail,,,,0.0,,,,,,,,,,
+s002,80,6.8568,sequential,sequential,2,false,not_run_after_fail,,,,0.0,,,,,,,,,,
+s004,100,8.8480,sequential,sequential,2,false,recovery_failed,1103.7198016028494,6.114928744999822,,65.5,4.6059,365442,1103.72,"[3.9874, 6.1149]","[6.078, 6.2983]",6.298277789098099,-0.009799331088818669,recovery_failed,950.0,false
+s004,90,7.9632,sequential,sequential,2,false,not_run_after_fail,,,,0.0,,,,,,,,,,
+s004,80,7.0784,sequential,sequential,2,false,not_run_after_fail,,,,0.0,,,,,,,,,,
+s005,100,3.8433,sequential,sequential,2,true,,914.412733366503,2.172062376304137,1.0344,13.8,0.9661,325,914.413,"[1.5054, 2.1721]","[2.386, 3.1148]",3.1147976556189856,5.044574779982213e-6,optimized,950.0,false
+s005,90,3.4589,sequential,sequential,2,true,,916.7247013819162,2.7776100232364893,1.0370,15.2,1.0650,1089,916.725,"[1.8969, 2.7776]","[2.386, 3.1148]",3.1147976556189856,1.4355756573204416e-6,optimized,950.0,false
+s005,80,3.0746,sequential,sequential,2,true,,1305.95682503858,2.3570969143192433,1.4774,13.2,0.9263,2810,1305.957,"[1.5575, 2.3571]","[2.0756, 3.0521]",3.0520554317395665,0.011563746524780786,optimized,950.0,true

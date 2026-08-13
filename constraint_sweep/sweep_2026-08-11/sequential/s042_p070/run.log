@@ -1,56 +1,0 @@
-Landmark scenario: random — 3 landmarks, 4 obstacles, start (0.0, 0.0) → goal (700.0, 0.0)
-Hex graph: 724 nodes (720 heading-states + 3 sensors + goal), radius=57.73502691896258m, directed_edges=1908, grid=12x15, start_cell=(1, 7), goal_cell=(8, 7), start_heading=0
-
-── SEQUENTIAL PLANNING (2 agent(s), one at a time) ──
-  Leg 1 — primary, 1 helper(s) parked at start (bound 13.0111 = 2.0x the 6.505559983 threshold the shipped route is held to):
-  [A*] iter 1000/500000 (0.2%)  left=499000  elapsed=0.1s   
-    ✓ feasible at iter 1093: dist=1150.0, unc=9.293
-  Leg 2 — helper 1 vs the fixed primary trajectory (13 steps, beam 400):
-    → helper 1 placed; primary goal_unc now 7.165
-  Leg 3 — primary re-planned against the committed helper paths:
-  [A*] iter 1000/500000 (0.2%)  left=499000  elapsed=0.1s     [A*] iter 2000/500000 (0.4%)  left=498000  elapsed=0.3s     [A*] iter 3000/500000 (0.6%)  left=497000  elapsed=0.4s     [A*] iter 4000/500000 (0.8%)  left=496000  elapsed=0.5s     [A*] iter 5000/500000 (1.0%)  left=495000  elapsed=0.5s     [A*] iter 6000/500000 (1.2%)  left=494000  elapsed=0.5s     [A*] iter 7000/500000 (1.4%)  left=493000  elapsed=0.6s     [A*] iter 8000/500000 (1.6%)  left=492000  elapsed=0.6s     [A*] iter 9000/500000 (1.8%)  left=491000  elapsed=0.7s     [A*] iter 10000/500000 (2.0%)  left=490000  elapsed=0.7s     [A*] iter 11000/500000 (2.2%)  left=489000  elapsed=0.8s     [A*] iter 12000/500000 (2.4%)  left=488000  elapsed=0.8s     [A*] iter 13000/500000 (2.6%)  left=487000  elapsed=0.9s     [A*] iter 14000/500000 (2.8%)  left=486000  elapsed=1.0s     [A*] iter 15000/500000 (3.0%)  left=485000  elapsed=1.0s   ┌ Warning: Seed is infeasible (min_slack=-0.2506441778698685, ε=0.001); the barrier will try to recover it before shortening. Expected for the straight_cont ablation, and for a discrete seed that A* returned as its best incumbent after exhausting its budget.
-└ @ Main ~/projects/landmark_planning/planners/hexspline_cl.jl:1215
-
-    ✓ feasible at iter 15963: dist=1950.0, unc=6.4851
-    leg 1 route: len=1150.0, unc=7.165 ✗  |  re-planned: len=1950.0, unc=6.4851 ✓  → TAKE re-plan
-  Helper 1: dist=1150.0m, goal_unc=6.051m
-  Primary  : dist=1950.0m, goal_unc=6.4851m (threshold 6.505559983 ✓)
-
-=== Continuous Spline Optimization (threshold=6.5056) ===
-  Initial (discrete→spline): prim_len=1799.011, unc=6.7562
-  Barrier stage 1/15: μ=20.0
-  [Spline barrier] line search stalled; stopping at stage 1
-  Barrier stage 2/15: μ=20.0
-  [Spline barrier] line search stalled; stopping at stage 2
-  Barrier stage 3/15: μ=20.0
-  [Spline barrier] line search stalled; stopping at stage 3
-  Barrier stage 4/15: μ=20.0
-  [Spline barrier] line search stalled; stopping at stage 4
-  Barrier stage 5/15: μ=20.0
-  [Spline barrier] line search stalled; stopping at stage 5
-  Barrier stage 6/15: μ=20.0
-  [Spline barrier] line search stalled; stopping at stage 6
-  Barrier stage 7/15: μ=20.0
-  [Spline barrier] line search stalled; stopping at stage 7
-  Barrier stage 8/15: μ=20.0
-  [Spline barrier] line search stalled; stopping at stage 8
-  Barrier stage 9/15: μ=20.0
-  [Spline barrier] line search stalled; stopping at stage 9
-  Barrier stage 10/15: μ=20.0
-  [Spline barrier] line search stalled; stopping at stage 10
-  Barrier stage 11/15: μ=20.0
-  [Spline barrier] line search stalled; stopping at stage 11
-  Barrier stage 12/15: μ=20.0
-  [Spline barrier] line search stalled; stopping at stage 12
-  Barrier stage 13/15: μ=20.0
-  [Spline barrier] line search stalled; stopping at stage 13
-  Barrier stage 14/15: μ=20.0
-  [Spline barrier] line search stalled; stopping at stage 14
-  Barrier stage 15/15: μ=20.0
-  [Spline barrier] line search stalled; stopping at stage 15
-  Final: prim_len=1794.295, unc=6.6922, threshold=6.5056, status=recovery_failed, min_slack=-0.186591
-  Obstacle re-verification: mean path clears all obstacles ✓
-Fig combined (main) saved: Discrete Len=1799.01 → Continuous Len=1794.3
-Fig uncertainty profile (main) saved: /home/tonyzhang/projects/landmark_planning/constraint_sweep/sweep_2026-08-11/sequential/s042_p070/sequential/figures/main_unc_profile.png
-
-[sequential] produced 1 solution(s) -> /home/tonyzhang/projects/landmark_planning/constraint_sweep/sweep_2026-08-11/sequential/s042_p070/sequential

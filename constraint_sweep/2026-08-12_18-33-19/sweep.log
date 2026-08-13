@@ -1,0 +1,5 @@
+── constraint sweep 2026-08-12_18-33-19 ──
+  methods: hexspline_cl, sequential, formation, straight_cont
+  ladder:  100, 90, 80%   patience=1   method_patience=1   timeout=900s
+  scenarios: drawing until 6 references succeed (guard: 30 draws)
+  output:  /home/tony-zhang/Research/landmark_planning/constraint_sweep/2026-08-12_18-33-19

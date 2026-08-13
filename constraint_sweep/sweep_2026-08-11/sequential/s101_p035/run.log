@@ -1,56 +1,0 @@
-Landmark scenario: random — 4 landmarks, 3 obstacles, start (0.0, 0.0) → goal (800.0, 0.0)
-Hex graph: 797 nodes (792 heading-states + 4 sensors + goal), radius=57.73502691896258m, directed_edges=2112, grid=13x15, start_cell=(1, 7), goal_cell=(9, 7), start_heading=0
-
-── SEQUENTIAL PLANNING (2 agent(s), one at a time) ──
-  Leg 1 — primary, 1 helper(s) parked at start (bound 6.6088 = 2.0x the 3.304421681 threshold the shipped route is held to):
-
-    ✓ feasible at iter 348: dist=1050.0, unc=4.7989
-  Leg 2 — helper 1 vs the fixed primary trajectory (12 steps, beam 400):
-    → helper 1 placed; primary goal_unc now 3.5718
-  Leg 3 — primary re-planned against the committed helper paths:
-  [A*] iter 1000/500000 (0.2%)  left=499000  elapsed=0.0s     [A*] iter 2000/500000 (0.4%)  left=498000  elapsed=0.1s     [A*] iter 3000/500000 (0.6%)  left=497000  elapsed=0.4s     [A*] iter 4000/500000 (0.8%)  left=496000  elapsed=0.5s     [A*] iter 5000/500000 (1.0%)  left=495000  elapsed=0.5s     [A*] iter 6000/500000 (1.2%)  left=494000  elapsed=0.6s     [A*] iter 7000/500000 (1.4%)  left=493000  elapsed=0.6s     [A*] iter 8000/500000 (1.6%)  left=492000  elapsed=0.7s     [A*] iter 9000/500000 (1.8%)  left=491000  elapsed=0.8s   ┌ Warning: Seed is infeasible (min_slack=-0.5836943133540751, ε=0.001); the barrier will try to recover it before shortening. Expected for the straight_cont ablation, and for a discrete seed that A* returned as its best incumbent after exhausting its budget.
-└ @ Main ~/projects/landmark_planning/planners/hexspline_cl.jl:1215
-
-    ✓ feasible at iter 9309: dist=1750.0, unc=3.2722
-    leg 1 route: len=1050.0, unc=3.5718 ✗  |  re-planned: len=1750.0, unc=3.2722 ✓  → TAKE re-plan
-  Helper 1: dist=1050.0m, goal_unc=2.2155m
-  Primary  : dist=1750.0m, goal_unc=3.2722m (threshold 3.304421681 ✓)
-
-=== Continuous Spline Optimization (threshold=3.3044) ===
-  Initial (discrete→spline): prim_len=1651.333, unc=3.8881
-  Barrier stage 1/15: μ=20.0
-  [Spline barrier] line search stalled; stopping at stage 1
-  Barrier stage 2/15: μ=20.0
-  [Spline barrier] line search stalled; stopping at stage 2
-  Barrier stage 3/15: μ=20.0
-  [Spline barrier] line search stalled; stopping at stage 3
-  Barrier stage 4/15: μ=20.0
-  [Spline barrier] line search stalled; stopping at stage 4
-  Barrier stage 5/15: μ=20.0
-  [Spline barrier] line search stalled; stopping at stage 5
-  Barrier stage 6/15: μ=20.0
-  [Spline barrier] line search stalled; stopping at stage 6
-  Barrier stage 7/15: μ=20.0
-  [Spline barrier] line search stalled; stopping at stage 7
-  Barrier stage 8/15: μ=20.0
-  [Spline barrier] line search stalled; stopping at stage 8
-  Barrier stage 9/15: μ=20.0
-  [Spline barrier] line search stalled; stopping at stage 9
-  Barrier stage 10/15: μ=20.0
-  [Spline barrier] line search stalled; stopping at stage 10
-  Barrier stage 11/15: μ=20.0
-  [Spline barrier] line search stalled; stopping at stage 11
-  Barrier stage 12/15: μ=20.0
-  [Spline barrier] line search stalled; stopping at stage 12
-  Barrier stage 13/15: μ=20.0
-  [Spline barrier] line search stalled; stopping at stage 13
-  Barrier stage 14/15: μ=20.0
-  [Spline barrier] line search stalled; stopping at stage 14
-  Barrier stage 15/15: μ=20.0
-  [Spline barrier] line search stalled; stopping at stage 15
-  Final: prim_len=1655.779, unc=3.7049, threshold=3.3044, status=recovery_failed, min_slack=-0.400497
-  Obstacle re-verification: mean path clears all obstacles ✓
-Fig combined (main) saved: Discrete Len=1651.33 → Continuous Len=1655.78
-Fig uncertainty profile (main) saved: /home/tonyzhang/projects/landmark_planning/constraint_sweep/sweep_2026-08-11/sequential/s101_p035/sequential/figures/main_unc_profile.png
-
-[sequential] produced 1 solution(s) -> /home/tonyzhang/projects/landmark_planning/constraint_sweep/sweep_2026-08-11/sequential/s101_p035/sequential
