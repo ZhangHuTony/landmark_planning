@@ -53,7 +53,9 @@ prune_by_support_uncertainty: false
 # 1.5M is ~2.6x the deepest solution actually observed. It is a MEMORY bound now
 # rather than a time bound (every expansion pushes a State); wall_s in trials.csv
 # is the honest cost signal.
-astar_iteration_limit: 500000
+# (This line had drifted to 500000 despite the reasoning above concluding 1.5M —
+# restored to match. 500k would have re-truncated the exact 572,554 example above.)
+astar_iteration_limit: 1000000
 straight_cont_primary_wpts: 11
 support_idle_penalty: 30.0
 support_plot_offset_m: 3.0

@@ -1,0 +1,70 @@
+# ==========================================================================
+# SMOKE sweep — inspect-before-launch config for run_constraint_sweep.jl
+# ==========================================================================
+# Not a measurement. Sized to exercise every mechanism once, fast enough to read
+# the log end to end:
+#   * the trivial-scenario screen accepting AND rejecting a draw
+#   * the reference run, the ladder, method_patience, pct_patience
+#   * one representative of each planner family
+# Everything not listed here is deliberately identical to sweep.yaml, so what the
+# smoke exercises is what the real sweep will do.
+#
+#   julia run_constraint_sweep.jl --sweep config/mc/sweep_smoke.yaml --tag smoke
+# ==========================================================================
+
+# 4 accepted scenarios. Different seed base from sweep.yaml (1067) on purpose: a
+# smoke that shares the real sweep's draws tells you nothing the real sweep will
+# not immediately tell you again, and reusing 1067 here would make the smoke's
+# rejects look like the real sweep's rejects.
+n_scenarios: 6
+scenario_seed_base: 2000
+# The screen rejects roughly a quarter of draws and reference failures take more,
+# so the guard has to allow comfortably more draws than n_scenarios.
+max_scenario_draws: 30
+
+# goal_dist is drawn in whole hex COLUMNS (D = hex_width_m * rand(lo:hi)), so the
+# usable range depends on hex_width_m. At 150 the old 600-800 admits only 600 and
+# 750; opening the top to 900 restores three values (600/750/900) and re-opens the
+# long corridors sweep.yaml had to cap at 800 because the joint A* stopped finding
+# solutions past ~900 m INSIDE ITS BUDGET at hex_width 100 — a budget artifact that
+# the coarser grid is meant to remove. Whether it actually does is the main thing
+# this smoke is measuring: watch D=900 for capped runs.
+goal_dist_min: 600.0
+goal_dist_max: 900.0
+n_landmarks_min: 2
+n_landmarks_max: 4
+n_obstacles_min: 3
+n_obstacles_max: 5
+
+# THE FLAG UNDER INSPECTION. On here; off in sweep.yaml.
+reject_trivial_straight: true
+reject_trivial_spec: straight_cont@algorithms=straight_cont,num_agents=2
+
+# Three rungs, not eight. Enough to see a ladder walk down and a method get
+# dropped by method_patience, without paying for the failure tail.
+pct_start: 100
+pct_step: 10
+pct_floor: 80
+pct_patience: 1
+method_patience: 1
+
+# One planner per family: the joint search under test, the strongest decomposed
+# baseline, a rigid-rule baseline, and the straight-line ablation (kept here on
+# purpose — with the screen ON it should come back 0/4, which is the check that
+# the screen actually bit).
+methods: hexspline_cl@algorithms=hexspline_cl,num_agents=2 | sequential@algorithms=sequential,num_agents=2 | formation@algorithms=formation,num_agents=2 | straight_cont@algorithms=straight_cont,num_agents=2
+
+# On for a smoke — the point is to LOOK at the plans before committing hours.
+save_figures: true
+save_csv: false
+
+run_timeout_s: 900
+
+# 4, not 6. Only one method in the list is hexspline_cl, so at most one joint A*
+# is ever resident; that is what keeps peak memory bounded. Concurrent
+# hexspline_cl runs at astar_iteration_limit: 1000000 each push a State per
+# expansion and exhausted 32 GB on 2026-08-12, taking the machine down with them.
+# Do not raise this by adding a second joint-search method without re-checking RSS.
+workers: 4
+
+outroot: constraint_sweep

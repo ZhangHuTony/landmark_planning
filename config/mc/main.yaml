@@ -84,10 +84,18 @@ comm_radius: 300.0
 # wall with nothing to trade against. At 20/15 both are gradients, and "further
 # out but holding a fix" can beat "close but blind" — a trade a search exploits
 # and a fixed rule cannot.
+#
+# 200 -> 300, tracking hex_width_m 100 -> 150 to HOLD that 2x ratio. This is not a
+# free parameter: at 200 against a 150 m hex only ring 1 sits inside comm range
+# (ring 2 is at ~260-300 m), which is precisely the 1x regime described above —
+# coarsening the grid without moving this would have re-made rigid formation
+# near-optimal by construction and thrown away what the sweep is trying to measure.
+# formation's lateral reach is still pinned at hex_width + visibility, now 250 m,
+# against a joint search that can reach 300 m; the asymmetry is preserved.
 visibility_range: 100.0
 visibility_width: 15.0
 comm_interval: 100.0
-comm_range: 200.0
+comm_range: 300.0
 comm_width: 20.0
 comm_weight_min: 1.0e-4
 comm_interval_dist: 5.0
@@ -114,7 +122,27 @@ min_turn_radius_m: 40.0
 #   two set the row COUNT — at the defaults below, 9 rows. Retune them whenever
 #   hex_width_m changes, or the graph blows up (Floyd-Warshall is O(n³)); see
 #   config/hardware/main.yaml for the 4 m version.
-hex_width_m: 100.0
+# 100 -> 150. At 100 the budget, not the problem, decided the sweep: the 2-agent
+# joint routing space is 792^2 = 627,264 pairs against an astar_iteration_limit of
+# 1e6, i.e. ~1.6 expansions per joint pair, and the Pareto front holds several
+# non-dominated covariances at each — the search could not enumerate its own state
+# space once. On sweep 2026-08-12_13-51-20 that showed up as 24% of hexspline_cl
+# runs hitting the cap, 89% of its failures capped, and FOUR pct=100 no_solutions
+# (s005/s012/s029/s030) that are provably false: at pct=100 the threshold IS U_ref,
+# and the 2-agent feasible set is a strict superset of the 1-agent one, so the
+# reference's own path is feasible by construction.
+# 150 takes heading-states to 336/384/432 at D=600/750/900, i.e. joint spaces of
+# 113k/147k/187k — 3.4-5.6x smaller. Verified on constraint_sweep/
+# coarse_grid_ab_2026-08-12: with geometry pinned and hex_width the only variable,
+# all four of those false negatives solve, in 4,490-391,579 expansions (worst case
+# 39% of budget) against the full 1e6 they used to burn.
+# NOT free: the coarser seed costs path length, and at 140 one single-agent
+# reference (s030) went IMPOSSIBLE because every goal-reaching seed's B-spline
+# breached an obstacle. Watch the reference-failure rate.
+# The cap is a MEMORY bound before it is a time bound (every expansion pushes a
+# State) — four concurrent 2-agent runs at 1e6 took a 32 GB machine down on
+# 2026-08-12. Coarsening relieves that too.
+hex_width_m: 150.0
 hex_padding: 2
 # 260 -> 350: at 260 the reachable rows stopped at +/-259.8 and HALF of all
 # generated landmarks already sat outside the corridor entirely (measured over

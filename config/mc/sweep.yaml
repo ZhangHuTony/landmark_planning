@@ -23,12 +23,48 @@
 # it toward the total silently shrank the sample (sweep 2026-08-10_18-17-16 asked
 # for 50 and measured 42). Rejected draws are still recorded in scenarios.csv
 # with empty L_ref/U_ref, so a resume skips them instead of retrying.
-n_scenarios: 100
+n_scenarios: 30
 scenario_seed_base: 1067
 # Runaway guard for that loop: if references keep failing, stop here rather than
 # drawing forever. Hit only when the geometry ranges make most scenarios
 # unsolvable, which is itself the thing worth knowing.
 max_scenario_draws: 200
+
+# ── Trivial-scenario screen ──────────────────────────────────────────────────
+# Reject a drawn scenario when the straight-line continuous planner ALREADY meets
+# the loosest rung of the ladder (pct_start). Such a scenario poses no
+# localization problem at its top rung: every method scores a free pass, and the
+# pct=100 row measures nothing. Measured on sweep 2026-08-12_13-51-20, 8 of 30
+# scenarios (27%) were trivial in exactly this sense, and straight_cont's own
+# 8/30 success at pct=100 IS that count.
+#
+# OFF by default, and the default matters:
+#   BASELINE comparisons (hexspline_cl vs sequential/greedy/formation/clgbt) want
+#     this ON. The claim under test is "coordinated planning beats decomposed
+#     planning", which is only meaningful where coordination is needed at all;
+#     scenarios the straight line solves dilute every mean toward 1.0 and cost
+#     wall clock to prove nothing.
+#   ABLATIONS (hexspline_cl vs straight_cont vs discrete_only) want this OFF, and
+#     must keep it off. They measure what each STAGE of the pipeline contributes,
+#     so the population has to be the unconditioned draw — screening on
+#     straight_cont's outcome conditions the sample on the very quantity the
+#     ablation reports, and would pin its success rate to 0 by construction.
+# Flipping this changes which scenarios exist, so screened and unscreened sweeps
+# are not comparable and must not be pooled.
+#
+# Cost: one extra ~18 s subprocess per DRAW (recorded under <sweep>/screen/<sid>/).
+# Rejected draws keep their scenarios.csv row — L_ref/U_ref intact, with
+# reject_reason=trivial_straight — so the rejection is auditable and a resume
+# skips it instead of re-running it. They do not count toward n_scenarios, so the
+# sweep simply draws further down the seed sequence to reach it; budget more draws
+# via max_scenario_draws accordingly (~1.4x at the 27% rate above).
+#
+# Leaving straight_cont in `methods` while this is ON is redundant but harmless:
+# every surviving scenario is one it just failed, so its rows come back 0/n.
+reject_trivial_straight: false
+# The screen itself, in the same label@key=value grammar as `methods`. Points at a
+# planner and the config overrides it runs under; only its success/failure is read.
+reject_trivial_spec: straight_cont@algorithms=straight_cont,num_agents=2
 
 # Random scenario ranges (see generate_scenario in src/scenario_generation.jl).
 # goal_dist drives cost hardest: hex columns grow linearly with it, the graph
@@ -64,7 +100,7 @@ n_obstacles_max: 5
 # still run and still logged, so the failure tail is never silently truncated.
 # Set 0 to always walk the full ladder.
 pct_start: 100
-pct_step: 5
+pct_step: 10
 # Floor at 30, not 50: the interesting number is where each method finally gives
 # out, and pct_patience already stops a scenario two levels after everything
 # fails — so a deeper floor costs nothing on the easy scenarios and buys
@@ -97,7 +133,7 @@ method_patience: 1
 # name with no @ means "that algorithm at the base config's defaults".
 # Adding a future baseline is a line here — the harness contains no
 # algorithm-specific logic whatsoever.
-methods: hexspline_cl@algorithms=hexspline_cl,num_agents=2 | straight_cont@algorithms=straight_cont,num_agents=2 | discrete_only@algorithms=discrete_only,num_agents=2 | greedy@algorithms=greedy,num_agents=2 | formation@algorithms=formation,num_agents=2 | sequential@algorithms=sequential,num_agents=2
+methods: hexspline_cl@algorithms=hexspline_cl,num_agents=2 | straight_cont@algorithms=straight_cont,num_agents=2 | discrete_only@algorithms=discrete_only,num_agents=2 | greedy@algorithms=greedy,num_agents=2 | formation@algorithms=formation,num_agents=2 | sequential@algorithms=sequential,num_agents=2 | clgbt@algorithms=clgbt,num_agents=2
 # other baselines, ready to uncomment (append with a leading `|` on the line above):
 #   discrete_only@algorithms=discrete_only,num_agents=2
 #   straight_line@algorithms=straight_line,num_agents=2
@@ -106,7 +142,7 @@ methods: hexspline_cl@algorithms=hexspline_cl,num_agents=2 | straight_cont@algor
 # Debugging: keep the per-run figures / CSVs for every scenario at every
 # constraint level, under <sweep>/<label>/<scenario>_p<pct>/. Off by default —
 # a 20-scenario sweep is several hundred runs and thousands of PNGs.
-save_figures: false
+save_figures: true
 save_csv: false
 
 # Hard wall-clock kill per subprocess. A killed run is recorded as a
@@ -115,7 +151,11 @@ run_timeout_s: 900
 
 # Methods within one constraint level run concurrently (levels stay sequential
 # because the early stop depends on their outcome), so the useful ceiling is
-# the number of methods.
-workers: 4
+# the number of methods (7). Each subprocess is a single-threaded, CPU-bound
+# Julia process; set to the physical core count of the machine this is run on
+# (6-core/12-thread AMD Ryzen 5 5600X, 32GB RAM here) rather than the thread
+# count, to avoid oversubscription contention on numerical work. Re-tune this
+# on a different machine.
+workers: 6
 
 outroot: constraint_sweep

@@ -89,13 +89,21 @@ const ROOT  = joinpath(_ROOT, String(SWEEP["outroot"]), TAG)
 # depends on their outcome), so this only ever throttles methods within a level.
 const SLOTS = Base.Semaphore(max(1, Int(SWEEP["workers"])))
 
-# Categorical series colors, fixed order, never cycled: slots 1-5 of a palette
-# validated for colorblind separation (worst adjacent CVD ΔE 9.1, normal-vision
-# 19.6). Three of these sit under 3:1 against a light surface, which obliges a
-# non-color reading of the same data — summary.csv / SUMMARY.md are it. Marker
-# shape is a second, redundant encoding so identity is never color-alone.
-const SERIES_COLORS  = ["#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4"]
-const SERIES_MARKERS = [:circle, :rect, :diamond, :utriangle, :star5]
+# Categorical series colors, fixed order, never cycled: all 8 slots of a
+# palette validated for colorblind separation (worst adjacent CVD ΔE 9.1,
+# normal-vision 19.6 — unchanged from the prior 5-slot cut; the worst-adjacent
+# pairs both fall inside slots 1-5). Three of these sit under 3:1 against a
+# light surface, which obliges a non-color reading of the same data —
+# summary.csv / SUMMARY.md are it. Marker shape is a second, redundant
+# encoding so identity is never color-alone. 8 slots covers hexspline_cl,
+# straight_cont, discrete_only, greedy, formation, sequential, clgbt with one
+# spare; a 9th method cycles back to slot 1 (mod1 below) rather than erroring,
+# but at that point it should get its own 9th slot instead — a cycled color
+# silently makes two series indistinguishable in the plot, which is what
+# happened to sequential/clgbt against hexspline_cl/straight_cont before this
+# was extended from 5 to 8.
+const SERIES_COLORS  = ["#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#008300", "#4a3aa7", "#e34948"]
+const SERIES_MARKERS = [:circle, :rect, :diamond, :utriangle, :star5, :dtriangle, :pentagon, :cross]
 
 # ==========================================================================
 # Methods:  "label@key=value,key=value | label@..."  (bare "algo" also works)
@@ -135,6 +143,15 @@ end
 
 const METHODS = parse_methods(String(SWEEP["methods"]))
 
+# Trivial-scenario screen. OFF by default, so an ablation sweep draws exactly the
+# population it always did — see reject_trivial_straight in sweep.yaml for why
+# baselines and ablations want different populations.
+const REJECT_TRIVIAL = Bool(get(SWEEP, "reject_trivial_straight", false))
+# Reuses the METHODS grammar so the screen is configured the same way a method is,
+# and so it can be pointed at a different planner without touching this file.
+const SCREEN = first(parse_methods(String(get(SWEEP, "reject_trivial_spec",
+                     "straight_cont@algorithms=straight_cont,num_agents=2"))))
+
 # ==========================================================================
 # Config generation: copy config/mc/*.yaml (minus sweep.yaml), patch overrides
 # ==========================================================================
@@ -145,7 +162,10 @@ const METHODS = parse_methods(String(SWEEP["methods"]))
 # shared-key warning. Keys defined nowhere are appended to main.yaml.
 function write_run_config(dest::String, overrides::Dict{String,String})
     mkpath(dest)
-    files = sort(filter(f -> endswith(f, ".yaml") && f != "sweep.yaml", readdir(MC_CONFIG_DIR)))
+    # Any sweep_*.yaml is harness config, never planner config: load_config only ever
+    # reads main.yaml plus <algorithm>.yaml, so copying one in is inert rather than
+    # wrong — but it lands in every run's _cfg/ and reads like it was used.
+    files = sort(filter(f -> endswith(f, ".yaml") && !startswith(f, "sweep"), readdir(MC_CONFIG_DIR)))
     contents = Dict(f => readlines(joinpath(MC_CONFIG_DIR, f)) for f in files)
     for (k, v) in overrides
         placed = false
@@ -487,6 +507,12 @@ function main()
             ref = scen_done[sid]
             L_ref = tryparse(Float64, ref["L_ref"]); U_ref = tryparse(Float64, ref["U_ref"])
             (L_ref === nothing || U_ref === nothing) && (say("  $(sid): previously rejected, skipping"); continue)
+            # A scenario the screen threw out has a perfectly good L_ref/U_ref, so the
+            # empty-L_ref test above cannot see it — it needs its own column. Absent on
+            # sweeps written before the screen existed, which is exactly right: they
+            # were never screened, so nothing was rejected for this reason.
+            rr = get(ref, "reject_reason", "")
+            isempty(rr) || (say("  $(sid): previously rejected ($(rr)), skipping"); continue)
             # Sweeps written before wall_ref existed have no such column; a missing
             # value disables the ratio for that scenario instead of erroring.
             wall_ref = something(tryparse(Float64, get(ref, "wall_ref", "")), NaN)
@@ -531,13 +557,46 @@ function main()
             push!(scen_rows, row)
             write_table(joinpath(ROOT, "scenarios.csv"), scen_rows,
                         ["scenario_id","seed","goal_dist","n_landmarks","n_obstacles",
-                         "L_ref","U_ref","U_ref_cont","wall_ref"])
+                         "L_ref","U_ref","U_ref_cont","wall_ref","reject_reason"])
             if L_ref === nothing || U_ref === nothing || !isfinite(L_ref) || !isfinite(U_ref) || U_ref <= 0
                 # No shortest path ⇒ nothing to normalise against. Recorded with
                 # empty L_ref/U_ref so a resume skips it instead of retrying.
                 say("  $(sid): REFERENCE FAILED (rc=$(r.rc) killed=$(r.killed)) — " *
                     "scenario skipped, does NOT count toward n_scenarios")
                 continue
+            end
+            # ── Trivial-scenario screen (baseline comparisons only) ──
+            # Screened at pcts[1], the LOOSEST rung the ladder will ever apply: if the
+            # straight line already clears that, the scenario hands every method a free
+            # pass at the top of its ladder and measures no coordination at all.
+            # Rejected draws keep their scenarios.csv row (with L_ref/U_ref intact, so
+            # the rejection is auditable and a resume can skip it) but do not count
+            # toward n_scenarios.
+            if REJECT_TRIVIAL
+                sthr = pcts[1] / 100 * U_ref
+                sdir = joinpath(ROOT, "screen", sid)
+                sov  = merge(base, SCREEN.overrides,
+                             Dict("unc_radius_threshold" => @sprintf("%.10g", sthr),
+                                  "emit_figures" => string(save_figs), "emit_csv" => string(save_csv)))
+                write_run_config(joinpath(sdir, "_cfg"), sov)
+                sr = run_one(joinpath(sdir, "_cfg"), sdir, joinpath(sdir, "run.log"), timeout)
+                flatten_algo_dir!(sdir, SCREEN.algorithm)
+                sres = parse_results_yaml(joinpath(sdir, "results.yaml"))
+                slog = isfile(joinpath(sdir, "run.log")) ? read(joinpath(sdir, "run.log"), String) : ""
+                sok, swhy = classify(sr, sres, slog, sthr)
+                sL = getnum(sres, "primary_length"); sU = getnum(sres, "primary_unc")
+                if sok
+                    row["reject_reason"] = "trivial_straight"
+                    write_table(joinpath(ROOT, "scenarios.csv"), scen_rows,
+                                ["scenario_id","seed","goal_dist","n_landmarks","n_obstacles",
+                                 "L_ref","U_ref","U_ref_cont","wall_ref","reject_reason"])
+                    say("  $(sid): TRIVIAL — $(SCREEN.label) already meets the $(pcts[1])% bound " *
+                        "(unc $(sU === nothing ? "?" : round(sU,digits=3)) <= $(round(sthr,digits=3)), " *
+                        "len $(sL === nothing ? "?" : round(sL,digits=1))) — rejected, does NOT " *
+                        "count toward n_scenarios  ($(round(sr.wall,digits=1))s)")
+                    continue
+                end
+                say("  $(sid): screen ok — $(SCREEN.label) fails the $(pcts[1])% bound ($(swhy))")
             end
             accepted += 1
             say("  $(sid): D=$(Int(p.D)) L=$(p.nl) O=$(p.no)  L_ref=$(round(L_ref,digits=1)) " *

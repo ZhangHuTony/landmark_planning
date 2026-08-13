@@ -45,7 +45,8 @@ const PLANNER_ENGINE = Dict("straight_cont" => "hexspline_cl",
                             "discrete_only" => "hexspline_cl",
                             "greedy"        => "hexspline_cl",
                             "formation"     => "hexspline_cl",
-                            "sequential"    => "hexspline_cl")
+                            "sequential"    => "hexspline_cl",
+                            "clgbt"         => "hexspline_cl")
 engine_of(algo) = get(PLANNER_ENGINE, String(algo), String(algo))
 
 # Reads config/main.yaml, then merges config/<algo>.yaml for each algorithm
