@@ -8,45 +8,96 @@
 #
 # What is and is not ported, and why: see the header of planners/clgbt.jl.
 # Short version — the TREE-GROWTH STRATEGY is ported (joint-state tree,
-# nearest-neighbor steering, goal-biased and besties-biased sampling); the
-# original's own Sigma/Lambda belief propagation and linear Cprop/Ccl
-# measurement model are NOT — this baseline uses the SAME landmark/comm
-# covariance model (src/covariance.jl) every other planner in this repo uses,
-# so the comparison isolates "sampling-based tree growth" vs "combinatorial
-# joint A*" under identical uncertainty semantics, not a different physics.
+# nearest-neighbor steering, goal-biased and besties-biased sampling, one
+# constant control per extension); the original's own Sigma/Lambda belief
+# propagation and linear Cprop/Ccl measurement model are NOT — this baseline
+# uses the SAME landmark/comm covariance model (src/covariance.jl) every other
+# planner in this repo uses, so the comparison isolates "sampling-based tree
+# growth" vs "combinatorial joint A*" under identical uncertainty semantics,
+# not a different physics.
+#
+# The tree lives in CONTINUOUS R², as the original's does. It used to sample hex
+# graph node indices and steer along graph edges, which handed it the joint A*'s
+# own discretization and so confounded the single variable this baseline exists
+# to isolate. The hex graph is still built (every other planner needs it) but
+# clgbt now reads only two things off it: the corridor extents it samples in, so
+# both arms search the same region, and the goal point.
 
 # Search budget: cap on RRT iterations (one joint-tree sample-and-extend
 # attempt each, successful or not). Nearest-neighbor here is a LINEAR SCAN
 # over existing tree nodes (no KD-tree/GNAT, matching this baseline's spirit
 # of a small, reviewable port rather than reproducing the original's
 # NearestNeighborsKD infrastructure) — cost is O(iterations^2), so this is
-# deliberately much smaller than astar_iteration_limit. Raise it for scenarios
-# that need a bigger tree; lower it if runs get slow on large graphs.
+# deliberately much smaller than astar_iteration_limit.
+#
+# Left at 3000: the continuous tree reaches the goal FAR sooner than the hex one
+# did (`clustered` solves in 59 iterations; the hex version found nothing there
+# in 3000, tree size 2872 — see notes/LOGS.md), so the budget now binds only on
+# scenarios that are hard for structural reasons, where more of it does not
+# help: behind_wall still finds nothing at 12,000 (tree size 9,450, 79% of
+# extensions accepted, so the search is healthy — it just cannot place the
+# helper usefully behind the wall).
 clgbt_max_iterations: 3000
 
-# Probability a sampled joint target aims the PRIMARY directly at a
-# goal-adjacent cell instead of a uniformly random routing node. Mirrors the
-# original's [Planner] goal_bias.
+# Arc length of ONE propagation step, and the spacing of the waypoints handed to
+# the refiner.
+#
+# NOT a free resolution knob. The covariance model fuses landmarks once per
+# waypoint (src/covariance.jl, advance_to_arc!), so halving this doubles the
+# number of landmark updates along the same geometry and quietly gives clgbt a
+# better sensor model than every other planner — the measured physics changes,
+# not just the path smoothness. The default is HEX_WIDTH_M, the hex
+# centre-to-centre spacing, which is exactly the fusion cadence the graph
+# planners get; planners/clgbt.jl warns if you change it.
+#
+# Left UNSET on purpose so it tracks hex_width_m automatically — pinning a
+# number here would silently decouple the two the next time hex_width_m moves
+# (config/mc/main.yaml already runs at 150).
+# clgbt_step_m: 100.0
+
+# How close the primary must come to the goal before the goal is pinned onto its
+# path as a final waypoint. The uncertainty threshold is then certified at that
+# pinned point, i.e. on the trajectory actually shipped. (The hex version tested
+# a goal-ADJACENT cell centre and then let seed_control_points move that control
+# point to the true goal, leaving the last stretch uncertified — the same gap
+# run_constraint_sweep.jl:428-432 documents for the discrete planners.)
+# Defaults to clgbt_step_m; left unset for the same reason.
+# clgbt_goal_radius_m: 100.0
+
+# Reject any branch whose primary arc exceeds this multiple of the straight-line
+# start→goal distance. The hex version bounded branch depth implicitly — its
+# per-agent `visited` set plus out-degree 3 strangled long wandering branches —
+# and in open R² nothing does, while cost per extension is linear in depth.
+clgbt_max_path_factor: 3.0
+
+# Probability a sampled joint target aims the PRIMARY directly at the goal
+# instead of a uniformly random point in the corridor. Mirrors the original's
+# [Planner] goal_bias.
 clgbt_goal_bias: 0.1
 
 # Probability each SUPPORT's sampled target is snapped to the primary's own
 # sampled target, instead of drawn independently. Mirrors the original's
 # besties_bias with besties_bias_type=0 ("replicate one robot's coords onto
-# all robots") — the type-1 annulus variant is not ported (it leans on a
-# continuous state space; there is no clean analogue over discrete graph
-# nodes). Defaulted well above the original's own shipped default (mostly 0
-# across their configs) because a support that samples fully independently of
+# all robots"). Defaulted well above the original's own shipped default (mostly
+# 0 across their configs) because a support that samples fully independently of
 # the primary rarely ends up somewhere useful for localization, and this is
 # the only mechanism this port has for "helper stays near primary" — without
 # it the baseline mostly fails to find a feasible tree at all.
+#
+# Their type-1 annulus variant ("sample in a ring around another robot") is
+# still not ported, but it is no longer INEXPRESSIBLE the way it was over
+# discrete graph nodes — the state space is continuous now, so it is a genuine
+# option if this bias ever proves too blunt.
 clgbt_besties_bias: 0.5
 
 # Each successful RRT extension advances EVERY agent, jointly, by a number of
-# single hex-graph edges sampled uniformly from 1:clgbt_extend_steps -- mirrors
+# steps of clgbt_step_m sampled uniformly from 1:clgbt_extend_steps -- mirrors
 # the original's controlDur (a random integration-step count per propagated
-# edge). All agents in one extension take the SAME number of steps (their
-# joint control/duration is shared, exactly as in the original's stacked
-# propagation), so support and primary path lengths never need reconciling.
+# edge). All agents in one extension take the SAME number of steps AND hold a
+# single constant heading throughout it (their joint control/duration is shared,
+# exactly as in the original's stacked propagation), so an agent's contribution
+# to one extension is a straight segment and support and primary path lengths
+# never need reconciling.
 # The whole extension is discarded (no tree node added) if any single step is
 # infeasible for any agent, mirroring the original's `propCd == cd` check —
 # a partial-duration propagation is not kept as a partial motion.
@@ -58,3 +109,12 @@ clgbt_extend_steps: 3
 # discrete seed is randomized rather than deterministic; fixing this pins that
 # randomness so a run is reproducible.
 clgbt_seed: 42
+
+# NOTE — there is deliberately no `clgbt_max_turn` key. The per-step heading cap
+# is DERIVED at load time in planners/clgbt.jl by bisecting on the repo's own
+# spline sampler for the largest turn whose B-spline still satisfies
+# κ ≤ 1/min_turn_radius_m (~85° at the defaults). The circular-arc relation
+# Δθ = step/radius is the wrong bound — it permits 143°, which measures
+# max|κ| = 0.19 against a 0.025 limit, and the barrier then burns its whole
+# budget recovering feasibility instead of shortening. Change min_turn_radius_m
+# or clgbt_step_m and the cap follows automatically.
