@@ -30,14 +30,36 @@
 # NearestNeighborsKD infrastructure) — cost is O(iterations^2), so this is
 # deliberately much smaller than astar_iteration_limit.
 #
-# Left at 3000: the continuous tree reaches the goal FAR sooner than the hex one
-# did (`clustered` solves in 59 iterations; the hex version found nothing there
-# in 3000, tree size 2872 — see notes/LOGS.md), so the budget now binds only on
-# scenarios that are hard for structural reasons, where more of it does not
-# help: behind_wall still finds nothing at 12,000 (tree size 9,450, 79% of
-# extensions accepted, so the search is healthy — it just cannot place the
-# helper usefully behind the wall).
-clgbt_max_iterations: 3000
+# SET FOR COMPUTE PARITY WITH hexspline_cl, not for count parity. An A* expansion
+# and an RRT iteration are not the same unit of work — measured on this machine,
+# an expansion costs 521.7us and an iteration 38-395us — so matching the two
+# COUNTS would match neither work nor time. At the old 3000 the two budgets were:
+#
+#   hexspline_cl  1,600,000 expansions x 521.7us  = ~835 s
+#   clgbt             3,000 iterations x  43.4us  = ~0.13 s     (a ~6400x gap)
+#
+# Cost is quadratic in the cap because nearest-neighbour is a LINEAR SCAN over the
+# tree (no KD-tree/GNAT — this baseline stays a small reviewable port rather than
+# reproducing the original's NearestNeighborsKD infrastructure). Fitting t = c*cap^2
+# on a behind_wall run that reaches the cap (30,000 iters -> 23,441 nodes -> 12.07 s,
+# c = 1.34e-8):
+#
+#   cap          est time   est tree   retained mem
+#   100,000        134 s       78k        0.05 GB
+#   250,000        838 s      195k        0.12 GB   <- matches the ~835 s above
+#   1,600,000      9.5 h     1,250k       0.82 GB   <- count parity, not affordable
+#
+# So 250,000 buys clgbt the same SECONDS hexspline_cl gets. Memory is not the
+# constraint (656 B/node retained); the linear scan is. Count parity would need a
+# sub-quadratic nearest-neighbour index first.
+#
+# In practice the cap now rarely binds — the continuous tree reaches the goal far
+# sooner than the hex one did (`clustered` solves in 59 iterations; the hex version
+# found nothing there in 3000, tree size 2872 — see notes/LOGS.md). It binds only on
+# scenarios that are hard for structural reasons, where more budget does not help:
+# behind_wall finds nothing at 12,000 either (tree 9,450, 79% of extensions accepted,
+# so the search is healthy — it just cannot place the helper usefully behind the wall).
+clgbt_max_iterations: 250000
 
 # Arc length of ONE propagation step, and the spacing of the waypoints handed to
 # the refiner.

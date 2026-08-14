@@ -32,24 +32,47 @@
 # NearestNeighborsKD infrastructure) — cost is O(iterations^2), so this is
 # deliberately much smaller than astar_iteration_limit.
 #
-# 30000 for the sweep. The calibration table that justified this number was
-# measured on the HEX version and is now STALE: the continuous tree accepts far
-# more of its extensions (79% on behind_wall vs the hex version's ~76%, but
-# reaching much deeper per branch), so both tree growth per iteration and cost
-# per iteration have moved. What has NOT changed is the conclusion that bought
-# this number -- a genuinely hard scenario found no solution at any cap up to
-# 100,000 -- so it is kept as a generous ceiling pending a re-measurement.
-# The old table, for reference (hex version, hard 700m/4-landmark/5-obstacle
-# scenario, search loop only):
-#   cap        tree size   wall time
-#   3,000      2,273       0.3s
-#   10,000     7,599       2.0s
-#   30,000     22,731      13.6s
-#   60,000     45,260      54.0s
-#   100,000    75,487      164.9s
-# Confirms the O(n^2) scan: doubling the cap roughly quadruples cost.
-# Re-calibrate if the scenario band (goal_dist / corridor width) changes.
-clgbt_max_iterations: 30000
+# SET FOR COMPUTE PARITY WITH hexspline_cl, not for count parity. An A* expansion
+# and an RRT iteration are not the same unit of work — measured on this machine,
+# an expansion costs 521.7us and an iteration 38-395us — so matching the two
+# COUNTS would match neither work nor time. At the old 3000 the two budgets were:
+#
+#   hexspline_cl  1,600,000 expansions x 521.7us  = ~835 s
+#   clgbt             3,000 iterations x  43.4us  = ~0.13 s     (a ~6400x gap)
+#
+# Cost is quadratic in the cap because nearest-neighbour is a LINEAR SCAN over the
+# tree (no KD-tree/GNAT — this baseline stays a small reviewable port rather than
+# reproducing the original's NearestNeighborsKD infrastructure). Fitting t = c*cap^2
+# on a behind_wall run that reaches the cap (30,000 iters -> 23,441 nodes -> 12.07 s,
+# c = 1.34e-8):
+#
+#   cap          est time   est tree   retained mem
+#   100,000        134 s       78k        0.05 GB
+#   250,000        838 s      195k        0.12 GB   <- matches the ~835 s above
+#   1,600,000      9.5 h     1,250k       0.82 GB   <- count parity, not affordable
+#
+# So 250,000 buys clgbt the same SECONDS hexspline_cl gets. Memory is not the
+# constraint (656 B/node retained); the linear scan is. Count parity would need a
+# sub-quadratic nearest-neighbour index first.
+#
+# THIS SWEEP COPY: astar_iteration_limit is 1,000,000 here (config/mc/hexspline_cl.yaml),
+# so hexspline_cl's ceiling is ~522 s and the parity cap is sqrt(522/1.34e-8) ~= 197k,
+# rounded to 200,000. c was measured under config/ (150 m steps here vs 100 m) but it
+# transfers: at these tree sizes the O(n^2) scan dominates utterly -- 23k nodes is
+# ~5.5e8 hypot calls, i.e. essentially the whole 12.07 s -- and that term depends on
+# tree size and agent count, not on the mesh. The step size only moves the
+# non-dominant evaluate_joint_discrete term, and moves it DOWN (fewer waypoints per
+# metre), so 200,000 is if anything conservative.
+#
+# Note run_timeout_s in the sweep configs was raised 900 -> 1200 alongside this: at
+# 900 s neither method could actually spend its documented budget once refinement is
+# added, which would have turned budget-exhaustion failures into timeout failures.
+#
+# In practice the cap rarely binds under this config -- every preset scenario now
+# solves (maze 57 iters, gauntlet 46, shoreline 41, clustered 176, dual 300,
+# long_sparse 1063, single 2318, two_routes 2721). It binds on the tightened
+# thresholds the ladder imposes, which is exactly where the budget should matter.
+clgbt_max_iterations: 200000
 
 # Arc length of ONE propagation step, and the spacing of the waypoints handed to
 # the refiner.

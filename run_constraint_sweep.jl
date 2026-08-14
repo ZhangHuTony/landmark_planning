@@ -294,6 +294,37 @@ function write_table(path::String, rows::Vector{Dict{String,String}}, core::Vect
     end
 end
 
+# One cross-planner file of the RAW per-trial numbers, for plotting outside this
+# script: constraint level, whether it solved, how long the primary path came out,
+# and how long it took. One row per (method, scenario, pct). No averaging —
+# summary.csv is where the aggregates live, and this deliberately duplicates data
+# that is already in the per-method trials.csv files, purely so all five planners
+# can be read from one file.
+#
+# Rows are projected onto a FIXED column set before write_table sees them: that
+# function appends the sorted union of every extra results.yaml key, which would
+# otherwise splice astar_iterations / clgbt_iterations / formation_offsets in as
+# sparse columns. Each method's own trials.csv still carries all of those.
+#
+# `fail_reason` is carried because not every false row is a failed SEARCH: the two
+# early stops write bookkeeping rows for levels never attempted
+# (`not_run_after_fail`, `not_run_below_stop`, both `wall_s = 0.0`). Counting
+# those as failures is the intended success-rate semantics — summarize() does the
+# same — but timing or per-level plots need to tell them apart.
+const ALL_TRIAL_COLS = ["method", "scenario_id", "pct", "threshold", "success",
+                        "fail_reason", "primary_length", "primary_unc",
+                        "length_ratio", "wall_s"]
+
+function write_all_trials(root::String, trials::Dict{String,Vector{Dict{String,String}}})
+    rows = Dict{String,String}[]
+    for m in METHODS                      # METHODS order, so row order is deterministic
+        for r in trials[m.label]
+            push!(rows, Dict(c => get(r, c, "") for c in ALL_TRIAL_COLS))
+        end
+    end
+    write_table(joinpath(root, "trials_all.csv"), rows, ALL_TRIAL_COLS)
+end
+
 function read_table(path::String)
     rows = Dict{String,String}[]
     isfile(path) || return rows
@@ -655,6 +686,7 @@ function main()
                         push!(done[m.label], (sid, string(pct)))
                         outcomes[m.label] = ok
                         write_table(joinpath(ROOT, m.label, "trials.csv"), trials[m.label], CORE_COLS)
+                        write_all_trials(ROOT, trials)
                         say("    $(sid) p$(pct)  $(rpad(m.label,16))  " *
                             (ok ? "ok   ratio=$(row["length_ratio"])" : "FAIL $(why)") *
                             "   $(row["wall_s"])s")
@@ -691,6 +723,7 @@ function main()
                     end
                     if newly > 0
                         write_table(joinpath(ROOT, m.label, "trials.csv"), trials[m.label], CORE_COLS)
+                        write_all_trials(ROOT, trials)
                         say("    $(sid): $(m.label) failed $(consec_fail[m.label])x in a row " *
                             "(through $(pct)%) — dropped, $(newly) stricter level(s) recorded unrun")
                     end
@@ -725,6 +758,7 @@ function main()
                 for m in METHODS
                     write_table(joinpath(ROOT, m.label, "trials.csv"), trials[m.label], CORE_COLS)
                 end
+                write_all_trials(ROOT, trials)
                 break
             end
         end

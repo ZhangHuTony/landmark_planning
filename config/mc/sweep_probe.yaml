@@ -1,4 +1,11 @@
 # ==========================================================================
+# PROBE sweep — the unit of measurement for the Phase-1 A* pruning arms.
+# Not a result in itself: 8 scenarios, 2 methods, ladder 100->50, screen OFF, so
+# arms stay comparable to each other. Deliberately small enough to run one arm in
+# ~10 min. The reportable numbers come from config/mc/sweep.yaml.
+#   julia run_constraint_sweep.jl --sweep config/mc/sweep_probe.yaml --tag probe_A<N>
+# ==========================================================================
+# ==========================================================================
 # Constraint-sweep knobs — read ONLY by run_constraint_sweep.jl
 # ==========================================================================
 # Never merged into any planner's CFG: load_config merges main.yaml plus
@@ -23,15 +30,12 @@
 # it toward the total silently shrank the sample (sweep 2026-08-10_18-17-16 asked
 # for 50 and measured 42). Rejected draws are still recorded in scenarios.csv
 # with empty L_ref/U_ref, so a resume skips them instead of retrying.
-n_scenarios: 30
+n_scenarios: 8
 scenario_seed_base: 1067
 # Runaway guard for that loop: if references keep failing, stop here rather than
 # drawing forever. Hit only when the geometry ranges make most scenarios
 # unsolvable, which is itself the thing worth knowing.
-# 200 -> 300: with reject_trivial_straight ON, ~27% of draws are discarded (the
-# measured trivial rate on sweep 2026-08-12_13-51-20), so reaching n_scenarios walks
-# ~1.4x further down the seed sequence.
-max_scenario_draws: 300
+max_scenario_draws: 200
 
 # ── Trivial-scenario screen ──────────────────────────────────────────────────
 # Reject a drawn scenario when the straight-line continuous planner ALREADY meets
@@ -64,12 +68,7 @@ max_scenario_draws: 300
 #
 # Leaving straight_cont in `methods` while this is ON is redundant but harmless:
 # every surviving scenario is one it just failed, so its rows come back 0/n.
-# ON as of 2026-08-13: this file is now the BASELINE comparison (hexspline_cl vs
-# sequential/greedy/formation/clgbt), which is exactly the case the reasoning above
-# says wants the screen. The two ablations that need it OFF moved to
-# sweep_ablation.yaml. Screened and unscreened sweeps are NOT comparable — in
-# particular nothing here pools with constraint_sweep/2026-08-12_13-51-20_RECOVERED.
-reject_trivial_straight: true
+reject_trivial_straight: false
 # The screen itself, in the same label@key=value grammar as `methods`. Points at a
 # planner and the config overrides it runs under; only its success/failure is read.
 reject_trivial_spec: straight_cont@algorithms=straight_cont,num_agents=2
@@ -125,7 +124,7 @@ pct_step: 10
 # resolution on the hard ones. Levels above the binding point are cheap anyway
 # (a slack constraint is found in ~900 A* expansions, ~21 s); they flatten the
 # top of the curve, which is the honest shape.
-pct_floor: 30
+pct_floor: 50
 pct_patience: 1
 # Per-METHOD early stop: after this many CONSECUTIVE failures, a method stops
 # being retried at stricter levels for that scenario, even while other methods
@@ -151,11 +150,7 @@ method_patience: 1
 # name with no @ means "that algorithm at the base config's defaults".
 # Adding a future baseline is a line here — the harness contains no
 # algorithm-specific logic whatsoever.
-# BASELINE COMPARISON, 5 methods. straight_cont / discrete_only are ABLATIONS of
-# hexspline_cl itself, not competing planners; they moved to sweep_ablation.yaml so
-# they can keep reject_trivial_straight OFF (screening on straight_cont's own outcome
-# would pin its success rate to 0 by construction) and get their own figure.
-methods: hexspline_cl@algorithms=hexspline_cl,num_agents=2 | greedy@algorithms=greedy,num_agents=2 | formation@algorithms=formation,num_agents=2 | sequential@algorithms=sequential,num_agents=2 | clgbt@algorithms=clgbt,num_agents=2
+methods: hexspline_cl@algorithms=hexspline_cl,num_agents=2 | sequential@algorithms=sequential,num_agents=2 | clgbt@algorithms=clgbt,num_agents=2
 # other baselines, ready to uncomment (append with a leading `|` on the line above):
 #   discrete_only@algorithms=discrete_only,num_agents=2
 #   straight_line@algorithms=straight_line,num_agents=2
@@ -164,7 +159,7 @@ methods: hexspline_cl@algorithms=hexspline_cl,num_agents=2 | greedy@algorithms=g
 # Debugging: keep the per-run figures / CSVs for every scenario at every
 # constraint level, under <sweep>/<label>/<scenario>_p<pct>/. Off by default —
 # a 20-scenario sweep is several hundred runs and thousands of PNGs.
-save_figures: true
+save_figures: false
 save_csv: false
 
 # Hard wall-clock kill per subprocess. A killed run is recorded as a

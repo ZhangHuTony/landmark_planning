@@ -1,4 +1,16 @@
 # ==========================================================================
+# ABLATION sweep — what each STAGE of the hexspline_cl pipeline contributes.
+#   hexspline_cl   discrete joint A* seed + continuous B-spline refinement
+#   straight_cont  straight-line seed + the SAME refinement (isolates the seed)
+#   discrete_only  the A* seed, shipped without refinement
+# Its own figure; NOT pooled with the baseline sweep in sweep.yaml.
+#
+# reject_trivial_straight MUST stay false here — see the note on it below. The
+# screen conditions on straight_cont's own outcome, which is the quantity this
+# sweep reports, and would pin its success rate to 0 by construction.
+#   julia run_constraint_sweep.jl --sweep config/mc/sweep_ablation.yaml --tag ablation_<date>
+# ==========================================================================
+# ==========================================================================
 # Constraint-sweep knobs — read ONLY by run_constraint_sweep.jl
 # ==========================================================================
 # Never merged into any planner's CFG: load_config merges main.yaml plus
@@ -69,7 +81,7 @@ max_scenario_draws: 300
 # says wants the screen. The two ablations that need it OFF moved to
 # sweep_ablation.yaml. Screened and unscreened sweeps are NOT comparable — in
 # particular nothing here pools with constraint_sweep/2026-08-12_13-51-20_RECOVERED.
-reject_trivial_straight: true
+reject_trivial_straight: false
 # The screen itself, in the same label@key=value grammar as `methods`. Points at a
 # planner and the config overrides it runs under; only its success/failure is read.
 reject_trivial_spec: straight_cont@algorithms=straight_cont,num_agents=2
@@ -155,7 +167,7 @@ method_patience: 1
 # hexspline_cl itself, not competing planners; they moved to sweep_ablation.yaml so
 # they can keep reject_trivial_straight OFF (screening on straight_cont's own outcome
 # would pin its success rate to 0 by construction) and get their own figure.
-methods: hexspline_cl@algorithms=hexspline_cl,num_agents=2 | greedy@algorithms=greedy,num_agents=2 | formation@algorithms=formation,num_agents=2 | sequential@algorithms=sequential,num_agents=2 | clgbt@algorithms=clgbt,num_agents=2
+methods: hexspline_cl@algorithms=hexspline_cl,num_agents=2 | straight_cont@algorithms=straight_cont,num_agents=2 | discrete_only@algorithms=discrete_only,num_agents=2
 # other baselines, ready to uncomment (append with a leading `|` on the line above):
 #   discrete_only@algorithms=discrete_only,num_agents=2
 #   straight_line@algorithms=straight_line,num_agents=2
