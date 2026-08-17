@@ -1,76 +1,0 @@
-Landmark scenario: random — 4 landmarks, 3 obstacles, start (0.0, 0.0) → goal (800.0, 0.0)
-Hex graph: 797 nodes (792 heading-states + 4 sensors + goal), radius=57.73502691896258m, directed_edges=2112, grid=13x15, start_cell=(1, 7), goal_cell=(9, 7), start_heading=0
-
-── FORMATION PLANNING ──
-  Primary: single-agent hexspline A* (threshold 3.458929257); supports added afterwards.
-
-  [Constraint A*] Incumbent seed at iter 91: dist=950.0, unc=3.8433 > 3.4589
-
-  [Constraint A*] Incumbent seed at iter 200: dist=986.603, unc=3.8433 > 3.4589
-
-  [Constraint A*] Incumbent seed at iter 223: dist=986.603, unc=3.8433 > 3.4589
-
-  [Constraint A*] Incumbent seed at iter 269: dist=1050.0, unc=3.8178 > 3.4589
-
-  [Constraint A*] Incumbent seed at iter 332: dist=1050.0, unc=3.8175 > 3.4589
-  [A*] iter 1000/1000000 (0.1%)  left=999000  elapsed=0.1s   
-  [Constraint A*] Incumbent seed at iter 1657: dist=1286.603, unc=3.8175 > 3.4589
-  [A*] iter 2000/1000000 (0.2%)  left=998000  elapsed=0.1s   
-  [Constraint A*] Incumbent seed at iter 2208: dist=1350.0, unc=3.8173 > 3.4589
-
-  [Constraint A*] Incumbent seed at iter 2222: dist=1350.0, unc=3.8173 > 3.4589
-  [A*] iter 3000/1000000 (0.3%)  left=997000  elapsed=0.1s     [A*] iter 4000/1000000 (0.4%)  left=996000  elapsed=0.1s   
-  [Constraint A*] Incumbent seed at iter 4927: dist=1486.603, unc=3.8173 > 3.4589
-  [A*] iter 5000/1000000 (0.5%)  left=995000  elapsed=0.1s   
-  [Constraint A*] Incumbent seed at iter 5195: dist=1550.0, unc=3.8173 > 3.4589
-  [A*] iter 6000/1000000 (0.6%)  left=994000  elapsed=0.1s     [A*] iter 7000/1000000 (0.7%)  left=993000  elapsed=0.1s     [A*] iter 8000/1000000 (0.8%)  left=992000  elapsed=0.1s     [A*] iter 9000/1000000 (0.9%)  left=991000  elapsed=0.1s     [A*] iter 10000/1000000 (1.0%)  left=990000  elapsed=0.1s     [A*] iter 11000/1000000 (1.1%)  left=989000  elapsed=0.1s     [A*] iter 12000/1000000 (1.2%)  left=988000  elapsed=0.1s     [A*] iter 13000/1000000 (1.3%)  left=987000  elapsed=0.1s     [A*] iter 14000/1000000 (1.4%)  left=986000  elapsed=0.1s     [A*] iter 15000/1000000 (1.5%)  left=985000  elapsed=0.1s     [A*] iter 16000/1000000 (1.6%)  left=984000  elapsed=0.1s     [A*] iter 17000/1000000 (1.7%)  left=983000  elapsed=0.2s     [A*] iter 18000/1000000 (1.8%)  left=982000  elapsed=0.2s     [A*] iter 19000/1000000 (1.9%)  left=981000  elapsed=0.2s     [A*] iter 20000/1000000 (2.0%)  left=980000  elapsed=0.2s     [A*] iter 21000/1000000 (2.1%)  left=979000  elapsed=0.2s     [A*] iter 22000/1000000 (2.2%)  left=978000  elapsed=0.2s     [A*] iter 23000/1000000 (2.3%)  left=977000  elapsed=0.2s     [A*] iter 24000/1000000 (2.4%)  left=976000  elapsed=0.2s     [A*] iter 25000/1000000 (2.5%)  left=975000  elapsed=0.2s     [A*] iter 26000/1000000 (2.6%)  left=974000  elapsed=0.2s     [A*] iter 27000/1000000 (2.7%)  left=973000  elapsed=0.3s     [A*] iter 28000/1000000 (2.8%)  left=972000  elapsed=0.5s     [A*] iter 29000/1000000 (2.9%)  left=971000  elapsed=0.5s     [A*] iter 30000/1000000 (3.0%)  left=970000  elapsed=0.5s     [A*] iter 31000/1000000 (3.1%)  left=969000  elapsed=0.5s     [A*] iter 32000/1000000 (3.2%)  left=968000  elapsed=0.5s     [A*] iter 33000/1000000 (3.3%)  left=967000  elapsed=0.5s     [A*] iter 34000/1000000 (3.4%)  left=966000  elapsed=0.5s     [A*] iter 35000/1000000 (3.5%)  left=965000  elapsed=0.5s     [A*] iter 36000/1000000 (3.6%)  left=964000  elapsed=0.5s     [A*] iter 37000/1000000 (3.7%)  left=963000  elapsed=0.5s     [A*] iter 38000/1000000 (3.8%)  left=962000  elapsed=0.5s     [A*] iter 39000/1000000 (3.9%)  left=961000  elapsed=0.5s     [A*] iter 40000/1000000 (4.0%)  left=960000  elapsed=0.5s     [A*] iter 41000/1000000 (4.1%)  left=959000  elapsed=0.5s     [A*] iter 42000/1000000 (4.2%)  left=958000  elapsed=0.5s     [A*] iter 43000/1000000 (4.3%)  left=957000  elapsed=0.6s     [A*] iter 44000/1000000 (4.4%)  left=956000  elapsed=0.6s     [A*] iter 45000/1000000 (4.5%)  left=955000  elapsed=0.6s     [A*] iter 46000/1000000 (4.6%)  left=954000  elapsed=0.6s     [A*] iter 47000/1000000 (4.7%)  left=953000  elapsed=0.6s     [A*] iter 48000/1000000 (4.8%)  left=952000  elapsed=0.6s     [A*] iter 49000/1000000 (4.9%)  left=951000  elapsed=0.6s     [A*] iter 50000/1000000 (5.0%)  left=950000  elapsed=0.6s     [A*] iter 51000/1000000 (5.1%)  left=949000  elapsed=0.6s     [A*] iter 52000/1000000 (5.2%)  left=948000  elapsed=0.7s     [A*] iter 53000/1000000 (5.3%)  left=947000  elapsed=0.7s     [A*] iter 54000/1000000 (5.4%)  left=946000  elapsed=0.7s     [A*] iter 55000/1000000 (5.5%)  left=945000  elapsed=0.7s     [A*] iter 56000/1000000 (5.6%)  left=944000  elapsed=0.7s     [A*] iter 57000/1000000 (5.7%)  left=943000  elapsed=0.7s     [A*] iter 58000/1000000 (5.8%)  left=942000  elapsed=0.7s     [A*] iter 59000/1000000 (5.9%)  left=941000  elapsed=0.7s     [A*] iter 60000/1000000 (6.0%)  left=940000  elapsed=0.7s     [A*] iter 61000/1000000 (6.1%)  left=939000  elapsed=0.7s     [A*] iter 62000/1000000 (6.2%)  left=938000  elapsed=0.7s     [A*] iter 63000/1000000 (6.3%)  left=937000  elapsed=0.7s     [A*] iter 64000/1000000 (6.4%)  left=936000  elapsed=0.7s     [A*] iter 65000/1000000 (6.5%)  left=935000  elapsed=0.8s     [A*] iter 66000/1000000 (6.6%)  left=934000  elapsed=0.8s     [A*] iter 67000/1000000 (6.7%)  left=933000  elapsed=0.8s     [A*] iter 68000/1000000 (6.8%)  left=932000  elapsed=0.8s     [A*] iter 69000/1000000 (6.9%)  left=931000  elapsed=0.8s     [A*] iter 70000/1000000 (7.0%)  left=930000  elapsed=0.8s     [A*] iter 71000/1000000 (7.1%)  left=929000  elapsed=0.8s     [A*] iter 72000/1000000 (7.2%)  left=928000  elapsed=0.8s     [A*] iter 73000/1000000 (7.3%)  left=927000  elapsed=0.9s     [A*] iter 74000/1000000 (7.4%)  left=926000  elapsed=0.9s     [A*] iter 75000/1000000 (7.5%)  left=925000  elapsed=0.9s     [A*] iter 76000/1000000 (7.6%)  left=924000  elapsed=0.9s     [A*] iter 77000/1000000 (7.7%)  left=923000  elapsed=0.9s     [A*] iter 78000/1000000 (7.8%)  left=922000  elapsed=1.1s     [A*] iter 79000/1000000 (7.9%)  left=921000  elapsed=1.1s     [A*] iter 80000/1000000 (8.0%)  left=920000  elapsed=1.1s     [A*] iter 81000/1000000 (8.1%)  left=919000  elapsed=1.2s     [A*] iter 82000/1000000 (8.2%)  left=918000  elapsed=1.2s     [A*] iter 83000/1000000 (8.3%)  left=917000  elapsed=1.2s     [A*] iter 84000/1000000 (8.4%)  left=916000  elapsed=1.2s     [A*] iter 85000/1000000 (8.5%)  left=915000  elapsed=1.2s     [A*] iter 86000/1000000 (8.6%)  left=914000  elapsed=1.2s     [A*] iter 87000/1000000 (8.7%)  left=913000  elapsed=1.2s     [A*] iter 88000/1000000 (8.8%)  left=912000  elapsed=1.2s   ┌ Warning: Seed is infeasible (min_slack=-21.8608105016674, ε=0.001); the barrier will try to recover it before shortening. Expected for the straight_cont ablation, and for a discrete seed that A* returned as its best incumbent after exhausting its budget.
-└ @ Main ~/Research/landmark_planning/planners/hexspline_cl.jl:1215
-
-  [Constraint A*] Budget exhausted with no seed under threshold; handing best incumbent to the optimizer: dist=1550.0, unc=3.8173 > 3.4589
-  One support: trying both lateral slots (+1 = 60° left, -1 = 60° right).
-  Slot [1]: unc=2.6799 ✓
-  Slot [-1]: unc=2.6818 ✓
-  → Chose slot [1]
-  Support 1 (slot 1): dist=1632.3m, goal_unc=2.3848m, arc drift vs primary=82.3m
-  Primary : dist=1550.0m, goal_unc=2.6799m (threshold 3.458929257 ✓)
-  ! A support drifted more than half a comm interval from the primary's arc; checkpoints no longer pair them where the formation puts them.
-
-=== Continuous Spline Optimization (threshold=3.4589) ===
-  Initial (discrete→spline): prim_len=1492.617, unc=2.8366
-  Barrier stage 1/15: μ=20.0
-    → Recovered into the feasible set at iter 3 (min_slack=0.011032); feasible-only gate now armed
-  [Spline barrier] line search stalled; stopping at stage 1
-  Barrier stage 2/15: μ=7.0
-  [Spline barrier] line search stalled; stopping at stage 2
-  Barrier stage 3/15: μ=2.45
-  [Spline barrier] line search stalled; stopping at stage 3
-  Barrier stage 4/15: μ=0.8575
-  [Spline barrier] line search stalled; stopping at stage 4
-  Barrier stage 5/15: μ=0.3001
-  [Spline barrier] line search stalled; stopping at stage 5
-  Barrier stage 6/15: μ=0.105
-  [Spline barrier] line search stalled; stopping at stage 6
-  Barrier stage 7/15: μ=0.0368
-  [Spline barrier] line search stalled; stopping at stage 7
-  Barrier stage 8/15: μ=0.0129
-  [Spline barrier] line search stalled; stopping at stage 8
-  Barrier stage 9/15: μ=0.0045
-  [Spline barrier] line search stalled; stopping at stage 9
-  Barrier stage 10/15: μ=0.0016
-  [Spline barrier] line search stalled; stopping at stage 10
-  Barrier stage 11/15: μ=0.0006
-  [Spline barrier] line search stalled; stopping at stage 11
-  Barrier stage 12/15: μ=0.0002
-  [Spline barrier] line search stalled; stopping at stage 12
-  Barrier stage 13/15: μ=0.0001
-  [Spline barrier] line search stalled; stopping at stage 13
-  Barrier stage 14/15: μ=0.0
-  [Spline barrier] line search stalled; stopping at stage 14
-  Barrier stage 15/15: μ=0.0
-  [Spline barrier] line search stalled; stopping at stage 15
-  Final: prim_len=1504.307, unc=2.9755, threshold=3.4589, status=optimized, min_slack=0.011032
-  Obstacle re-verification: mean path clears all obstacles ✓
-Fig combined (main) saved: Discrete Len=1492.62 → Continuous Len=1504.31
-Fig uncertainty profile (main) saved: /home/tony-zhang/Research/landmark_planning/constraint_sweep/smoke/formation/s005_p090/formation/figures/main_unc_profile.png
-
-[formation] produced 1 solution(s) -> /home/tony-zhang/Research/landmark_planning/constraint_sweep/smoke/formation/s005_p090/formation

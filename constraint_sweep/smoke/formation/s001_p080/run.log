@@ -1,62 +1,0 @@
-Landmark scenario: random — 4 landmarks, 4 obstacles, start (0.0, 0.0) → goal (600.0, 0.0)
-Hex graph: 653 nodes (648 heading-states + 4 sensors + goal), radius=57.73502691896258m, directed_edges=1704, grid=11x15, start_cell=(1, 7), goal_cell=(7, 7), start_heading=0
-
-── FORMATION PLANNING ──
-  Primary: single-agent hexspline A* (threshold 5.794809605); supports added afterwards.
-
-  [Constraint A*] Incumbent seed at iter 23: dist=750.0, unc=7.2435 > 5.7948
-
-  [Constraint A*] Incumbent seed at iter 72: dist=850.0, unc=6.9246 > 5.7948
-
-  [Constraint A*] Incumbent seed at iter 149: dist=950.0, unc=6.2824 > 5.7948
-
-  [Constraint A*] Incumbent seed at iter 343: dist=1050.0, unc=6.2806 > 5.7948
-
-  [Constraint A*] Incumbent seed at iter 709: dist=1150.0, unc=6.1937 > 5.7948
-  [A*] iter 1000/1000000 (0.1%)  left=999000  elapsed=0.1s   
-  [Constraint A*] Incumbent seed at iter 1058: dist=1186.603, unc=5.9494 > 5.7948
-
-  [Constraint A*] Incumbent seed at iter 1100: dist=1186.603, unc=5.9494 > 5.7948
-  [A*] iter 2000/1000000 (0.2%)  left=998000  elapsed=0.1s     [A*] iter 3000/1000000 (0.3%)  left=997000  elapsed=0.1s     [A*] iter 4000/1000000 (0.4%)  left=996000  elapsed=0.1s     [A*] iter 5000/1000000 (0.5%)  left=995000  elapsed=0.1s     [A*] iter 6000/1000000 (0.6%)  left=994000  elapsed=0.1s     [A*] iter 7000/1000000 (0.7%)  left=993000  elapsed=0.1s     [A*] iter 8000/1000000 (0.8%)  left=992000  elapsed=0.1s     [A*] iter 9000/1000000 (0.9%)  left=991000  elapsed=0.1s     [A*] iter 10000/1000000 (1.0%)  left=990000  elapsed=0.1s     [A*] iter 11000/1000000 (1.1%)  left=989000  elapsed=0.1s     [A*] iter 12000/1000000 (1.2%)  left=988000  elapsed=0.1s     [A*] iter 13000/1000000 (1.3%)  left=987000  elapsed=0.2s     [A*] iter 14000/1000000 (1.4%)  left=986000  elapsed=0.2s     [A*] iter 15000/1000000 (1.5%)  left=985000  elapsed=0.2s     [A*] iter 16000/1000000 (1.6%)  left=984000  elapsed=0.2s     [A*] iter 17000/1000000 (1.7%)  left=983000  elapsed=0.2s     [A*] iter 18000/1000000 (1.8%)  left=982000  elapsed=0.2s     [A*] iter 19000/1000000 (1.9%)  left=981000  elapsed=0.2s     [A*] iter 20000/1000000 (2.0%)  left=980000  elapsed=0.2s     [A*] iter 21000/1000000 (2.1%)  left=979000  elapsed=0.2s     [A*] iter 22000/1000000 (2.2%)  left=978000  elapsed=0.3s     [A*] iter 23000/1000000 (2.3%)  left=977000  elapsed=0.3s   
-  [Constraint A*] Budget exhausted with no seed under threshold; handing best incumbent to the optimizer: dist=1186.603, unc=5.9494 > 5.7948
-  One support: trying both lateral slots (+1 = 60° left, -1 = 60° right).
-  Slot [1]: unc=5.7156 ✓
-  Slot [-1]: unc=5.9494 ✗
-  → Chose slot [1]
-  Support 1 (slot 1): dist=1150.0m, goal_unc=5.2085m, arc drift vs primary=-36.6m
-  Primary : dist=1186.6m, goal_unc=5.7156m (threshold 5.794809605 ✓)
-
-=== Continuous Spline Optimization (threshold=5.7948) ===
-  Initial (discrete→spline): prim_len=1090.759, unc=5.0124
-  Barrier stage 1/15: μ=20.0
-  Barrier stage 2/15: μ=7.0
-  [Spline barrier] line search stalled; stopping at stage 2
-  Barrier stage 3/15: μ=2.45
-  [Spline barrier] line search stalled; stopping at stage 3
-  Barrier stage 4/15: μ=0.8575
-  Barrier stage 5/15: μ=0.3001
-  Barrier stage 6/15: μ=0.105
-  Barrier stage 7/15: μ=0.0368
-  → Converged at iter 367 (Δlen=0.000496)
-  Barrier stage 8/15: μ=0.0129
-  [Spline barrier] line search stalled; stopping at stage 8
-  Barrier stage 9/15: μ=0.0045
-  → Converged at iter 395 (Δlen=0.000565)
-  Barrier stage 10/15: μ=0.0016
-  → Converged at iter 396 (Δlen=0.000853)
-  Barrier stage 11/15: μ=0.0006
-  → Converged at iter 397 (Δlen=0.000999)
-  Barrier stage 12/15: μ=0.0002
-  [Spline barrier] line search stalled; stopping at stage 12
-  Barrier stage 13/15: μ=0.0001
-  [Spline barrier] line search stalled; stopping at stage 13
-  Barrier stage 14/15: μ=0.0
-  [Spline barrier] line search stalled; stopping at stage 14
-  Barrier stage 15/15: μ=0.0
-  [Spline barrier] line search stalled; stopping at stage 15
-  Final: prim_len=925.549, unc=4.9727, threshold=5.7948, status=optimized, min_slack=0.0
-  Obstacle re-verification: mean path clears all obstacles ✓
-Fig combined (main) saved: Discrete Len=1090.76 → Continuous Len=925.55
-Fig uncertainty profile (main) saved: /home/tony-zhang/Research/landmark_planning/constraint_sweep/smoke/formation/s001_p080/formation/figures/main_unc_profile.png
-
-[formation] produced 1 solution(s) -> /home/tony-zhang/Research/landmark_planning/constraint_sweep/smoke/formation/s001_p080/formation

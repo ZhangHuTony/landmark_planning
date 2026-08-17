@@ -1,8 +1,0 @@
-main:
-  primary_length: null
-  primary_unc: null
-  astar_iterations: 1000000
-  discrete_uncertainties: []
-  primary_disc_unc: null
-  continuous_primary_length: null
-  continuous_uncertainties: []

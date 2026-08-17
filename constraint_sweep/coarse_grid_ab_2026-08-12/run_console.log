@@ -1,9 +1,0 @@
-── coarsened-grid A/B, 12 runs ──
-  s012  wC_ref   w=160   a=1 nodes=389   ok               it=437       len=1000.2    wall=17s
-  s005  wC_ref   w=160   a=1 nodes=388   ok               it=97        len=963.4     wall=17s
-  s005  wC_a2    w=160   a=2 nodes=388   ok               it=16650     len=1018.8    wall=22s
-  s029  wC_a2    w=160   a=2 nodes=389   ok               it=4490      len=1190.9    wall=20s
-  s029  wC_ref   w=160   a=1 nodes=389   ok               it=62        len=944.6     wall=17s
-  s030  wC_a2    w=140   a=2 nodes=388   ok               it=11488     len=1019.2    wall=22s
-  s030  wC_ref   w=140   a=1 nodes=388   FAIL no_solution it=10374     len=-         wall=17s
-  s012  wC_a2    w=160   a=2 nodes=389   ok               it=391579    len=1150.7    wall=88s

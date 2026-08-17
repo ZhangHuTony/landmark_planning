@@ -1,61 +1,0 @@
-Landmark scenario: random — 3 landmarks, 3 obstacles, start (0.0, 0.0) → goal (900.0, 0.0)
-Hex graph: 436 nodes (432 heading-states + 3 sensors + goal), radius=86.60254037844388m, directed_edges=1104, grid=11x11, start_cell=(1, 5), goal_cell=(7, 5), start_heading=0
-
-── FORMATION PLANNING ──
-  Primary: single-agent hexspline A* (threshold 5.057340582); supports added afterwards.
-
-  [Constraint A*] Incumbent seed at iter 133: dist=1275.0, unc=6.3217 > 5.0573
-
-  [Constraint A*] Incumbent seed at iter 184: dist=1329.904, unc=6.3217 > 5.0573
-
-  [Constraint A*] Incumbent seed at iter 228: dist=1425.0, unc=6.3145 > 5.0573
-  [A*] iter 1000/1000000 (0.1%)  left=999000  elapsed=0.1s     [A*] iter 2000/1000000 (0.2%)  left=998000  elapsed=0.1s     [A*] iter 3000/1000000 (0.3%)  left=997000  elapsed=0.1s     [A*] iter 4000/1000000 (0.4%)  left=996000  elapsed=0.1s     [A*] iter 5000/1000000 (0.5%)  left=995000  elapsed=0.1s     [A*] iter 6000/1000000 (0.6%)  left=994000  elapsed=0.1s     [A*] iter 7000/1000000 (0.7%)  left=993000  elapsed=0.1s     [A*] iter 8000/1000000 (0.8%)  left=992000  elapsed=0.1s     [A*] iter 9000/1000000 (0.9%)  left=991000  elapsed=0.1s     [A*] iter 10000/1000000 (1.0%)  left=990000  elapsed=0.1s     [A*] iter 11000/1000000 (1.1%)  left=989000  elapsed=0.1s     [A*] iter 12000/1000000 (1.2%)  left=988000  elapsed=0.1s   ┌ Warning: Seed is infeasible (min_slack=-73.75727964040539, ε=0.001); the barrier will try to recover it before shortening. Expected for the straight_cont ablation, and for a discrete seed that A* returned as its best incumbent after exhausting its budget.
-└ @ Main ~/Research/landmark_planning/planners/hexspline_cl.jl:1215
-
-  [Constraint A*] Budget exhausted with no seed under threshold; handing best incumbent to the optimizer: dist=1425.0, unc=6.3145 > 5.0573
-  One support: trying both lateral slots (+1 = 60° left, -1 = 60° right).
-  Slot [1]: unc=5.9977 ✗
-  Slot [-1]: unc=6.2858 ✗
-  → Chose slot [1]
-  Support 1 (slot 1): dist=1548.4m, goal_unc=6.4738m, arc drift vs primary=123.4m
-  Primary : dist=1425.0m, goal_unc=5.9977m (threshold 5.057340582 ✗)
-  ! A support drifted more than half a comm interval from the primary's arc; checkpoints no longer pair them where the formation puts them.
-
-=== Continuous Spline Optimization (threshold=5.0573) ===
-  Initial (discrete→spline): prim_len=1346.116, unc=5.3438
-  Barrier stage 1/15: μ=20.0
-  [Spline barrier] line search stalled; stopping at stage 1
-  Barrier stage 2/15: μ=20.0
-  [Spline barrier] line search stalled; stopping at stage 2
-  Barrier stage 3/15: μ=20.0
-  [Spline barrier] line search stalled; stopping at stage 3
-  Barrier stage 4/15: μ=20.0
-  [Spline barrier] line search stalled; stopping at stage 4
-  Barrier stage 5/15: μ=20.0
-  [Spline barrier] line search stalled; stopping at stage 5
-  Barrier stage 6/15: μ=20.0
-  [Spline barrier] line search stalled; stopping at stage 6
-  Barrier stage 7/15: μ=20.0
-  [Spline barrier] line search stalled; stopping at stage 7
-  Barrier stage 8/15: μ=20.0
-  [Spline barrier] line search stalled; stopping at stage 8
-  Barrier stage 9/15: μ=20.0
-  [Spline barrier] line search stalled; stopping at stage 9
-  Barrier stage 10/15: μ=20.0
-  [Spline barrier] line search stalled; stopping at stage 10
-  Barrier stage 11/15: μ=20.0
-  [Spline barrier] line search stalled; stopping at stage 11
-  Barrier stage 12/15: μ=20.0
-  [Spline barrier] line search stalled; stopping at stage 12
-  Barrier stage 13/15: μ=20.0
-  [Spline barrier] line search stalled; stopping at stage 13
-  Barrier stage 14/15: μ=20.0
-  [Spline barrier] line search stalled; stopping at stage 14
-  Barrier stage 15/15: μ=20.0
-  [Spline barrier] line search stalled; stopping at stage 15
-  Final: prim_len=1379.29, unc=5.6679, threshold=5.0573, status=recovery_failed, min_slack=-0.610571
-  Obstacle re-verification: mean path clears all obstacles ✓
-Fig combined (main) saved: Discrete Len=1346.12 → Continuous Len=1379.29
-Fig uncertainty profile (main) saved: /home/tony-zhang/Research/landmark_planning/constraint_sweep/2026-08-12_18-33-34/formation/s008_p080/formation/figures/main_unc_profile.png
-
-[formation] produced 1 solution(s) -> /home/tony-zhang/Research/landmark_planning/constraint_sweep/2026-08-12_18-33-34/formation/s008_p080/formation

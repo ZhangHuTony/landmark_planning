@@ -254,6 +254,28 @@ function write_landmarks_csv(filename::String, landmarks::Vector{Landmark})
     println("  → Saved $(length(landmarks)) landmarks to $filename")
 end
 
+# Serialize the scenario obstacle field, for the same reason write_landmarks_csv
+# exists: a downstream stage — the HoloOcean simulation tester, or any external
+# non-Julia tool — needs the EXACT polygons the planner routed around, and that
+# geometry otherwise lives only as Julia literals in src/scenario_generation.jl.
+# One row per vertex in polygon order; Σo is repeated on each row of an obstacle
+# (mirroring how scenario_landmarks.csv carries its covariance). Only `verts` is
+# written — build_obstacle derives A/b from them deterministically, so storing
+# both would invite the two to disagree.
+function write_obstacles_csv(filename::String, obstacles::Vector{Obstacle})
+    EMIT_CSV || return
+    open(filename, "w") do io
+        println(io, "obstacle_id,vertex_index,x,y,s11,s12,s21,s22")
+        for (oi, obs) in enumerate(obstacles)
+            Σ = obs.Σo
+            for (vi, v) in enumerate(obs.verts)
+                println(io, "$(oi),$(vi),$(v[1]),$(v[2]),$(Σ[1,1]),$(Σ[1,2]),$(Σ[2,1]),$(Σ[2,2])")
+            end
+        end
+    end
+    println("  → Saved $(length(obstacles)) obstacles to $filename")
+end
+
 function read_landmarks_csv(filename::String)
     lms = Landmark[]
     open(filename) do io

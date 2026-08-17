@@ -1,89 +1,0 @@
-Landmark scenario: random — 4 landmarks, 3 obstacles, start (0.0, 0.0) → goal (900.0, 0.0)
-Hex graph: 437 nodes (432 heading-states + 4 sensors + goal), radius=86.60254037844388m, directed_edges=1104, grid=11x11, start_cell=(1, 5), goal_cell=(7, 5), start_heading=0
-
-── FORMATION PLANNING ──
-  Primary: single-agent hexspline A* (threshold 4.935597913); supports added afterwards.
-
-  [Constraint A*] Goal popped, unc OK, but its B-spline breaches an obstacle; discarded.
-
-  [Constraint A*] Goal popped, unc OK, but its B-spline breaches an obstacle; discarded.
-
-  [Constraint A*] Goal popped, unc OK, but its B-spline breaches an obstacle; discarded.
-
-  [Constraint A*] Goal popped, unc OK, but its B-spline breaches an obstacle; discarded.
-
-  [Constraint A*] Goal popped, unc OK, but its B-spline breaches an obstacle; discarded.
-
-  [Constraint A*] Goal popped, unc OK, but its B-spline breaches an obstacle; discarded.
-
-  [Constraint A*] Incumbent seed at iter 178: dist=1275.0, unc=6.1695 > 4.9356
-
-  [Constraint A*] Goal popped, unc OK, but its B-spline breaches an obstacle; discarded.
-
-  [Constraint A*] Incumbent seed at iter 241: dist=1329.904, unc=6.1695 > 4.9356
-
-  [Constraint A*] Incumbent seed at iter 312: dist=1425.0, unc=5.5216 > 4.9356
-
-  [Constraint A*] Goal popped, unc OK, but its B-spline breaches an obstacle; discarded.
-
-  [Constraint A*] Goal popped, unc OK, but its B-spline breaches an obstacle; discarded.
-
-  [Constraint A*] Goal popped, unc OK, but its B-spline breaches an obstacle; discarded.
-  [A*] iter 1000/1000000 (0.1%)  left=999000  elapsed=0.1s   
-  [Constraint A*] Goal popped, unc OK, but its B-spline breaches an obstacle; discarded.
-
-  [Constraint A*] Goal popped, unc OK, but its B-spline breaches an obstacle; discarded.
-  [A*] iter 2000/1000000 (0.2%)  left=998000  elapsed=0.1s     [A*] iter 3000/1000000 (0.3%)  left=997000  elapsed=0.1s     [A*] iter 4000/1000000 (0.4%)  left=996000  elapsed=0.1s     [A*] iter 5000/1000000 (0.5%)  left=995000  elapsed=0.1s   
-  [Constraint A*] Goal popped, unc OK, but its B-spline breaches an obstacle; discarded.
-
-  [Constraint A*] Goal popped, unc OK, but its B-spline breaches an obstacle; discarded.
-  [A*] iter 6000/1000000 (0.6%)  left=994000  elapsed=0.1s     [A*] iter 7000/1000000 (0.7%)  left=993000  elapsed=0.1s   
-  [Constraint A*] Goal popped, unc OK, but its B-spline breaches an obstacle; discarded.
-
-  [Constraint A*] Goal popped, unc OK, but its B-spline breaches an obstacle; discarded.
-  [A*] iter 8000/1000000 (0.8%)  left=992000  elapsed=0.1s     [A*] iter 9000/1000000 (0.9%)  left=991000  elapsed=0.1s     [A*] iter 10000/1000000 (1.0%)  left=990000  elapsed=0.1s     [A*] iter 11000/1000000 (1.1%)  left=989000  elapsed=0.1s     [A*] iter 12000/1000000 (1.2%)  left=988000  elapsed=0.1s     [A*] iter 13000/1000000 (1.3%)  left=987000  elapsed=0.1s     [A*] iter 14000/1000000 (1.4%)  left=986000  elapsed=0.1s     [A*] iter 15000/1000000 (1.5%)  left=985000  elapsed=0.1s     [A*] iter 16000/1000000 (1.6%)  left=984000  elapsed=0.2s     [A*] iter 17000/1000000 (1.7%)  left=983000  elapsed=0.2s   ┌ Warning: Seed is infeasible (min_slack=-90.06104168505271, ε=0.001); the barrier will try to recover it before shortening. Expected for the straight_cont ablation, and for a discrete seed that A* returned as its best incumbent after exhausting its budget.
-└ @ Main ~/Research/landmark_planning/planners/hexspline_cl.jl:1215
-
-  [Constraint A*] Budget exhausted with no seed under threshold; handing best incumbent to the optimizer: dist=1425.0, unc=5.5216 > 4.9356
-  One support: trying both lateral slots (+1 = 60° left, -1 = 60° right).
-  Slot [1]: unc=5.4342 ✗
-  Slot [-1]: unc=5.1359 ✗
-  → Chose slot [-1]
-  Support 1 (slot -1): dist=1548.4m, goal_unc=5.6244m, arc drift vs primary=123.4m
-  Primary : dist=1425.0m, goal_unc=5.1359m (threshold 4.935597913 ✗)
-  ! A support drifted more than half a comm interval from the primary's arc; checkpoints no longer pair them where the formation puts them.
-
-=== Continuous Spline Optimization (threshold=4.9356) ===
-  Initial (discrete→spline): prim_len=1359.121, unc=5.7244
-  Barrier stage 1/15: μ=20.0
-  Barrier stage 2/15: μ=20.0
-  [Spline barrier] line search stalled; stopping at stage 2
-  Barrier stage 3/15: μ=20.0
-  Barrier stage 4/15: μ=20.0
-  Barrier stage 5/15: μ=20.0
-  Barrier stage 6/15: μ=20.0
-  Barrier stage 7/15: μ=20.0
-    → Recovered into the feasible set at iter 395 (min_slack=0.013899); feasible-only gate now armed
-  → Converged at iter 407 (Δlen=0.000123)
-  Barrier stage 8/15: μ=7.0
-  → Converged at iter 408 (Δlen=0.000815)
-  Barrier stage 9/15: μ=2.45
-  → Converged at iter 410 (Δlen=0.00085)
-  Barrier stage 10/15: μ=0.8575
-  → Converged at iter 412 (Δlen=0.000713)
-  Barrier stage 11/15: μ=0.3001
-  → Converged at iter 414 (Δlen=0.000516)
-  Barrier stage 12/15: μ=0.105
-  → Converged at iter 415 (Δlen=0.000933)
-  Barrier stage 13/15: μ=0.0368
-  → Converged at iter 417 (Δlen=0.000236)
-  Barrier stage 14/15: μ=0.0129
-  → Converged at iter 418 (Δlen=0.000393)
-  Barrier stage 15/15: μ=0.0045
-  [Spline barrier] line search stalled; stopping at stage 15
-  Final: prim_len=1402.143, unc=4.6956, threshold=4.9356, status=optimized, min_slack=0.013897
-  Obstacle re-verification: mean path clears all obstacles ✓
-Fig combined (main) saved: Discrete Len=1359.12 → Continuous Len=1402.14
-Fig uncertainty profile (main) saved: /home/tony-zhang/Research/landmark_planning/constraint_sweep/2026-08-12_18-33-34/formation/s005_p080/formation/figures/main_unc_profile.png
-
-[formation] produced 1 solution(s) -> /home/tony-zhang/Research/landmark_planning/constraint_sweep/2026-08-12_18-33-34/formation/s005_p080/formation

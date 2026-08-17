@@ -1,3 +1,4 @@
+ENV["GKSwstype"] = "100"  # headless GR: savefig writes to disk, no window pops up
 using Plots
 using DataStructures
 using LinearAlgebra
@@ -52,7 +53,11 @@ println("Landmark scenario: $(LANDMARK_SCENARIO) — $(length(landmarks)) landma
 
 # Serialize the exact landmark field (positions + covariances) so the Monte
 # Carlo consistency stage reproduces it without re-seeding the RNG generator.
+# Obstacles go out beside them so a run is fully self-describing: the HoloOcean
+# simulation tester needs the polygons to score collisions, and nothing else
+# writes them.
 write_landmarks_csv(joinpath(OUTPUT_DIR, "scenario_landmarks.csv"), landmarks)
+write_obstacles_csv(joinpath(OUTPUT_DIR, "scenario_obstacles.csv"), scenario.obstacles)
 
 graph = build_hex_graph(landmarks, START_POS, GOAL_POS; hex_r=HEX_RADIUS_M)
 
