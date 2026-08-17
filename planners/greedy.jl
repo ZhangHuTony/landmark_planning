@@ -172,6 +172,26 @@ function plan_greedy(scenario, graph::LandmarkGraph, output_dir::String)
     end
 
     paths = vcat(support_paths, [primary_path])
+    # Last-resort spline gate, mirroring sequential.jl's shipped-roster fallback.
+    # The primary was gated inside its own A*, but the helpers are attached
+    # afterwards and nothing has spline-tested the COMBINATION: a helper whose
+    # spline cuts an obstacle corner (or outruns the primary as a spline) would
+    # reach the optimizer topologically stuck and die as recovery_failed — a
+    # false failure the search never made. Over-threshold uncertainty stays
+    # workable for the barrier, so it is not tested here; only the topological
+    # rows are. The fallback parks the helpers (a parked helper never
+    # dead-reckons, so it holds Σ₀ and still anchors from the start).
+    if NUM_AGENTS > 1 && !seed_spline_clear(paths, graph, landmarks)
+        parked = [a == NUM_AGENTS ? primary_path : Int[1] for a in 1:NUM_AGENTS]
+        if seed_spline_clear(parked, graph, landmarks)
+            println("  Greedy roster breaches the obstacle/support gate; " *
+                    "falling back to parked helpers.")
+            paths = parked
+        else
+            println("  [warn] Greedy roster breaches and so does the parked fallback; " *
+                    "the optimizer starts outside the feasible set.")
+        end
+    end
     seed_covs, seed_dists = evaluate_full_paths(paths, graph, landmarks, NUM_AGENTS)
     uncs = [unc_radius(seed_covs[a]) for a in 1:NUM_AGENTS]
 
