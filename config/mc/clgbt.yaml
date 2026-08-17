@@ -72,7 +72,7 @@
 # solves (maze 57 iters, gauntlet 46, shoreline 41, clustered 176, dual 300,
 # long_sparse 1063, single 2318, two_routes 2721). It binds on the tightened
 # thresholds the ladder imposes, which is exactly where the budget should matter.
-clgbt_max_iterations: 100000
+clgbt_max_iterations: 200000
 
 # Arc length of ONE propagation step, and the spacing of the waypoints handed to
 # the refiner.

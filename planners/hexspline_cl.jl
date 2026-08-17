@@ -1211,7 +1211,18 @@ function optimize_continuous(paths::Vector{Vector{Int}}, graph::LandmarkGraph, l
 
     # Barrier optimizer (simplified reuse of in-file logic but using cont_threshold)
     adam_m = zeros(total_free_cont); adam_v = zeros(total_free_cont)
-    best_feasible_flat = nothing; best_feasible_len = Inf; best_feasible_unc = Inf
+    # The incumbent starts as the SEED whenever the seed is feasible, so what
+    # ships can never be longer than what the search handed over. Without this,
+    # a feasible seed entered the race with no incumbent at all: the line search
+    # accepts any barrier-objective descent, and at stage-1 μ a step that
+    # LENGTHENS the path while moving interior is such a descent — so a run that
+    # stalled after those steps shipped the longer iterate labeled `optimized`.
+    # seed_feasible is remembered so the status below can tell "the seed won"
+    # (:seed_only) from "an accepted iterate beat it" (:optimized).
+    seed_feasible = reached_feasible
+    best_feasible_flat = seed_feasible ? copy(flat) : nothing
+    best_feasible_len  = seed_feasible ? init_len : Inf
+    best_feasible_unc  = seed_feasible ? init_unc : Inf
     # Incumbent for the recovery regime, mirroring best_feasible_flat: the LEAST
     # violating iterate seen while still outside. Seeded with the seed itself, so a
     # failed recovery can never ship something further out than what it started
@@ -1358,17 +1369,18 @@ function optimize_continuous(paths::Vector{Vector{Int}}, graph::LandmarkGraph, l
     # Status of what is actually being returned, so a caller (and results.yaml) can
     # tell a certified solution from a fallback instead of having to trust that one
     # was found.
-    #   :optimized       — a feasible iterate was found and its length improved
-    #   :seed_only       — the seed was already feasible but no step was accepted;
-    #                      this is the seed spline, feasible but not shortened
+    #   :optimized       — a feasible iterate beat the seed (or recovered an
+    #                      infeasible seed into the feasible set)
+    #   :seed_only       — the seed was already feasible and no accepted iterate
+    #                      beat its length; this is the seed spline, unshortened
     #   :recovery_failed — the seed was infeasible and the barrier never reached the
     #                      feasible set. THIS RESULT VIOLATES CONSTRAINTS (min_slack
     #                      < 0) and is the ablation's failure case — count these to
     #                      get the failure rate without the discrete search.
     final_slacks = slacks_from(opt_len, opt_unc, opt_curvs, opt_ctrls, opt_covs, opt_support_lens)
-    refinement_status = !isnothing(best_feasible_flat) ? :optimized :
-                        reached_feasible               ? :seed_only :
-                                                         :recovery_failed
+    refinement_status = isnothing(best_feasible_flat)                    ? :recovery_failed :
+                        (seed_feasible && best_feasible_len >= init_len) ? :seed_only :
+                                                                           :optimized
     refinement_info = (status = refinement_status, min_slack = min_slack(final_slacks))
     println("  Final: prim_len=$(round(opt_len,digits=3)), unc=$(round(opt_unc,digits=4)), threshold=$(round(cont_threshold,digits=4)), status=$(refinement_status), min_slack=$(round(min_slack(final_slacks),digits=6))")
 
