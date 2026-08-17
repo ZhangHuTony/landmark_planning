@@ -23,7 +23,7 @@
 # it toward the total silently shrank the sample (sweep 2026-08-10_18-17-16 asked
 # for 50 and measured 42). Rejected draws are still recorded in scenarios.csv
 # with empty L_ref/U_ref, so a resume skips them instead of retrying.
-n_scenarios: 30
+n_scenarios: 50
 scenario_seed_base: 1067
 # Runaway guard for that loop: if references keep failing, stop here rather than
 # drawing forever. Hit only when the geometry ranges make most scenarios
@@ -69,7 +69,7 @@ max_scenario_draws: 300
 # says wants the screen. The two ablations that need it OFF moved to
 # sweep_ablation.yaml. Screened and unscreened sweeps are NOT comparable — in
 # particular nothing here pools with constraint_sweep/2026-08-12_13-51-20_RECOVERED.
-reject_trivial_straight: true
+reject_trivial_straight: false
 # The screen itself, in the same label@key=value grammar as `methods`. Points at a
 # planner and the config overrides it runs under; only its success/failure is read.
 reject_trivial_spec: straight_cont@algorithms=straight_cont,num_agents=2
@@ -110,15 +110,15 @@ n_landmarks_max: 4
 # discarded after paying ~19 s for it. Obstacle placement is biased toward the
 # direct line (see random_convex_obstacles), so a handful is enough to make the
 # corridor an actual left-or-right decision most of the time.
-n_obstacles_min: 3
-n_obstacles_max: 5
+n_obstacles_min: 1
+n_obstacles_max: 3
 
 # Constraint ladder. pct_patience stops a scenario after that many CONSECUTIVE
 # levels at which every method failed — the levels that trigger the stop are
 # still run and still logged, so the failure tail is never silently truncated.
 # Set 0 to always walk the full ladder.
 pct_start: 100
-pct_step: 10
+pct_step: 5
 # Floor at 30, not 50: the interesting number is where each method finally gives
 # out, and pct_patience already stops a scenario two levels after everything
 # fails — so a deeper floor costs nothing on the easy scenarios and buys
@@ -155,11 +155,13 @@ method_patience: 1
 # hexspline_cl itself, not competing planners; they moved to sweep_ablation.yaml so
 # they can keep reject_trivial_straight OFF (screening on straight_cont's own outcome
 # would pin its success rate to 0 by construction) and get their own figure.
-methods: hexspline_cl@algorithms=hexspline_cl,num_agents=2 | greedy@algorithms=greedy,num_agents=2 | formation@algorithms=formation,num_agents=2 | sequential@algorithms=sequential,num_agents=2 | clgbt@algorithms=clgbt,num_agents=2
+#methods: hexspline_cl@algorithms=hexspline_cl,num_agents=2 | greedy@algorithms=greedy,num_agents=2 | formation@algorithms=formation,num_agents=2 | sequential@algorithms=sequential,num_agents=2 | clgbt@algorithms=clgbt,num_agents=2
 # other baselines, ready to uncomment (append with a leading `|` on the line above):
 #   discrete_only@algorithms=discrete_only,num_agents=2
 #   straight_line@algorithms=straight_line,num_agents=2
 #   hexspline_1@algorithms=hexspline_cl,num_agents=1
+
+methods: hexspline_cl@algorithms=hexspline_cl,num_agents=2 | straight_cont@algorithms=straight_cont,num_agents=2 | discrete_only@algorithms=discrete_only,num_agents=2
 
 # Debugging: keep the per-run figures / CSVs for every scenario at every
 # constraint level, under <sweep>/<label>/<scenario>_p<pct>/. Off by default —

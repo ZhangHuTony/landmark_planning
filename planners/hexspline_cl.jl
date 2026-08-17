@@ -430,7 +430,7 @@ end
 end
 
 struct JointState
-    paths   :: Vector{Vector{Int}}  # full path per agent (sequence of nodes); last = primary
+    nodes   :: Vector{Int}          # current graph node per agent; last = primary
     covs    :: Vector{Matrix{Float64}}  # covariance at end of each path
     dists   :: Vector{Float64}      # arc-distance per agent (computed from B-spline)
     g       :: Float64              # primary arc-distance (cost)
@@ -438,15 +438,26 @@ struct JointState
     visited :: Vector{BitVector}    # per-agent visited sets (cycle detection)
 end
 
-@inline function joint_heuristic(paths::Vector{Vector{Int}},
+# The full path per agent used to be stored on every JointState, alongside the
+# `parent` that already determines it. That cost O(depth) per state and nothing
+# is ever freed until the search returns, so it set the memory ceiling that
+# `astar_iteration_limit` really enforces. Rebuild it from the parent chain
+# instead — the single-agent branch above (`State`) always worked this way.
+# Called only at goal checks and in the debug plot, not on the hot path.
+function joint_trace(states::Vector{JointState}, si::Int, na::Int)
+    chain = Int[]
+    while si != -1
+        push!(chain, si)
+        si = states[si].parent
+    end
+    reverse!(chain)
+    return [[states[i].nodes[a] for i in chain] for a in 1:na]
+end
+
+@inline function joint_heuristic(nodes::Vector{Int},
                                   goal::Int,
                                   graph::LandmarkGraph)
-    primary = length(paths)
-    if isempty(paths[primary])
-        return 0.0  # no progress yet
-    end
-    v = paths[primary][end]  # current node of primary
-    return graph.shortest_paths[v, goal]
+    return graph.shortest_paths[nodes[end], goal]  # primary is the last agent
 end
 
 # ------------------------------------------------------------------
@@ -462,21 +473,7 @@ end
     return SUPPORT_IDLE_PENALTY * idle_count
 end
 
-@inline function joint_node_key(paths::Vector{Vector{Int}})
-    nodes = Vector{Int}(undef, length(paths))
-    for a in 1:length(paths)
-        nodes[a] = paths[a][end]
-    end
-    return Tuple(nodes)
-end
-
-@inline function joint_path_key(paths::Vector{Vector{Int}})
-    key = Vector{Tuple{Vararg{Int}}}(undef, length(paths))
-    for a in 1:length(paths)
-        key[a] = Tuple(paths[a])
-    end
-    return Tuple(key)
-end
+@inline joint_node_key(nodes::Vector{Int}) = Tuple(nodes)
 
 @inline function joint_visited_key(visited::Vector{BitVector})
     sig = Vector{Tuple{Vararg{Int}}}(undef, length(visited))
@@ -698,6 +695,7 @@ function joint_astar(graph::LandmarkGraph,
 
     # ── Initial state: all agents at node 1 (start) ──────────────────────────
     init_paths   = [fill(1, 1) for _ in 1:na]
+    init_nodes   = fill(1, na)
     init_visited = [falses(n) for _ in 1:na]
     for a in 1:na; init_visited[a][1] = true; end
 
@@ -705,15 +703,17 @@ function joint_astar(graph::LandmarkGraph,
     init_covs, init_dists = evaluate_full_paths(init_paths, graph, lms, na)
 
     states = JointState[]
-    push!(states, JointState(init_paths, init_covs, init_dists, 0.0, -1, init_visited))
+    push!(states, JointState(init_nodes, init_covs, init_dists, 0.0, -1, init_visited))
 
-    # Exact state cache keyed by immutable joint path tuples.
-    exact_state_best = Dict{Tuple{Vararg{Tuple{Vararg{Int}}}}, Int}()
-    exact_state_best[joint_path_key(init_paths)] = 1
+    # No exact-state dedup cache here. Every expansion appends one node to EVERY
+    # agent, so a child's joint path is its parent's plus one step: the search
+    # tree is a tree, every state's joint path is unique, and a cache keyed on it
+    # could never hit. It only cost an O(depth) tuple per state (measured 0 hits
+    # in 565,836 — notes/LOGS.md).
 
     w_astar = 1.0 + PRIMARY_EPSILON
     pq = PriorityQueue{Int, Tuple{Float64, Float64, Float64}}()
-    init_h = joint_heuristic(init_paths, goal, graph)
+    init_h = joint_heuristic(init_nodes, goal, graph)
     init_f = init_dists[primary] + w_astar * init_h
     init_unc = unc_radius(init_covs[primary])
     enqueue!(pq, 1, (init_f, init_unc, support_idle_score(init_dists)))
@@ -727,7 +727,7 @@ function joint_astar(graph::LandmarkGraph,
     # Safe dominance frontier keyed by (joint nodes, exact visited signature).
     # This only compares states with identical future action sets.
     frontier_by_signature = Dict{Any, Vector{Tuple{Float64, Matrix{Float64}}}}()
-    init_sig = (joint_node_key(init_paths), joint_visited_key(init_visited))
+    init_sig = (joint_node_key(init_nodes), joint_visited_key(init_visited))
     frontier_by_signature[init_sig] = [(0.0, copy(init_covs[primary]))]
     
     # Diagnostic: check if goal is reachable from start
@@ -748,7 +748,7 @@ function joint_astar(graph::LandmarkGraph,
     anim_frames = animate_enabled ? Plots.Animation() : nothing
     animation_saved = false
 
-    function debug_joint_astar_plot(state::JointState, best_si::Int, iter_no::Int)
+    function debug_joint_astar_plot(si::Int, best_si::Int, iter_no::Int)
         plt = plot(legend=:outerright, aspect_ratio=:equal,
                    xlabel="x (m)", ylabel="y (m)",
                    title="Constraint A* debug frame $(iter_no)")
@@ -761,7 +761,7 @@ function joint_astar(graph::LandmarkGraph,
         scatter!(plt, [graph.landmarks[goal].x], [graph.landmarks[goal].y],
                  label="Goal", color=:orange, marker=:star5, markersize=9, markerstrokewidth=0)
 
-        for (ai, path) in enumerate(state.paths)
+        for (ai, path) in enumerate(joint_trace(states, si, na))
             isempty(path) && continue
             px = [graph.landmarks[j].x for j in path]
             py = [graph.landmarks[j].y for j in path]
@@ -772,8 +772,7 @@ function joint_astar(graph::LandmarkGraph,
         end
 
         if best_si > 0
-            best = states[best_si]
-            for (ai, path) in enumerate(best.paths)
+            for (ai, path) in enumerate(joint_trace(states, best_si, na))
                 isempty(path) && continue
                 px = [graph.landmarks[j].x for j in path]
                 py = [graph.landmarks[j].y for j in path]
@@ -784,7 +783,7 @@ function joint_astar(graph::LandmarkGraph,
             end
         end
 
-        prim_node = isempty(state.paths[primary]) ? 0 : state.paths[primary][end]
+        prim_node = states[si].nodes[primary]
         prim_h = isinf(graph.shortest_paths[prim_node, goal]) ? "∞" : "$(round(graph.shortest_paths[prim_node, goal], digits=1))"
         ann = "Iter $iter_no, prim_node=$prim_node, h=$prim_h"
         annotate!(plt, (graph.landmarks[1].x, graph.landmarks[1].y + 100), text(ann, :black, 10))
@@ -807,7 +806,7 @@ function joint_astar(graph::LandmarkGraph,
         # --- Animation: plot only the requested iteration window, sampled sparsely ---
         if animate_enabled && iter_count >= animate_start_iter && iter_count <= animate_start_iter + animate_limit - 1 &&
            mod(iter_count - animate_start_iter, animate_sample_period) == 0
-            plt = debug_joint_astar_plot(S, 0, iter_count)
+            plt = debug_joint_astar_plot(si, 0, iter_count)
             frame(anim_frames, plt)
         end
 
@@ -824,13 +823,13 @@ function joint_astar(graph::LandmarkGraph,
         end
 
         # Standard A* ordering uses f only for priority; no incumbent pruning.
-        h = joint_heuristic(S.paths, goal, graph)
+        h = joint_heuristic(S.nodes, goal, graph)
         f = S.g + w_astar * h
 
 
         # Check if primary reached goal cell
-        if is_goal_cell[S.paths[primary][end]]
-            agent_paths = [copy(S.paths[a]) for a in 1:na]
+        if is_goal_cell[S.nodes[primary]]
+            agent_paths = joint_trace(states, si, na)
             exact_covs, exact_dists = evaluate_full_paths(agent_paths, graph, lms, na)
             exact_unc = unc_radius(exact_covs[primary])
             if unc_within_threshold(exact_unc, unc_threshold, UNC_FEAS_TOL)
@@ -870,15 +869,13 @@ function joint_astar(graph::LandmarkGraph,
 
         function expand_joint_moves(agent_idx::Int, primary_dist::Float64)
             if agent_idx > na
-                new_paths = [copy(S.paths[a]) for a in 1:na]
                 new_covs = Vector{Matrix{Float64}}(undef, na)
                 new_dists = Vector{Float64}(undef, na)
                 new_visited = [copy(S.visited[a]) for a in 1:na]
 
                 for a in 1:na
                     u = candidate_nodes[a]
-                    prev_node = S.paths[a][end]
-                    push!(new_paths[a], u)
+                    prev_node = S.nodes[a]
                     new_dists[a] = S.dists[a] + graph.distance[prev_node, u]
                     new_covs[a] = edge_cov_continuous(prev_node, u, graph, lms, S.covs[a])
                     new_visited[a][u] = true
@@ -900,7 +897,7 @@ function joint_astar(graph::LandmarkGraph,
                 # post-comm-fusion covariance carried on the state.
                 if !isempty(OBSTACLES)
                     for a in 1:na
-                        p0 = graph.landmarks[S.paths[a][end]]; p1 = graph.landmarks[candidate_nodes[a]]
+                        p0 = graph.landmarks[S.nodes[a]]; p1 = graph.landmarks[candidate_nodes[a]]
                         segment_obstacle_free((p0.x, p0.y), (p1.x, p1.y), new_covs[a]) || return
                     end
                 end
@@ -925,10 +922,10 @@ function joint_astar(graph::LandmarkGraph,
                     return
                 end
 
-                new_h = joint_heuristic(new_paths, goal, graph)
+                new_h = joint_heuristic(candidate_nodes, goal, graph)
                 f_exact = new_g + w_astar * new_h
 
-                sig_key = (joint_node_key(new_paths), joint_visited_key(new_visited))
+                sig_key = (joint_node_key(candidate_nodes), joint_visited_key(new_visited))
                 labels = get(frontier_by_signature, sig_key, Tuple{Float64, Matrix{Float64}}[])
                 for (od, ocov) in labels
                     if od <= new_g + 1e-9 && cov_dominates(ocov, new_covs[primary])
@@ -945,21 +942,16 @@ function joint_astar(graph::LandmarkGraph,
                 push!(kept_labels, (new_g, copy(new_covs[primary])))
                 frontier_by_signature[sig_key] = kept_labels
 
-                new_path_key = joint_path_key(new_paths)
-                if haskey(exact_state_best, new_path_key)
-                    return
-                end
-
-                push!(states, JointState(copy(new_paths), new_covs, new_dists,
+                # `candidate_nodes` is the shared recursion buffer — copy it.
+                push!(states, JointState(copy(candidate_nodes), new_covs, new_dists,
                                           new_g, si, new_visited))
                 new_si = length(states)
-                exact_state_best[new_path_key] = new_si
                 enqueue!(pq, new_si, (f_exact, prim_unc, support_idle_score(new_dists)))
                 return
             end
 
             agent = move_order[agent_idx]
-            curr_node = S.paths[agent][end]
+            curr_node = S.nodes[agent]
             for u in graph.neighbors[curr_node]
                 S.visited[agent][u] && continue
 

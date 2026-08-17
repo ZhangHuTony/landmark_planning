@@ -19,9 +19,9 @@
 #   (0,0), goal (goal_dist,0)). Driven per-run by run_constraint_sweep.jl, but
 #   usable by hand: SCENARIO=random julia generate_plan.jl. Reproducible from
 #   those four numbers alone — it does NOT use generate_plan.jl's global seed.
-landmark_scenario: single
+landmark_scenario: behind_wall
 num_agents: 2
-algorithms: formation
+algorithms: hexspline_cl
 
 # Inline scenario geometry — read ONLY when landmark_scenario: manual.
 #   start / goal: "x,y"

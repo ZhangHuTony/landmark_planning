@@ -1,16 +1,32 @@
 # ==========================================================================
 # formation: baseline that separates routing from support placement entirely.
 #
-#   Primary  : the ordinary single-agent hexspline search — joint_astar with
-#              na=1, held to the same unc_radius_threshold as every other
-#              planner. It plans as if it were alone.
-#   Supports : added AFTERWARDS, by walking the finished primary path once.
-#              Each holds a slot in the primary's BODY frame (one hex out, at a
-#              60° multiple off its heading) and starts on the primary's own node.
+#   Primary  : its own weighted A* over (cell, belief) — formation_primary_astar
+#              below. Routing is the ordinary single-agent search, but a goal
+#              candidate is ACCEPTED on the uncertainty the primary has once its
+#              supports are attached, never on what it can certify alone.
+#   Supports : attached by walking a candidate primary path once, INSIDE the
+#              acceptance test. Each holds a slot in the primary's BODY frame
+#              (one hex out, at a 60° multiple off its heading) and starts on
+#              the primary's own node.
 #
-# There is no joint search and no formation state inside the search, which is
-# what makes this the cheapest planner here: one single-agent A*, then a linear
-# placement walk. It is a baseline for "route selfishly, then bring help".
+# There is still no joint state space: the supports follow a fixed rule rather
+# than being searched, so this stays the cheapest planner here — one single-agent
+# A*, plus a linear placement walk per goal candidate. It is a baseline for
+# "route with help in mind, but place that help by a fixed formation rule".
+#
+# Holding the primary to the threshold ALONE (which is what calling joint_astar
+# with na=1 did) is not the same policy and is strictly more pessimistic than
+# even `sequential`'s parked-helper leg 1: at na=1 the comm-fusion loop in
+# apply_synchronized_propagation! is empty, so the supports contribute nothing
+# at all to the belief being searched over. Every CI fusion is det-non-increasing
+# by construction (ω=1 leaves the agent's own covariance untouched and is always
+# in ci_omega_det's feasible set), so escorted uncertainty is never worse than
+# solo — the old bound demanded the primary certify a route by itself and then
+# handed it escorts its certificate never needed. It bought detour length for
+# landmark coverage the formation supplies free, and at tight thresholds it was
+# often unreachable at all, draining the budget and returning the
+# minimum-solo-uncertainty incumbent, i.e. a long landmark detour.
 #
 # ── Placement policy, per support per step ───────────────────────────────────
 # Pick a TARGET, then move exactly one hex toward it.
@@ -261,6 +277,153 @@ function place_supports(graph::LandmarkGraph, lms::Vector{Landmark},
     return paths
 end
 
+# Attach supports to a candidate primary path and score the result. This is the
+# acceptance test's whole content: place, evaluate ESCORTED, gate the spline.
+#
+# Returns (paths, offsets, unc, clear) for the best slot roster, ranked
+# (spline-clear, then escorted primary uncertainty). Length is deliberately NOT a
+# ranking row: every roster here reuses the SAME primary path, so primary length
+# ties exactly and the row would only be reading float noise.
+#
+# `clear` is seed_spline_clear on the FULL roster, which is what actually ships.
+# The supports' own moves are filtered as polylines between hex centres
+# (support_move_ok), but the refined B-spline cuts those corners off and pads
+# supports to the primary's waypoint count, so a polyline-clean formation can
+# still breach — and unlike an over-threshold seed, which the barrier can trade
+# length for, an obstacle breach or a support-cap violation is topological and no
+# local perturbation of the spline repairs it.
+function formation_attach(graph::LandmarkGraph, lms::Vector{Landmark},
+                          nbrs::Vector{Vector{Int}}, at::Dict{Tuple{Int,Int}, Int},
+                          primary_path::Vector{Int}, rosters::Vector{Vector{Int}})
+    best_paths = Vector{Vector{Int}}(); best_offs = Int[]
+    best_unc = Inf; best_clear = false; best_key = nothing
+    for roster in rosters
+        cand = vcat(place_supports(graph, lms, nbrs, at, primary_path, roster), [primary_path])
+        covs, _ = evaluate_full_paths(cand, graph, lms, NUM_AGENTS)
+        u = unc_radius(covs[NUM_AGENTS])
+        clear = seed_spline_clear(cand, graph, lms)
+        key = (clear ? 0 : 1, u)
+        if best_key === nothing || key < best_key
+            best_key = key
+            best_paths = cand; best_offs = roster; best_unc = u; best_clear = clear
+        end
+    end
+    return best_paths, best_offs, best_unc, best_clear
+end
+
+# ==========================================================================
+# The primary's route, searched against the ESCORTED belief
+# ==========================================================================
+# Weighted A* over (cell, belief): the same f = g + (1+ε)·h on the Floyd-Warshall
+# heuristic, the same node-level PSD-dominance frontier and the same anytime
+# incumbent as joint_astar's single-agent branch. The one difference is the
+# acceptance test — at every goal candidate the supports are attached and the
+# PRIMARY'S ESCORTED uncertainty is what decides, so the search returns the
+# shortest route the formation can actually escort rather than the shortest the
+# primary could have certified unaided.
+#
+# Why this is a separate search and not a flag on joint_astar: the supports do
+# not exist until a WHOLE primary path exists (place_supports walks a finished
+# route), so the escorted belief cannot be threaded through the frontier the way
+# sequential's joint-prefix evaluation is. It is available only at a goal pop.
+#
+# The frontier therefore still prunes on the SOLO (distance, covariance) pair,
+# because that is all a partial path has. Two prefixes that tie there can escort
+# differently, so pruning here is a heuristic rather than the sound dominance the
+# single-agent branch enjoys — the same character of approximation as
+# sequential's beam. There is deliberately NO uncertainty gate on popped or
+# expanded states: gating on solo uncertainty is precisely the thing this search
+# exists to stop doing, so PRUNE_BY_PRIMARY_UNCERTAINTY is not consulted (it is
+# false in the shipped configs anyway). A* pops in f order, so the first
+# candidate that clears the escorted bound is the shortest one that does.
+#
+# Returns (paths, offsets, unc, iters); `paths` empty means no route at all.
+function formation_primary_astar(graph::LandmarkGraph, lms::Vector{Landmark},
+                                 nbrs::Vector{Vector{Int}}, at::Dict{Tuple{Int,Int}, Int},
+                                 rosters::Vector{Vector{Int}}, threshold::Float64)
+    goal = graph.n
+    is_goal_cell = falses(goal)
+    for v in 1:(goal - 1); goal in graph.neighbors[v] && (is_goal_cell[v] = true); end
+
+    init_visited = falses(goal); init_visited[1] = true
+    states = State[State(1, 0.0, copy(lms[1].cov), -1, init_visited)]
+
+    w  = 1.0 + PRIMARY_EPSILON
+    pq = PriorityQueue{Int, Tuple{Float64, Float64}}()
+    enqueue!(pq, 1, (w * graph.shortest_paths[1, goal], unc_radius(states[1].cov)))
+
+    frontier = Dict{Int, Vector{Tuple{Float64, Matrix{Float64}}}}()
+    frontier[1] = [(0.0, copy(states[1].cov))]
+
+    # One incumbent, ranked exactly as formation_attach ranks rosters: a
+    # spline-clear roster beats a breaching one, then lower escorted uncertainty.
+    # Seeded empty, so a search that never reaches the goal reports no solution
+    # while one that reaches it but never clears the bound still hands the barrier
+    # its best attempt — the same degradation every other planner here performs.
+    best_paths = Vector{Vector{Int}}(); best_offs = Int[]; best_unc = Inf
+    best_key = nothing
+    iters = 0; t0 = time()
+
+    trace(si::Int) = begin
+        path = Int[]; p = si
+        while p != -1; pushfirst!(path, states[p].node); p = states[p].parent; end
+        path
+    end
+
+    while !isempty(pq) && iters < ASTAR_ITERATION_LIMIT
+        si = dequeue!(pq); S = states[si]
+        iters += 1
+        astar_progress(iters, ASTAR_ITERATION_LIMIT, t0)
+
+        if is_goal_cell[S.node]
+            cand, offs, unc, clear = formation_attach(graph, lms, nbrs, at, trace(si), rosters)
+            if clear && unc_within_threshold(unc, threshold, UNC_FEAS_TOL)
+                println()
+                println("    ✓ escorted-feasible at iter $(iters): dist=$(round(S.dist, digits=3)), " *
+                        "unc=$(round(unc, digits=4)) (slot $(offs))")
+                return cand, offs, unc, iters
+            end
+            key = (clear ? 0 : 1, unc)
+            if best_key === nothing || key < best_key
+                best_key = key; best_paths = cand; best_offs = offs; best_unc = unc
+            end
+            continue
+        end
+
+        for u in graph.neighbors[S.node]
+            S.visited[u] && continue
+
+            ncov = edge_cov_continuous(S.node, u, graph, lms, S.cov)
+            nd   = S.dist + graph.distance[S.node, u]
+
+            # Chance-constrained obstacle filter at the primary's own belief, same
+            # call site as joint_astar's expansion (hexspline_cl.jl:643).
+            if !isempty(OBSTACLES)
+                p0 = graph.landmarks[S.node]; p1 = graph.landmarks[u]
+                segment_obstacle_free((p0.x, p0.y), (p1.x, p1.y), ncov) || continue
+            end
+
+            labels = get(frontier, u, Tuple{Float64, Matrix{Float64}}[])
+            any(l -> l[1] <= nd + 1e-9 && cov_dominates(l[2], ncov), labels) && continue
+            kept = [l for l in labels if !(nd <= l[1] + 1e-9 && cov_dominates(ncov, l[2]))]
+            push!(kept, (nd, copy(ncov)))
+            frontier[u] = kept
+
+            nvis = copy(S.visited); nvis[u] = true
+            push!(states, State(u, nd, ncov, si, nvis))
+            enqueue!(pq, length(states),
+                     (nd + w * graph.shortest_paths[u, goal], unc_radius(ncov)))
+        end
+    end
+
+    println()   # release the status-bar line
+    isempty(best_paths) && return best_paths, best_offs, Inf, iters
+    println("    nothing cleared the escorted bound; handing the best attempt to the barrier: " *
+            "unc=$(round(best_unc, digits=4)) (slot $(best_offs))" *
+            (best_key[1] == 0 ? "" : " [breaches the spline gate]"))
+    return best_paths, best_offs, best_unc, iters
+end
+
 # How far each support's arc length ends up from the primary's. Zero unless a
 # support had to take the rung-3 fallback (see the header): comm checkpoints are
 # arc-indexed, so drift here is drift in WHEN agents talk, not just where.
@@ -289,49 +452,32 @@ function plan_formation(scenario, graph::LandmarkGraph, output_dir::String)
         "needs $(ns). Add slots to config/formation.yaml (60° units; 0 is the primary's own cell).")
 
     println("\n── FORMATION PLANNING ──")
-    println("  Primary: single-agent hexspline A* (threshold $(UNC_RADIUS_THRESHOLD)); supports added afterwards.")
+    println("  Primary: own A* (formation_primary_astar); a goal candidate is accepted on the " *
+            "primary's uncertainty WITH its supports attached (threshold $(UNC_RADIUS_THRESHOLD)).")
 
-    # ── Primary plans alone ──
-    ppaths, _, _, iters = joint_astar(graph, landmarks, UNC_RADIUS_THRESHOLD, 1)
-    if isempty(ppaths) || isempty(ppaths[1])
+    # With ONE support there is a single slot to pick and picking it wrong is the
+    # worst failure mode (a support held away from every landmark contributes
+    # nothing but a halved comm weight). Placement is a linear walk over a path
+    # the candidate already fixes, so trying both lateral slots is cheap. With 2+
+    # supports the roster is a config decision: the slots interact and the
+    # combinatorics are 5·4·… .
+    rosters = ns == 1 ? [[1], [-1]] : [FORMATION_OFFSETS[1:ns]]
+    println(ns == 1 ? "  One support: both lateral slots (+1 = 60° left, -1 = 60° right) tried per candidate." :
+                      "  Body-frame slots (60° units off the primary's heading): $(rosters[1])")
+
+    # Built before the search, not after: the acceptance test places supports at
+    # every goal candidate, so it needs these.
+    at   = build_hex_lookup(graph)
+    nbrs = build_formation_neighbors(graph, at)
+
+    paths, offsets, _, iters =
+        formation_primary_astar(graph, landmarks, nbrs, at, rosters, UNC_RADIUS_THRESHOLD)
+    if isempty(paths)
         println("  ✗ No route to the goal for the primary.")
         write_no_solution(iters)
         return NamedTuple[]
     end
-    primary_path = ppaths[1]
-
-    # ── Supports added on top ──
-    # With ONE support there is a single slot to pick and picking it wrong is the
-    # worst failure mode (a support held away from every landmark contributes
-    # nothing but a halved comm weight). Placement is a linear walk over a path
-    # that is already fixed, so trying both lateral slots is nearly free — unlike
-    # before, the primary is NOT re-searched per slot. With 2+ supports the roster
-    # is a config decision: the slots interact and the combinatorics are 5·4·… .
-    rosters = ns == 1 ? [[1], [-1]] : [FORMATION_OFFSETS[1:ns]]
-    println(ns == 1 ? "  One support: trying both lateral slots (+1 = 60° left, -1 = 60° right)." :
-                      "  Body-frame slots (60° units off the primary's heading): $(rosters[1])")
-
-    at   = build_hex_lookup(graph)
-    nbrs = build_formation_neighbors(graph, at)
-
-    offsets = Int[]; paths = Vector{Vector{Int}}(); best_rank = (typemax(Int), Inf, Inf)
-    for roster in rosters
-        cand = vcat(place_supports(graph, landmarks, nbrs, at, primary_path, roster), [primary_path])
-        covs, dists = evaluate_full_paths(cand, graph, landmarks, NUM_AGENTS)
-        u = unc_radius(covs[NUM_AGENTS])
-        ok = unc_within_threshold(u, UNC_RADIUS_THRESHOLD, UNC_FEAS_TOL)
-        # Feasible beats infeasible; then shorter (the barrier's objective); then
-        # lower uncertainty. That last row is not a formality — every roster reuses
-        # the SAME primary path, so lengths tie exactly and ranking on length alone
-        # would leave the choice to float noise (measured: it picked unc 9.49 over
-        # 8.88). Length is rounded so a 1-ULP spread cannot pre-empt it.
-        rank = (ok ? 0 : 1, ok ? round(dists[NUM_AGENTS], digits=6) : 0.0, u)
-        length(rosters) > 1 && println("  Slot $(roster): unc=$(round(u, digits=4)) $(ok ? "✓" : "✗")")
-        if rank < best_rank
-            best_rank = rank; paths = cand; offsets = roster
-        end
-    end
-    length(rosters) > 1 && println("  → Chose slot $(offsets)")
+    ns == 1 && println("  → Chose slot $(offsets)")
 
     seed_covs, seed_dists = evaluate_full_paths(paths, graph, landmarks, NUM_AGENTS)
     uncs = [unc_radius(seed_covs[a]) for a in 1:NUM_AGENTS]

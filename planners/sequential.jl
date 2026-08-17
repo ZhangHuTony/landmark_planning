@@ -294,7 +294,35 @@ function seq_helper_search(graph::LandmarkGraph, lms::Vector{Landmark},
         layer = nxt
     end
 
-    return layer[1].path        # layers are sorted by seq_rank, so this is the argmin
+    # Best-first: the layer is sorted by seq_rank, so this returns the highest-ranked
+    # route that ALSO survives as a SPLINE. The per-step filter above only tests the
+    # straight polyline between hex centres, but what ships is gated on the spline
+    # (seed_spline_clear, in plan_sequential) — so without this the leg optimises
+    # against one standard and is judged by another, with nothing downstream able to
+    # repair it: the helpers are never re-planned, and leg 4 can only vary the PRIMARY,
+    # which cannot fix a helper-side breach. Measured on s001/s017 of
+    # constraint_sweep/2026-08-14_16-55-00: every one of leg 4's 41 and 47 goal
+    # candidates was uncertainty-feasible and every one was vetoed by the helper's
+    # breach, leaving the parked fallback — which discards the whole leg — as the only
+    # recourse. It fired on 28 of 50 scenarios at the 100% rung.
+    #
+    # Exact rather than approximate: at k=K the helper's path is already the primary's
+    # length, so seed_control_points pads nothing and this builds the same spline the
+    # seed gate will. Affordable because it runs once per LEG, not once per expansion —
+    # the cost that put the gate at goal pops to begin with (hexspline_cl.jl:308).
+    # Measured ~0.2 ms per test, median 8 tests, a full 400-label beam in 0.09 s.
+    for (i, L) in enumerate(layer)
+        if seed_spline_clear(seq_with(roster, free, L.path), graph, lms)
+            i > 1 && println("    (took rank #$(i) of $(length(layer)); " *
+                             "$(i - 1) better-ranked route(s) breach as splines)")
+            return L.path
+        end
+    end
+    # Nothing in the final layer survives. Hand back the rank-best anyway — that is
+    # exactly what shipped before this loop existed, so plan_sequential's parked
+    # fallback takes over as it always did. 2 of the 28 measured scenarios land here.
+    println("    (no route in the final layer survives as a spline)")
+    return layer[1].path
 end
 
 # ==========================================================================
@@ -391,11 +419,29 @@ function plan_sequential(scenario, graph::LandmarkGraph, output_dir::String)
             # has already spent 6x the length budget leaves it nothing to work with.
             # Length rounded so a 1-ULP spread cannot pre-empt the row (formation.jl
             # ranks its slots the same way).
-            rank(ok, len, unc) = (ok ? 0 : 1, round(len, digits=6), unc)
-            take = rank(ok2, len2, unc2) < rank(ok1, len1, unc1)
+            # Spline clearance outranks EVERYTHING, including uncertainty feasibility.
+            # An over-threshold seed is still workable — trading length for
+            # uncertainty is exactly what the barrier does — but obstacle clearance
+            # and the support cap are topological, and no local perturbation
+            # re-routes a spline around a wall. Shipping a seed that breaches leaves
+            # the optimizer starting outside the feasible set with nothing it can do,
+            # which surfaces as `recovery_failed` no matter how slack the constraint
+            # was: measured on probe_A3_sound, s001 p100 failed at unc 1.65 against a
+            # threshold of 8.63, seed min_slack -11.05.
+            #
+            # Both rosters have to be tested HERE rather than relying on the gate
+            # inside seq_primary_astar. That gate sees the untruncated roster, while
+            # what actually ships is `cand`, whose helpers are cut to the new
+            # primary's length — and the truncation can break a clearance the gate
+            # had already certified.
+            clear1 = seed_spline_clear(roster, graph, landmarks)
+            clear2 = seed_spline_clear(cand, graph, landmarks)
+            rank(clr, ok, len, unc) = (clr ? 0 : 1, ok ? 0 : 1, round(len, digits=6), unc)
+            take = rank(clear2, ok2, len2, unc2) < rank(clear1, ok1, len1, unc1)
             println("    leg 1 route: len=$(round(len1, digits=1)), unc=$(round(unc1, digits=4)) " *
-                    "$(ok1 ? "✓" : "✗")  |  re-planned: len=$(round(len2, digits=1)), " *
-                    "unc=$(round(unc2, digits=4)) $(ok2 ? "✓" : "✗")  → " *
+                    "$(ok1 ? "✓" : "✗")$(clear1 ? "" : " [breaches]")  |  " *
+                    "re-planned: len=$(round(len2, digits=1)), " *
+                    "unc=$(round(unc2, digits=4)) $(ok2 ? "✓" : "✗")$(clear2 ? "" : " [breaches]")  → " *
                     "$(take ? "TAKE re-plan" : "keep leg 1")")
             take && (roster = cand; replanned = true)
         else
@@ -404,6 +450,25 @@ function plan_sequential(scenario, graph::LandmarkGraph, output_dir::String)
     end
 
     paths = roster
+    # Last resort. The helpers are planned AFTER the leg-1 primary and are never
+    # re-planned, so the combination that actually ships is a roster no gate has
+    # necessarily seen — leg 1 certified the primary against PARKED helpers, and
+    # leg 4 only runs (and is only taken) sometimes. If what is left still breaches,
+    # fall back to the configuration leg 1 did certify: primary as planned, helpers
+    # parked. A parked helper never dead-reckons, so it holds Σ₀ and still anchors —
+    # weaker localization, but a seed the optimizer can start from rather than one it
+    # must reject outright.
+    if na > 1 && !seed_spline_clear(paths, graph, landmarks)
+        parked = [a == na ? paths[na] : Int[1] for a in 1:na]
+        if seed_spline_clear(parked, graph, landmarks)
+            println("  Shipped roster breaches the obstacle/support gate; " *
+                    "falling back to parked helpers.")
+            paths = parked
+        else
+            println("  [warn] Shipped roster breaches and so does the parked fallback; " *
+                    "the optimizer starts outside the feasible set.")
+        end
+    end
     seed_covs, seed_dists = evaluate_full_paths(paths, graph, landmarks, na)
     uncs = [unc_radius(seed_covs[a]) for a in 1:na]
     for a in 1:(na - 1)
