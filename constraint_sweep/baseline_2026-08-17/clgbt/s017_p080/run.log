@@ -1,0 +1,37 @@
+Landmark scenario: random — 2 landmarks, 3 obstacles, start (0.0, 0.0) → goal (750.0, 0.0)
+Hex graph: 339 nodes (336 heading-states + 2 sensors + goal), radius=86.60254037844388m, directed_edges=840, grid=10x11, start_cell=(2, 5), goal_cell=(7, 5), start_heading=0
+
+── CL-GBT PLANNING (sampling-based joint tree, continuous R²) ──
+  [CL-GBT] iter 200/200000  tree=162  elapsed=0.1s     [CL-GBT] iter 400/200000  tree=312  elapsed=0.1s     [CL-GBT] iter 600/200000  tree=466  elapsed=0.1s     [CL-GBT] iter 800/200000  tree=629  elapsed=0.1s     [CL-GBT] iter 1000/200000  tree=771  elapsed=0.1s     [CL-GBT] iter 1200/200000  tree=915  elapsed=0.1s     [CL-GBT] iter 1400/200000  tree=1053  elapsed=0.2s   ┌ Warning: Seed is infeasible (min_slack=-0.3200212232840018, ε=0.001); the barrier will try to recover it before shortening. Expected for the straight_cont ablation, and for a discrete seed that A* returned as its best incumbent after exhausting its budget.
+└ @ Main ~/projects/landmark_planning/planners/hexspline_cl.jl:1207
+
+  Support 1: dist=2100.0m, goal_unc=6.3621m
+  Primary  : dist=2248.0m, goal_unc=6.8328m (threshold 7.164028589) — 1520 iterations, tree size 1136
+
+=== Continuous Spline Optimization (threshold=7.164) ===
+  Initial (discrete→spline): prim_len=1896.621, unc=6.831
+  Barrier stage 1/15: μ=20.0
+  Barrier stage 2/15: μ=20.0
+  Barrier stage 3/15: μ=20.0
+  Barrier stage 4/15: μ=20.0
+  Barrier stage 5/15: μ=20.0
+  Barrier stage 6/15: μ=20.0
+  Barrier stage 7/15: μ=20.0
+  Barrier stage 8/15: μ=20.0
+  Barrier stage 9/15: μ=20.0
+  Barrier stage 10/15: μ=20.0
+  Barrier stage 11/15: μ=20.0
+  Barrier stage 12/15: μ=20.0
+  [Spline barrier] line search stalled; stopping at stage 12
+  Barrier stage 13/15: μ=20.0
+  [Spline barrier] line search stalled; stopping at stage 13
+  Barrier stage 14/15: μ=20.0
+  [Spline barrier] line search stalled; stopping at stage 14
+  Barrier stage 15/15: μ=20.0
+  [Spline barrier] line search stalled; stopping at stage 15
+  Final: prim_len=2095.937, unc=6.024, threshold=7.164, status=recovery_failed, min_slack=-0.000643
+  Obstacle re-verification: mean path clears all obstacles ✓
+Fig combined (main) saved: Discrete Len=1896.62 → Continuous Len=2095.94
+Fig uncertainty profile (main) saved: /home/tonyzhang/projects/landmark_planning/constraint_sweep/baseline_2026-08-17/clgbt/s017_p080/clgbt/figures/main_unc_profile.png
+
+[clgbt] produced 1 solution(s) -> /home/tonyzhang/projects/landmark_planning/constraint_sweep/baseline_2026-08-17/clgbt/s017_p080/clgbt

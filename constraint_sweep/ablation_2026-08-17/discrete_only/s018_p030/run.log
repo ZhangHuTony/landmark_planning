@@ -1,0 +1,49 @@
+Landmark scenario: random — 4 landmarks, 2 obstacles, start (0.0, 0.0) → goal (900.0, 0.0)
+Hex graph: 383 nodes (378 heading-states + 4 sensors + goal), radius=86.60254037844388m, directed_edges=954, grid=11x11, start_cell=(2, 5), goal_cell=(8, 5), start_heading=0
+Conditional ε-bound: ε_sample=1.1925, w=1.0, ε_total=1.1925
+  Bound form (conditional): L_returned ≤ (1+ε_total) L* with assumptions documented in comments.
+
+── MULTI-AGENT PLANNING (Synchronized Kalman) ──
+
+  Running joint discrete A* (threshold=3.3169)... (max_iters=1000000)
+  Stops on the first feasible candidate under the threshold.
+  ✓ Goal reachable from node 1 with distance 900.0
+
+  [Constraint A*] Incumbent seed at iter 679: dist=1050.0, unc=7.2201 > 3.3169
+  [A*] iter 1000/1000000 (0.1%)  left=999000  elapsed=1.4s   
+  [Constraint A*] Incumbent seed at iter 1406: dist=1050.0, unc=4.1288 > 3.3169
+
+  [Constraint A*] Incumbent seed at iter 1479: dist=1050.0, unc=4.1285 > 3.3169
+
+  [Constraint A*] Incumbent seed at iter 1812: dist=1050.0, unc=3.6026 > 3.3169
+  [A*] iter 2000/1000000 (0.2%)  left=998000  elapsed=1.5s     [A*] iter 3000/1000000 (0.3%)  left=997000  elapsed=1.6s     [A*] iter 4000/1000000 (0.4%)  left=996000  elapsed=1.6s     [A*] iter 5000/1000000 (0.5%)  left=995000  elapsed=1.6s     [A*] iter 6000/1000000 (0.6%)  left=994000  elapsed=1.7s     [A*] iter 7000/1000000 (0.7%)  left=993000  elapsed=1.7s     [A*] iter 8000/1000000 (0.8%)  left=992000  elapsed=2.0s     [A*] iter 9000/1000000 (0.9%)  left=991000  elapsed=2.0s     [A*] iter 10000/1000000 (1.0%)  left=990000  elapsed=2.1s     [A*] iter 11000/1000000 (1.1%)  left=989000  elapsed=2.1s     [A*] iter 12000/1000000 (1.2%)  left=988000  elapsed=2.1s     [A*] iter 13000/1000000 (1.3%)  left=987000  elapsed=2.1s     [A*] iter 14000/1000000 (1.4%)  left=986000  elapsed=2.2s     [A*] iter 15000/1000000 (1.5%)  left=985000  elapsed=2.3s     [A*] iter 16000/1000000 (1.6%)  left=984000  elapsed=2.3s     [A*] iter 17000/1000000 (1.7%)  left=983000  elapsed=2.3s     [A*] iter 18000/1000000 (1.8%)  left=982000  elapsed=2.4s     [A*] iter 19000/1000000 (1.9%)  left=981000  elapsed=2.4s   
+  ✓ FEASIBLE SOLUTION at iter 19954: dist=1200.0, unc=1.5234
+  [Constraint A*] Complete: 19954 iterations, final_dist=1200.0
+
+✓ Multi-agent solution with synchronized Kalman fusion:
+  Support agent 1: node=312, dist=1200.0m, goal_unc=1.0765m
+  Primary agent: node=210, dist=1200.0m, goal_unc=1.5234m
+  ├─ Communication: every 100.0m, sigmoid taper range=300.0m width=20.0m
+  └─ All agents' uncertainties benefit from synchronized Kalman fusion at checkpoints
+
+--- Final Results ---
+Support agent 1 : [1, 230, 279, 338, 343, 349, 355, 361, 312]  dist=1200.0  goal_unc=1.0765  ✓  (Kalman-fused)
+Primary agent : [1, 175, 236, 290, 295, 301, 307, 264, 210]  dist=1200.0  goal_unc=1.5234  threshold=3.316862917 ✓ met  (Kalman-fused)
+
+=== Kalman Filtering Summary ===
+All 2 agents performing synchronized Kalman filtering:
+  • Dead-reckoning propagation: DIR=0.05/m, PERP=0.016666666666666666/m
+  • Landmark fusion: Information filter (Joseph form) at every waypoint
+  • SYNCHRONIZED inter-agent communication: every 100.0m of travel
+  • Tapered sigmoid weighting: range=300.0m, width=20.0m (soft plateau + rolloff)
+  • Bidirectional Kalman fusion: all agent pairs within range at each checkpoint
+  • Measurement model: bearing-angle sensor with noise=0.038, ratio=2.2
+  └─ Support agents: goal_unc=1.0765m (improved by inter-agent fusion)
+  └─ Primary agent: goal_unc=1.5234m (direct path with landmark updates)
+Converged at iteration : 19954
+Figure path-role mapping: supports = paths[1:1], primary = paths[2]
+Discrete evaluation: prim_len=1200.0, unc=1.5234
+Fig 1 saved.
+Discrete-only spline: prim_len=1135.862, unc=1.5234
+
+[discrete_only] produced 1 solution(s) -> /home/tonyzhang/projects/landmark_planning/constraint_sweep/ablation_2026-08-17/discrete_only/s018_p030/discrete_only

@@ -1,0 +1,38 @@
+Landmark scenario: random — 3 landmarks, 3 obstacles, start (0.0, 0.0) → goal (600.0, 0.0)
+Hex graph: 298 nodes (294 heading-states + 3 sensors + goal), radius=86.60254037844388m, directed_edges=726, grid=9x11, start_cell=(2, 5), goal_cell=(6, 5), start_heading=0
+
+── CL-GBT PLANNING (sampling-based joint tree, continuous R²) ──
+  [CL-GBT] iter 200/200000  tree=142  elapsed=0.0s     [CL-GBT] iter 400/200000  tree=280  elapsed=0.0s     [CL-GBT] iter 600/200000  tree=418  elapsed=0.0s     [CL-GBT] iter 800/200000  tree=552  elapsed=0.0s     [CL-GBT] iter 1000/200000  tree=685  elapsed=0.0s     [CL-GBT] iter 1200/200000  tree=821  elapsed=0.0s     [CL-GBT] iter 1400/200000  tree=948  elapsed=0.0s     [CL-GBT] iter 1600/200000  tree=1071  elapsed=0.1s     [CL-GBT] iter 1800/200000  tree=1187  elapsed=0.1s     [CL-GBT] iter 2000/200000  tree=1297  elapsed=0.1s     [CL-GBT] iter 2200/200000  tree=1413  elapsed=0.1s     [CL-GBT] iter 2400/200000  tree=1525  elapsed=0.1s     [CL-GBT] iter 2600/200000  tree=1638  elapsed=0.1s     [CL-GBT] iter 2800/200000  tree=1742  elapsed=0.2s     [CL-GBT] iter 3000/200000  tree=1856  elapsed=0.2s     [CL-GBT] iter 3200/200000  tree=1951  elapsed=0.2s     [CL-GBT] iter 3400/200000  tree=2063  elapsed=0.2s     [CL-GBT] iter 3600/200000  tree=2174  elapsed=0.2s     [CL-GBT] iter 3800/200000  tree=2279  elapsed=0.2s     [CL-GBT] iter 4000/200000  tree=2383  elapsed=0.2s     [CL-GBT] iter 4200/200000  tree=2478  elapsed=0.2s     [CL-GBT] iter 4400/200000  tree=2579  elapsed=0.3s     [CL-GBT] iter 4600/200000  tree=2676  elapsed=0.3s     [CL-GBT] iter 4800/200000  tree=2781  elapsed=0.3s     [CL-GBT] iter 5000/200000  tree=2891  elapsed=0.3s     [CL-GBT] iter 5200/200000  tree=2996  elapsed=0.3s     [CL-GBT] iter 5400/200000  tree=3084  elapsed=0.4s     [CL-GBT] iter 5600/200000  tree=3177  elapsed=0.4s     [CL-GBT] iter 5800/200000  tree=3284  elapsed=0.4s     [CL-GBT] iter 6000/200000  tree=3394  elapsed=0.4s     [CL-GBT] iter 6200/200000  tree=3510  elapsed=0.4s     [CL-GBT] iter 6400/200000  tree=3609  elapsed=0.4s     [CL-GBT] iter 6600/200000  tree=3717  elapsed=0.5s     [CL-GBT] iter 6800/200000  tree=3809  elapsed=0.5s     [CL-GBT] iter 7000/200000  tree=3900  elapsed=0.5s     [CL-GBT] iter 7200/200000  tree=3986  elapsed=0.5s     [CL-GBT] iter 7400/200000  tree=4088  elapsed=0.5s     [CL-GBT] iter 7600/200000  tree=4185  elapsed=0.6s     [CL-GBT] iter 7800/200000  tree=4268  elapsed=0.6s     [CL-GBT] iter 8000/200000  tree=4366  elapsed=0.7s     [CL-GBT] iter 8200/200000  tree=4477  elapsed=0.7s     [CL-GBT] iter 8400/200000  tree=4571  elapsed=0.7s     [CL-GBT] iter 8600/200000  tree=4676  elapsed=0.7s     [CL-GBT] iter 8800/200000  tree=4771  elapsed=0.8s     [CL-GBT] iter 9000/200000  tree=4871  elapsed=0.8s     [CL-GBT] iter 9200/200000  tree=4957  elapsed=0.8s     [CL-GBT] iter 9400/200000  tree=5052  elapsed=0.8s     [CL-GBT] iter 9600/200000  tree=5144  elapsed=0.9s     [CL-GBT] iter 9800/200000  tree=5235  elapsed=0.9s     [CL-GBT] iter 10000/200000  tree=5326  elapsed=0.9s   ┌ Warning: Seed is infeasible (min_slack=-0.0022974026302133924, ε=0.001); the barrier will try to recover it before shortening. Expected for the straight_cont ablation, and for a discrete seed that A* returned as its best incumbent after exhausting its budget.
+└ @ Main ~/projects/landmark_planning/planners/hexspline_cl.jl:1207
+
+  Support 1: dist=1650.0m, goal_unc=0.8495m
+  Primary  : dist=1769.1m, goal_unc=2.7212m (threshold 3.057838333) — 10108 iterations, tree size 5383
+
+=== Continuous Spline Optimization (threshold=3.0578) ===
+  Initial (discrete→spline): prim_len=1452.205, unc=2.5775
+  Barrier stage 1/15: μ=20.0
+  Barrier stage 2/15: μ=20.0
+  Barrier stage 3/15: μ=20.0
+  Barrier stage 4/15: μ=20.0
+  Barrier stage 5/15: μ=20.0
+  Barrier stage 6/15: μ=20.0
+  Barrier stage 7/15: μ=20.0
+  Barrier stage 8/15: μ=20.0
+  Barrier stage 9/15: μ=20.0
+  Barrier stage 10/15: μ=20.0
+  Barrier stage 11/15: μ=20.0
+  Barrier stage 12/15: μ=20.0
+    → Recovered into the feasible set at iter 779 (min_slack=1.2e-5); feasible-only gate now armed
+  → Converged at iter 799 (Δlen=5.8e-5)
+  Barrier stage 13/15: μ=7.0
+  → Converged at iter 800 (Δlen=3.3e-5)
+  Barrier stage 14/15: μ=2.45
+  → Converged at iter 806 (Δlen=0.000687)
+  Barrier stage 15/15: μ=0.8575
+  [Spline barrier] line search stalled; stopping at stage 15
+  Final: prim_len=1502.582, unc=2.8144, threshold=3.0578, status=optimized, min_slack=0.0
+  Obstacle re-verification: mean path clears all obstacles ✓
+Fig combined (main) saved: Discrete Len=1452.21 → Continuous Len=1502.58
+Fig uncertainty profile (main) saved: /home/tonyzhang/projects/landmark_planning/constraint_sweep/baseline_2026-08-17/clgbt/s023_p060/clgbt/figures/main_unc_profile.png
+
+[clgbt] produced 1 solution(s) -> /home/tonyzhang/projects/landmark_planning/constraint_sweep/baseline_2026-08-17/clgbt/s023_p060/clgbt

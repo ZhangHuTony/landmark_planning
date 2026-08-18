@@ -1,0 +1,76 @@
+Landmark scenario: random — 4 landmarks, 2 obstacles, start (0.0, 0.0) → goal (600.0, 0.0)
+Hex graph: 299 nodes (294 heading-states + 4 sensors + goal), radius=86.60254037844388m, directed_edges=726, grid=9x11, start_cell=(2, 5), goal_cell=(6, 5), start_heading=0
+Conditional ε-bound: ε_sample=1.2887, w=1.0, ε_total=1.2887
+  Bound form (conditional): L_returned ≤ (1+ε_total) L* with assumptions documented in comments.
+
+── MULTI-AGENT PLANNING (Synchronized Kalman) ──
+
+  Running joint discrete A* (threshold=6.739)... (max_iters=1000000)
+  Stops on the first feasible candidate under the threshold.
+  ✓ Goal reachable from node 1 with distance 600.0
+
+  ✓ FEASIBLE SOLUTION at iter 28: dist=750.0, unc=5.7681
+  [Constraint A*] Complete: 28 iterations, final_dist=750.0
+
+✓ Multi-agent solution with synchronized Kalman fusion:
+  Support agent 1: node=69, dist=750.0m, goal_unc=1.0589m
+  Primary agent: node=158, dist=750.0m, goal_unc=5.7681m
+  ├─ Communication: every 100.0m, sigmoid taper range=300.0m width=20.0m
+  └─ All agents' uncertainties benefit from synchronized Kalman fusion at checkpoints
+
+--- Final Results ---
+Support agent 1 : [1, 103, 61, 25, 26, 69]  dist=750.0  goal_unc=1.0589  ✓  (Kalman-fused)
+Primary agent : [1, 103, 104, 110, 116, 158]  dist=750.0  goal_unc=5.7681  threshold=6.7389956 ✓ met  (Kalman-fused)
+
+=== Kalman Filtering Summary ===
+All 2 agents performing synchronized Kalman filtering:
+  • Dead-reckoning propagation: DIR=0.05/m, PERP=0.016666666666666666/m
+  • Landmark fusion: Information filter (Joseph form) at every waypoint
+  • SYNCHRONIZED inter-agent communication: every 100.0m of travel
+  • Tapered sigmoid weighting: range=300.0m, width=20.0m (soft plateau + rolloff)
+  • Bidirectional Kalman fusion: all agent pairs within range at each checkpoint
+  • Measurement model: bearing-angle sensor with noise=0.038, ratio=2.2
+  └─ Support agents: goal_unc=1.0589m (improved by inter-agent fusion)
+  └─ Primary agent: goal_unc=5.7681m (direct path with landmark updates)
+Converged at iteration : 28
+Figure path-role mapping: supports = paths[1:1], primary = paths[2]
+Discrete evaluation: prim_len=750.0, unc=5.7681
+Fig 1 saved.
+
+=== Continuous Spline Optimization (threshold=6.739) ===
+  Initial (discrete→spline): prim_len=704.202, unc=5.7681
+  Barrier stage 1/15: μ=20.0
+  → Converged at iter 22 (Δlen=8.3e-5)
+  Barrier stage 2/15: μ=7.0
+  [Spline barrier] line search stalled; stopping at stage 2
+  Barrier stage 3/15: μ=2.45
+  [Spline barrier] line search stalled; stopping at stage 3
+  Barrier stage 4/15: μ=0.8575
+  [Spline barrier] line search stalled; stopping at stage 4
+  Barrier stage 5/15: μ=0.3001
+  [Spline barrier] line search stalled; stopping at stage 5
+  Barrier stage 6/15: μ=0.105
+  [Spline barrier] line search stalled; stopping at stage 6
+  Barrier stage 7/15: μ=0.0368
+  [Spline barrier] line search stalled; stopping at stage 7
+  Barrier stage 8/15: μ=0.0129
+  [Spline barrier] line search stalled; stopping at stage 8
+  Barrier stage 9/15: μ=0.0045
+  [Spline barrier] line search stalled; stopping at stage 9
+  Barrier stage 10/15: μ=0.0016
+  [Spline barrier] line search stalled; stopping at stage 10
+  Barrier stage 11/15: μ=0.0006
+  Barrier stage 12/15: μ=0.0002
+  → Converged at iter 146 (Δlen=0.000957)
+  Barrier stage 13/15: μ=0.0001
+  → Converged at iter 148 (Δlen=0.000237)
+  Barrier stage 14/15: μ=0.0
+  → Converged at iter 149 (Δlen=0.000356)
+  Barrier stage 15/15: μ=0.0
+  [Spline barrier] line search stalled; stopping at stage 15
+  Final: prim_len=682.256, unc=6.0275, threshold=6.739, status=optimized, min_slack=1.7e-5
+  Obstacle re-verification: mean path clears all obstacles ✓
+Fig combined (main) saved: Discrete Len=704.2 → Continuous Len=682.26
+Fig uncertainty profile (main) saved: /home/tonyzhang/projects/landmark_planning/constraint_sweep/baseline_2026-08-17/hexspline_cl/s002_p100/hexspline_cl/figures/main_unc_profile.png
+
+[hexspline_cl] produced 1 solution(s) -> /home/tonyzhang/projects/landmark_planning/constraint_sweep/baseline_2026-08-17/hexspline_cl/s002_p100/hexspline_cl

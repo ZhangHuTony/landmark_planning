@@ -1,0 +1,11 @@
+main:
+  primary_length: 1725.6147479572435
+  primary_unc: 5.910169179478233
+  clgbt_iterations: 33445
+  clgbt_tree_size: 22530
+  discrete_uncertainties: [5.7835, 5.9152]
+  primary_disc_unc: 5.915220623505469
+  continuous_primary_length: 1725.615
+  continuous_uncertainties: [5.7783, 5.9102]
+  refinement_status: seed_only
+  refinement_min_slack: 1.000090628366923e-9

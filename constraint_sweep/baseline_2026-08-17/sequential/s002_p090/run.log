@@ -1,0 +1,46 @@
+Landmark scenario: random — 4 landmarks, 2 obstacles, start (0.0, 0.0) → goal (600.0, 0.0)
+Hex graph: 299 nodes (294 heading-states + 4 sensors + goal), radius=86.60254037844388m, directed_edges=726, grid=9x11, start_cell=(2, 5), goal_cell=(6, 5), start_heading=0
+
+── SEQUENTIAL PLANNING (2 agent(s), one at a time) ──
+  Leg 1 — primary, 1 helper(s) parked at start (bound 12.1302 = 2.0x the 6.06509604 threshold the shipped route is held to):
+
+    ✓ feasible at iter 17: dist=750.0, unc=6.0152
+  Leg 2 — helper 1 vs the fixed primary trajectory (6 steps, beam 400):
+    (took rank #4 of 52; 3 better-ranked route(s) breach as splines)
+    → helper 1 placed; primary goal_unc now 3.8538
+  Leg 3 — primary re-planned against the committed helper paths:
+
+    ✓ feasible at iter 15: dist=750.0, unc=3.8538
+    leg 1 route: len=750.0, unc=3.8538 ✓  |  re-planned: len=750.0, unc=3.8538 ✓  → keep leg 1
+  Helper 1: dist=750.0m, goal_unc=1.3436m
+  Primary  : dist=750.0m, goal_unc=3.8538m (threshold 6.06509604 ✓)
+
+=== Continuous Spline Optimization (threshold=6.0651) ===
+  Initial (discrete→spline): prim_len=685.869, unc=3.8538
+  Barrier stage 1/15: μ=20.0
+  [Spline barrier] line search stalled; stopping at stage 1
+  Barrier stage 2/15: μ=7.0
+  [Spline barrier] line search stalled; stopping at stage 2
+  Barrier stage 3/15: μ=2.45
+  [Spline barrier] line search stalled; stopping at stage 3
+  Barrier stage 4/15: μ=0.8575
+  [Spline barrier] line search stalled; stopping at stage 4
+  Barrier stage 5/15: μ=0.3001
+  [Spline barrier] line search stalled; stopping at stage 5
+  Barrier stage 6/15: μ=0.105
+  [Spline barrier] line search stalled; stopping at stage 6
+  Barrier stage 7/15: μ=0.0368
+  Barrier stage 8/15: μ=0.0129
+  Barrier stage 9/15: μ=0.0045
+  Barrier stage 10/15: μ=0.0016
+  Barrier stage 11/15: μ=0.0006
+  Barrier stage 12/15: μ=0.0002
+  Barrier stage 13/15: μ=0.0001
+  Barrier stage 14/15: μ=0.0
+  Barrier stage 15/15: μ=0.0
+  Final: prim_len=669.05, unc=5.9447, threshold=6.0651, status=optimized, min_slack=0.016109
+  Obstacle re-verification: mean path clears all obstacles ✓
+Fig combined (main) saved: Discrete Len=685.87 → Continuous Len=669.05
+Fig uncertainty profile (main) saved: /home/tonyzhang/projects/landmark_planning/constraint_sweep/baseline_2026-08-17/sequential/s002_p090/sequential/figures/main_unc_profile.png
+
+[sequential] produced 1 solution(s) -> /home/tonyzhang/projects/landmark_planning/constraint_sweep/baseline_2026-08-17/sequential/s002_p090/sequential

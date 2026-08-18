@@ -1,0 +1,75 @@
+Landmark scenario: random — 2 landmarks, 3 obstacles, start (0.0, 0.0) → goal (750.0, 0.0)
+Hex graph: 339 nodes (336 heading-states + 2 sensors + goal), radius=86.60254037844388m, directed_edges=840, grid=10x11, start_cell=(2, 5), goal_cell=(7, 5), start_heading=0
+Conditional ε-bound: ε_sample=1.2309, w=1.0, ε_total=1.2309
+  Bound form (conditional): L_returned ≤ (1+ε_total) L* with assumptions documented in comments.
+
+── MULTI-AGENT PLANNING (Synchronized Kalman) ──
+
+  Running joint discrete A* (threshold=6.2685)... (max_iters=1000000)
+  Stops on the first feasible candidate under the threshold.
+  ✓ Goal reachable from node 1 with distance 750.0
+  [A*] iter 1000/1000000 (0.1%)  left=999000  elapsed=1.4s     [A*] iter 2000/1000000 (0.2%)  left=998000  elapsed=1.5s     [A*] iter 3000/1000000 (0.3%)  left=997000  elapsed=1.6s     [A*] iter 4000/1000000 (0.4%)  left=996000  elapsed=1.6s     [A*] iter 5000/1000000 (0.5%)  left=995000  elapsed=1.9s     [A*] iter 6000/1000000 (0.6%)  left=994000  elapsed=2.0s     [A*] iter 7000/1000000 (0.7%)  left=993000  elapsed=2.0s     [A*] iter 8000/1000000 (0.8%)  left=992000  elapsed=2.1s     [A*] iter 9000/1000000 (0.9%)  left=991000  elapsed=2.1s     [A*] iter 10000/1000000 (1.0%)  left=990000  elapsed=2.3s     [A*] iter 11000/1000000 (1.1%)  left=989000  elapsed=2.4s     [A*] iter 12000/1000000 (1.2%)  left=988000  elapsed=2.4s     [A*] iter 13000/1000000 (1.3%)  left=987000  elapsed=2.5s   
+  ✓ FEASIBLE SOLUTION at iter 13222: dist=1200.0, unc=6.0182
+  [Constraint A*] Complete: 13222 iterations, final_dist=1200.0
+
+✓ Multi-agent solution with synchronized Kalman fusion:
+  Support agent 1: node=326, dist=1200.0m, goal_unc=5.767m
+  Primary agent: node=185, dist=1200.0m, goal_unc=6.0182m
+  ├─ Communication: every 100.0m, sigmoid taper range=300.0m width=20.0m
+  └─ All agents' uncertainties benefit from synchronized Kalman fusion at checkpoints
+
+--- Final Results ---
+Support agent 1 : [1, 157, 212, 255, 308, 313, 270, 271, 326]  dist=1200.0  goal_unc=5.767  ✓  (Kalman-fused)
+Primary agent : [1, 206, 211, 260, 265, 271, 277, 240, 185]  dist=1200.0  goal_unc=6.0182  threshold=6.268525015 ✓ met  (Kalman-fused)
+
+=== Kalman Filtering Summary ===
+All 2 agents performing synchronized Kalman filtering:
+  • Dead-reckoning propagation: DIR=0.05/m, PERP=0.016666666666666666/m
+  • Landmark fusion: Information filter (Joseph form) at every waypoint
+  • SYNCHRONIZED inter-agent communication: every 100.0m of travel
+  • Tapered sigmoid weighting: range=300.0m, width=20.0m (soft plateau + rolloff)
+  • Bidirectional Kalman fusion: all agent pairs within range at each checkpoint
+  • Measurement model: bearing-angle sensor with noise=0.038, ratio=2.2
+  └─ Support agents: goal_unc=5.767m (improved by inter-agent fusion)
+  └─ Primary agent: goal_unc=6.0182m (direct path with landmark updates)
+Converged at iteration : 13222
+Figure path-role mapping: supports = paths[1:1], primary = paths[2]
+Discrete evaluation: prim_len=1200.0, unc=6.0182
+Fig 1 saved.
+
+=== Continuous Spline Optimization (threshold=6.2685) ===
+  Initial (discrete→spline): prim_len=1093.08, unc=6.0182
+  Barrier stage 1/15: μ=20.0
+  [Spline barrier] line search stalled; stopping at stage 1
+  Barrier stage 2/15: μ=7.0
+  [Spline barrier] line search stalled; stopping at stage 2
+  Barrier stage 3/15: μ=2.45
+  [Spline barrier] line search stalled; stopping at stage 3
+  Barrier stage 4/15: μ=0.8575
+  Barrier stage 5/15: μ=0.3001
+  Barrier stage 6/15: μ=0.105
+  → Converged at iter 143 (Δlen=0.000936)
+  Barrier stage 7/15: μ=0.0368
+  → Converged at iter 145 (Δlen=0.000129)
+  Barrier stage 8/15: μ=0.0129
+  → Converged at iter 182 (Δlen=0.00036)
+  Barrier stage 9/15: μ=0.0045
+  → Converged at iter 183 (Δlen=0.000452)
+  Barrier stage 10/15: μ=0.0016
+  → Converged at iter 189 (Δlen=0.0003)
+  Barrier stage 11/15: μ=0.0006
+  → Converged at iter 190 (Δlen=0.000451)
+  Barrier stage 12/15: μ=0.0002
+  [Spline barrier] line search stalled; stopping at stage 12
+  Barrier stage 13/15: μ=0.0001
+  [Spline barrier] line search stalled; stopping at stage 13
+  Barrier stage 14/15: μ=0.0
+  [Spline barrier] line search stalled; stopping at stage 14
+  Barrier stage 15/15: μ=0.0
+  [Spline barrier] line search stalled; stopping at stage 15
+  Final: prim_len=982.383, unc=4.8427, threshold=6.2685, status=optimized, min_slack=1.8e-5
+  Obstacle re-verification: mean path clears all obstacles ✓
+Fig combined (main) saved: Discrete Len=1093.08 → Continuous Len=982.38
+Fig uncertainty profile (main) saved: /home/tonyzhang/projects/landmark_planning/constraint_sweep/baseline_2026-08-17/hexspline_cl/s017_p070/hexspline_cl/figures/main_unc_profile.png
+
+[hexspline_cl] produced 1 solution(s) -> /home/tonyzhang/projects/landmark_planning/constraint_sweep/baseline_2026-08-17/hexspline_cl/s017_p070/hexspline_cl

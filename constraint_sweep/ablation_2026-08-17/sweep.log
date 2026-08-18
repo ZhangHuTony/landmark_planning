@@ -1,0 +1,616 @@
+── constraint sweep ablation_2026-08-17 ──
+  methods: hexspline_cl, straight_cont, discrete_only
+  ladder:  100, 90, 80, 70, 60, 50, 40, 30%   patience=1   method_patience=1   timeout=1200s
+  scenarios: drawing until 30 references succeed (guard: 300 draws)
+  output:  /home/tonyzhang/projects/landmark_planning/constraint_sweep/ablation_2026-08-17
+  s001: D=750 L=4 O=3  L_ref=784.7 U_ref=10.73  (15.3s)  [1/30]
+    s001 p100  discrete_only     ok   ratio=1.0886   16.5s
+    s001 p100  straight_cont     ok   ratio=1.0858   17.3s
+    s001 p100  hexspline_cl      ok   ratio=1.0306   17.5s
+    s001 p90  discrete_only     ok   ratio=1.0886   16.5s
+    s001 p90  hexspline_cl      ok   ratio=1.0315   17.6s
+    s001 p90  straight_cont     FAIL recovery_failed   17.8s
+    s001: straight_cont failed 1x in a row (through 90%) — dropped, 6 stricter level(s) recorded unrun
+    s001 p80  discrete_only     ok   ratio=1.0886   16.3s
+    s001 p80  hexspline_cl      ok   ratio=1.0307   17.5s
+    s001 p70  discrete_only     ok   ratio=1.0886   16.4s
+    s001 p70  hexspline_cl      ok   ratio=1.0319   17.4s
+    s001 p60  discrete_only     ok   ratio=1.0886   16.3s
+    s001 p60  hexspline_cl      ok   ratio=1.0389   17.3s
+    s001 p50  discrete_only     ok   ratio=1.0886   16.4s
+    s001 p50  hexspline_cl      ok   ratio=1.0886   16.9s
+    s001 p40  discrete_only     ok   ratio=1.0886   16.4s
+    s001 p40  hexspline_cl      ok   ratio=1.0886   17.0s
+    s001 p30  discrete_only     ok   ratio=1.0886   16.5s
+    s001 p30  hexspline_cl      ok   ratio=1.0886   16.9s
+  s002: D=600 L=4 O=2  L_ref=604.0 U_ref=6.739  (15.3s)  [2/30]
+    s002 p100  discrete_only     ok   ratio=1.1659   16.3s
+    s002 p100  hexspline_cl      ok   ratio=1.1296   17.3s
+    s002 p100  straight_cont     FAIL recovery_failed   18.3s
+    s002: straight_cont failed 1x in a row (through 100%) — dropped, 7 stricter level(s) recorded unrun
+    s002 p90  discrete_only     ok   ratio=1.1659   16.2s
+    s002 p90  hexspline_cl      ok   ratio=1.1301   17.0s
+    s002 p80  discrete_only     ok   ratio=1.1356   16.2s
+    s002 p80  hexspline_cl      ok   ratio=1.0975   17.3s
+    s002 p70  discrete_only     ok   ratio=1.1356   16.2s
+    s002 p70  hexspline_cl      ok   ratio=1.0962   17.4s
+    s002 p60  discrete_only     ok   ratio=1.1356   16.3s
+    s002 p60  hexspline_cl      ok   ratio=1.1356   16.7s
+    s002 p50  discrete_only     ok   ratio=1.3814   16.4s
+    s002 p50  hexspline_cl      ok   ratio=1.3814   16.9s
+    s002 p40  discrete_only     ok   ratio=1.3814   16.3s
+    s002 p40  hexspline_cl      ok   ratio=1.3814   16.9s
+    s002 p30  discrete_only     ok   ratio=1.3814   16.3s
+    s002 p30  hexspline_cl      ok   ratio=1.3811   16.9s
+  s003: D=600 L=2 O=1  L_ref=600.2 U_ref=9.913  (15.2s)  [3/30]
+    s003 p100  discrete_only     ok   ratio=1.1427   16.3s
+    s003 p100  straight_cont     ok   ratio=1.0010   16.8s
+    s003 p100  hexspline_cl      ok   ratio=1.0093   17.6s
+    s003 p90  discrete_only     ok   ratio=1.1427   16.4s
+    s003 p90  straight_cont     ok   ratio=1.0010   16.9s
+    s003 p90  hexspline_cl      ok   ratio=1.0093   17.6s
+    s003 p80  discrete_only     ok   ratio=1.1427   16.3s
+    s003 p80  straight_cont     ok   ratio=1.0010   17.0s
+    s003 p80  hexspline_cl      ok   ratio=1.0093   17.6s
+    s003 p70  discrete_only     ok   ratio=1.1427   16.3s
+    s003 p70  straight_cont     FAIL recovery_failed   16.8s
+    s003 p70  hexspline_cl      ok   ratio=1.0092   17.5s
+    s003: straight_cont failed 1x in a row (through 70%) — dropped, 4 stricter level(s) recorded unrun
+    s003 p60  discrete_only     ok   ratio=1.1427   16.3s
+    s003 p60  hexspline_cl      ok   ratio=1.0090   17.4s
+    s003 p50  discrete_only     ok   ratio=1.3901   16.3s
+    s003 p50  hexspline_cl      ok   ratio=1.2409   17.6s
+    s003 p40  discrete_only     ok   ratio=1.3901   16.3s
+    s003 p40  hexspline_cl      ok   ratio=1.3380   17.5s
+    s003 p30  discrete_only     ok   ratio=1.3901   16.3s
+    s003 p30  hexspline_cl      ok   ratio=1.3901   16.9s
+  s004: D=750 L=4 O=1  L_ref=800.2 U_ref=5.342  (15.3s)  [4/30]
+    s004 p100  discrete_only     ok   ratio=1.2556   16.7s
+    s004 p100  hexspline_cl      ok   ratio=1.2475   17.5s
+    s004 p100  straight_cont     FAIL recovery_failed   17.6s
+    s004: straight_cont failed 1x in a row (through 100%) — dropped, 7 stricter level(s) recorded unrun
+    s004 p90  discrete_only     ok   ratio=1.2556   16.5s
+    s004 p90  hexspline_cl      ok   ratio=1.2556   17.1s
+    s004 p80  discrete_only     ok   ratio=1.2556   16.5s
+    s004 p80  hexspline_cl      ok   ratio=1.2556   17.0s
+    s004 p70  discrete_only     ok   ratio=1.2556   16.5s
+    s004 p70  hexspline_cl      ok   ratio=1.2556   17.3s
+    s004 p60  discrete_only     ok   ratio=1.4040   17.6s
+    s004 p60  hexspline_cl      ok   ratio=1.4040   18.1s
+    s004 p50  discrete_only     ok   ratio=1.4040   17.6s
+    s004 p50  hexspline_cl      ok   ratio=1.4040   18.1s
+    s004 p40  discrete_only     ok   ratio=1.7216   32.6s
+    s004 p40  hexspline_cl      ok   ratio=1.7216   34.0s
+    s004 p30  hexspline_cl      FAIL recovery_failed   85.6s
+    s004 p30  discrete_only     FAIL unc_violated   88.3s
+    s004: every method failed at 1 consecutive levels (down to 30%) — constraint is impossible, moving on
+  s005: D=900 L=3 O=1  L_ref=915.9 U_ref=11.355  (15.3s)  [5/30]
+    s005 p100  discrete_only     ok   ratio=1.0964   16.6s
+    s005 p100  hexspline_cl      ok   ratio=1.0040   18.1s
+    s005 p100  straight_cont     ok   ratio=1.0167   18.7s
+    s005 p90  discrete_only     ok   ratio=1.0964   16.5s
+    s005 p90  hexspline_cl      ok   ratio=1.0024   18.3s
+    s005 p90  straight_cont     ok   ratio=1.0107   19.0s
+    s005 p80  discrete_only     ok   ratio=1.0964   16.5s
+    s005 p80  hexspline_cl      ok   ratio=1.0142   17.9s
+    s005 p80  straight_cont     ok   ratio=1.0052   18.1s
+    s005 p70  discrete_only     ok   ratio=1.0964   16.6s
+    s005 p70  hexspline_cl      ok   ratio=1.0175   18.0s
+    s005 p70  straight_cont     ok   ratio=0.9958   18.5s
+    s005 p60  discrete_only     ok   ratio=1.0964   16.5s
+    s005 p60  hexspline_cl      ok   ratio=1.0262   17.8s
+    s005 p60  straight_cont     ok   ratio=0.9982   18.7s
+    s005 p50  discrete_only     ok   ratio=1.0964   16.5s
+    s005 p50  hexspline_cl      ok   ratio=1.0656   17.6s
+    s005 p50  straight_cont     FAIL recovery_failed   18.6s
+    s005: straight_cont failed 1x in a row (through 50%) — dropped, 2 stricter level(s) recorded unrun
+    s005 p40  discrete_only     ok   ratio=1.0964   16.4s
+    s005 p40  hexspline_cl      ok   ratio=1.0638   17.5s
+    s005 p30  discrete_only     ok   ratio=1.2212   17.1s
+    s005 p30  hexspline_cl      ok   ratio=1.2212   17.7s
+  s006: D=600 L=2 O=1  L_ref=602.5 U_ref=9.977  (15.2s)  [6/30]
+    s006 p100  discrete_only     ok   ratio=1.1689   16.5s
+    s006 p100  hexspline_cl      ok   ratio=1.1689   17.4s
+    s006 p100  straight_cont     ok   ratio=1.0083   17.9s
+    s006 p90  discrete_only     ok   ratio=1.1689   16.4s
+    s006 p90  hexspline_cl      ok   ratio=1.1689   17.4s
+    s006 p90  straight_cont     ok   ratio=1.0092   18.0s
+    s006 p80  discrete_only     ok   ratio=1.1689   16.4s
+    s006 p80  straight_cont     ok   ratio=1.0149   17.0s
+    s006 p80  hexspline_cl      ok   ratio=1.1689   17.4s
+    s006 p70  discrete_only     ok   ratio=1.1689   16.5s
+    s006 p70  hexspline_cl      ok   ratio=1.1689   17.5s
+    s006 p70  straight_cont     ok   ratio=1.0017   18.0s
+    s006 p60  discrete_only     ok   ratio=1.1689   16.3s
+    s006 p60  hexspline_cl      ok   ratio=1.1689   17.5s
+    s006 p60  straight_cont     FAIL recovery_failed   19.2s
+    s006: straight_cont failed 1x in a row (through 60%) — dropped, 3 stricter level(s) recorded unrun
+    s006 p50  discrete_only     ok   ratio=1.1689   16.3s
+    s006 p50  hexspline_cl      ok   ratio=1.1689   17.2s
+    s006 p40  discrete_only     ok   ratio=1.1689   16.2s
+    s006 p40  hexspline_cl      ok   ratio=1.1689   17.2s
+    s006 p30  discrete_only     FAIL unc_violated   83.7s
+    s006 p30  hexspline_cl      FAIL recovery_failed   89.0s
+    s006: every method failed at 1 consecutive levels (down to 30%) — constraint is impossible, moving on
+  s007: D=750 L=4 O=1  L_ref=781.9 U_ref=7.139  (15.4s)  [7/30]
+    s007 p100  discrete_only     ok   ratio=1.0691   16.5s
+    s007 p100  hexspline_cl      ok   ratio=1.0409   17.5s
+    s007 p100  straight_cont     FAIL recovery_failed   18.0s
+    s007: straight_cont failed 1x in a row (through 100%) — dropped, 7 stricter level(s) recorded unrun
+    s007 p90  discrete_only     ok   ratio=1.0691   16.4s
+    s007 p90  hexspline_cl      ok   ratio=1.0399   17.4s
+    s007 p80  discrete_only     ok   ratio=1.0691   16.3s
+    s007 p80  hexspline_cl      ok   ratio=1.0401   17.4s
+    s007 p70  discrete_only     ok   ratio=1.0924   16.3s
+    s007 p70  hexspline_cl      ok   ratio=1.0713   17.2s
+    s007 p60  discrete_only     ok   ratio=1.2397   17.0s
+    s007 p60  hexspline_cl      ok   ratio=1.2293   17.5s
+    s007 p50  hexspline_cl      FAIL recovery_failed   80.7s
+    s007 p50  discrete_only     FAIL unc_violated   82.2s
+    s007: hexspline_cl failed 1x in a row (through 50%) — dropped, 2 stricter level(s) recorded unrun
+    s007: discrete_only failed 1x in a row (through 50%) — dropped, 2 stricter level(s) recorded unrun
+    s007: every method failed at 1 consecutive levels (down to 50%) — constraint is impossible, moving on
+  s008: D=900 L=4 O=2  L_ref=966.5 U_ref=7.969  (15.7s)  [8/30]
+    s008 p100  straight_cont     FAIL recovery_failed   17.5s
+    s008 p100  discrete_only     ok   ratio=1.1581   19.0s
+    s008 p100  hexspline_cl      ok   ratio=1.1336   20.7s
+    s008: straight_cont failed 1x in a row (through 100%) — dropped, 7 stricter level(s) recorded unrun
+    s008 p90  discrete_only     ok   ratio=1.1581   18.9s
+    s008 p90  hexspline_cl      ok   ratio=1.1319   20.8s
+    s008 p80  discrete_only     ok   ratio=1.1581   18.8s
+    s008 p80  hexspline_cl      ok   ratio=1.1339   20.7s
+    s008 p70  discrete_only     ok   ratio=1.1581   18.8s
+    s008 p70  hexspline_cl      ok   ratio=1.1327   20.7s
+    s008 p60  discrete_only     ok   ratio=1.1581   18.9s
+    s008 p60  hexspline_cl      ok   ratio=1.1335   20.6s
+    s008 p50  discrete_only     ok   ratio=1.1752   19.2s
+    s008 p50  hexspline_cl      ok   ratio=1.1752   19.8s
+    s008 p40  discrete_only     ok   ratio=1.1752   20.0s
+    s008 p40  hexspline_cl      ok   ratio=1.1752   20.5s
+    s008 p30  discrete_only     FAIL unc_violated   91.4s
+    s008 p30  hexspline_cl      FAIL recovery_failed   91.7s
+    s008: every method failed at 1 consecutive levels (down to 30%) — constraint is impossible, moving on
+  s009: D=900 L=2 O=3  L_ref=989.8 U_ref=10.124  (15.8s)  [9/30]
+    s009 p100  straight_cont     ok   ratio=0.9196   16.7s
+    s009 p100  discrete_only     ok   ratio=1.1667   17.6s
+    s009 p100  hexspline_cl      ok   ratio=1.0922   19.5s
+    s009 p90  discrete_only     ok   ratio=1.1667   17.6s
+    s009 p90  straight_cont     ok   ratio=0.9146   18.1s
+    s009 p90  hexspline_cl      ok   ratio=1.0921   19.5s
+    s009 p80  discrete_only     ok   ratio=1.1667   17.6s
+    s009 p80  straight_cont     FAIL recovery_failed   18.9s
+    s009 p80  hexspline_cl      ok   ratio=1.0921   19.7s
+    s009: straight_cont failed 1x in a row (through 80%) — dropped, 5 stricter level(s) recorded unrun
+    s009 p70  discrete_only     ok   ratio=1.1667   17.4s
+    s009 p70  hexspline_cl      ok   ratio=1.0938   19.2s
+    s009 p60  discrete_only     ok   ratio=1.1309   17.4s
+    s009 p60  hexspline_cl      ok   ratio=1.0991   18.7s
+    s009 p50  hexspline_cl      FAIL recovery_failed   87.2s
+    s009 p50  discrete_only     FAIL unc_violated   92.9s
+    s009: hexspline_cl failed 1x in a row (through 50%) — dropped, 2 stricter level(s) recorded unrun
+    s009: discrete_only failed 1x in a row (through 50%) — dropped, 2 stricter level(s) recorded unrun
+    s009: every method failed at 1 consecutive levels (down to 50%) — constraint is impossible, moving on
+  s010: D=600 L=4 O=3  L_ref=634.0 U_ref=7.628  (15.3s)  [10/30]
+    s010 p100  discrete_only     ok   ratio=1.3159   16.5s
+    s010 p100  hexspline_cl      ok   ratio=1.1868   17.8s
+    s010 p100  straight_cont     ok   ratio=0.9592   18.1s
+    s010 p90  discrete_only     ok   ratio=1.3159   16.5s
+    s010 p90  straight_cont     FAIL recovery_failed   17.6s
+    s010 p90  hexspline_cl      ok   ratio=1.1870   17.8s
+    s010: straight_cont failed 1x in a row (through 90%) — dropped, 6 stricter level(s) recorded unrun
+    s010 p80  discrete_only     ok   ratio=1.3159   16.4s
+    s010 p80  hexspline_cl      ok   ratio=1.1872   17.6s
+    s010 p70  discrete_only     ok   ratio=1.3159   16.3s
+    s010 p70  hexspline_cl      ok   ratio=1.1966   17.4s
+    s010 p60  discrete_only     ok   ratio=1.3159   16.3s
+    s010 p60  hexspline_cl      ok   ratio=1.3159   16.8s
+    s010 p50  discrete_only     FAIL unc_violated   91.5s
+    s010 p50  hexspline_cl      ok   ratio=1.2745   94.7s
+    s010: discrete_only failed 1x in a row (through 50%) — dropped, 2 stricter level(s) recorded unrun
+    s010 p40  hexspline_cl      FAIL recovery_failed   88.0s
+    s010: hexspline_cl failed 1x in a row (through 40%) — dropped, 1 stricter level(s) recorded unrun
+    s010: every method failed at 1 consecutive levels (down to 40%) — constraint is impossible, moving on
+  s011: D=600 L=4 O=3  L_ref=600.0 U_ref=7.142  (15.3s)  [11/30]
+    s011 p100  straight_cont     ok   ratio=1.0000   16.1s
+    s011 p100  discrete_only     ok   ratio=1.0000   16.3s
+    s011 p100  hexspline_cl      ok   ratio=1.0000   16.8s
+    s011 p90  discrete_only     ok   ratio=1.0000   16.3s
+    s011 p90  hexspline_cl      ok   ratio=1.0000   16.8s
+    s011 p90  straight_cont     FAIL recovery_failed   19.1s
+    s011: straight_cont failed 1x in a row (through 90%) — dropped, 6 stricter level(s) recorded unrun
+    s011 p80  discrete_only     ok   ratio=1.0000   16.1s
+    s011 p80  hexspline_cl      ok   ratio=1.0000   16.6s
+    s011 p70  discrete_only     ok   ratio=1.0000   16.1s
+    s011 p70  hexspline_cl      ok   ratio=1.0000   16.7s
+    s011 p60  discrete_only     ok   ratio=1.0000   16.2s
+    s011 p60  hexspline_cl      ok   ratio=1.0000   16.6s
+    s011 p50  discrete_only     ok   ratio=1.0000   16.2s
+    s011 p50  hexspline_cl      ok   ratio=1.0000   16.7s
+    s011 p40  discrete_only     ok   ratio=2.7689   59.9s
+    s011 p40  hexspline_cl      ok   ratio=2.7689   63.8s
+    s011 p30  discrete_only     FAIL unc_violated   91.1s
+    s011 p30  hexspline_cl      FAIL recovery_failed   92.4s
+    s011: every method failed at 1 consecutive levels (down to 30%) — constraint is impossible, moving on
+  s012: D=900 L=4 O=3  L_ref=1125.2 U_ref=7.598  (15.8s)  [12/30]
+    s012 p100  straight_cont     FAIL recovery_failed   17.4s
+    s012 p100  discrete_only     ok   ratio=1.2418   52.0s
+    s012 p100  hexspline_cl      ok   ratio=1.0051   53.9s
+    s012: straight_cont failed 1x in a row (through 100%) — dropped, 7 stricter level(s) recorded unrun
+    s012 p90  discrete_only     ok   ratio=1.2418   51.2s
+    s012 p90  hexspline_cl      ok   ratio=0.9935   54.3s
+    s012 p80  discrete_only     ok   ratio=1.2418   51.4s
+    s012 p80  hexspline_cl      ok   ratio=0.9740   54.3s
+    s012 p70  discrete_only     ok   ratio=1.2418   50.9s
+    s012 p70  hexspline_cl      ok   ratio=1.2418   51.7s
+    s012 p60  discrete_only     FAIL unc_violated   108.2s
+    s012 p60  hexspline_cl      ok   ratio=1.2043   108.6s
+    s012: discrete_only failed 1x in a row (through 60%) — dropped, 3 stricter level(s) recorded unrun
+    s012 p50  hexspline_cl      ok   ratio=1.2150   103.2s
+    s012 p40  hexspline_cl      FAIL recovery_failed   105.2s
+    s012: hexspline_cl failed 1x in a row (through 40%) — dropped, 1 stricter level(s) recorded unrun
+    s012: every method failed at 1 consecutive levels (down to 40%) — constraint is impossible, moving on
+  s013: D=600 L=2 O=2  L_ref=613.9 U_ref=10.3  (15.3s)  [13/30]
+    s013 p100  discrete_only     ok   ratio=1.3923   16.6s
+    s013 p100  hexspline_cl      ok   ratio=1.0776   17.8s
+    s013 p100  straight_cont     ok   ratio=1.0002   18.2s
+    s013 p90  discrete_only     ok   ratio=1.3923   16.6s
+    s013 p90  straight_cont     ok   ratio=1.0012   17.6s
+    s013 p90  hexspline_cl      ok   ratio=1.0808   17.8s
+    s013 p80  discrete_only     ok   ratio=1.3923   16.7s
+    s013 p80  straight_cont     ok   ratio=1.0020   17.1s
+    s013 p80  hexspline_cl      ok   ratio=1.1650   17.9s
+    s013 p70  discrete_only     ok   ratio=1.3923   16.7s
+    s013 p70  hexspline_cl      ok   ratio=1.1652   17.6s
+    s013 p70  straight_cont     FAIL recovery_failed   18.7s
+    s013: straight_cont failed 1x in a row (through 70%) — dropped, 4 stricter level(s) recorded unrun
+    s013 p60  discrete_only     ok   ratio=1.3591   16.5s
+    s013 p60  hexspline_cl      ok   ratio=1.3591   17.2s
+    s013 p50  discrete_only     FAIL unc_violated   87.2s
+    s013 p50  hexspline_cl      FAIL recovery_failed   87.6s
+    s013: hexspline_cl failed 1x in a row (through 50%) — dropped, 2 stricter level(s) recorded unrun
+    s013: discrete_only failed 1x in a row (through 50%) — dropped, 2 stricter level(s) recorded unrun
+    s013: every method failed at 1 consecutive levels (down to 50%) — constraint is impossible, moving on
+  s014: D=600 L=4 O=1  L_ref=600.0 U_ref=7.131  (15.1s)  [14/30]
+    s014 p100  straight_cont     ok   ratio=1.0000   16.2s
+    s014 p100  discrete_only     ok   ratio=1.0000   16.3s
+    s014 p100  hexspline_cl      ok   ratio=1.0000   16.8s
+    s014 p90  discrete_only     ok   ratio=1.0000   16.3s
+    s014 p90  hexspline_cl      ok   ratio=1.0000   16.9s
+    s014 p90  straight_cont     FAIL recovery_failed   16.9s
+    s014: straight_cont failed 1x in a row (through 90%) — dropped, 6 stricter level(s) recorded unrun
+    s014 p80  discrete_only     ok   ratio=1.0000   16.2s
+    s014 p80  hexspline_cl      ok   ratio=1.0000   16.7s
+    s014 p70  discrete_only     ok   ratio=1.0000   16.1s
+    s014 p70  hexspline_cl      ok   ratio=1.0000   16.8s
+    s014 p60  discrete_only     ok   ratio=1.0000   16.2s
+    s014 p60  hexspline_cl      ok   ratio=1.0000   16.7s
+    s014 p50  discrete_only     ok   ratio=1.0000   16.1s
+    s014 p50  hexspline_cl      ok   ratio=1.0000   16.7s
+    s014 p40  discrete_only     ok   ratio=1.0000   16.1s
+    s014 p40  hexspline_cl      ok   ratio=1.0000   16.7s
+    s014 p30  discrete_only     ok   ratio=1.0000   16.1s
+    s014 p30  hexspline_cl      ok   ratio=1.0000   16.7s
+  s015: D=900 L=3 O=2  L_ref=975.3 U_ref=6.012  (15.6s)  [15/30]
+    s015 p100  discrete_only     ok   ratio=1.1477   17.7s
+    s015 p100  hexspline_cl      ok   ratio=1.1156   19.0s
+    s015 p100  straight_cont     FAIL recovery_failed   19.3s
+    s015: straight_cont failed 1x in a row (through 100%) — dropped, 7 stricter level(s) recorded unrun
+    s015 p90  discrete_only     ok   ratio=1.1477   17.5s
+    s015 p90  hexspline_cl      ok   ratio=1.1155   18.7s
+    s015 p80  discrete_only     ok   ratio=1.1477   17.5s
+    s015 p80  hexspline_cl      ok   ratio=1.1155   19.0s
+    s015 p70  discrete_only     ok   ratio=1.1477   17.5s
+    s015 p70  hexspline_cl      ok   ratio=1.1477   18.0s
+    s015 p60  discrete_only     ok   ratio=1.1477   17.5s
+    s015 p60  hexspline_cl      ok   ratio=1.1477   18.0s
+    s015 p50  discrete_only     ok   ratio=1.1477   17.5s
+    s015 p50  hexspline_cl      ok   ratio=1.1477   18.0s
+    s015 p40  discrete_only     FAIL unc_violated   97.5s
+    s015 p40  hexspline_cl      FAIL recovery_failed   99.8s
+    s015: hexspline_cl failed 1x in a row (through 40%) — dropped, 1 stricter level(s) recorded unrun
+    s015: discrete_only failed 1x in a row (through 40%) — dropped, 1 stricter level(s) recorded unrun
+    s015: every method failed at 1 consecutive levels (down to 40%) — constraint is impossible, moving on
+  s016: D=750 L=4 O=3  L_ref=937.5 U_ref=5.33  (15.8s)  [16/30]
+    s016 p100  straight_cont     FAIL recovery_failed   18.1s
+    s016 p100  discrete_only     ok   ratio=1.3549   27.7s
+    s016 p100  hexspline_cl      ok   ratio=1.2893   29.7s
+    s016: straight_cont failed 1x in a row (through 100%) — dropped, 7 stricter level(s) recorded unrun
+    s016 p90  discrete_only     ok   ratio=1.3549   27.7s
+    s016 p90  hexspline_cl      ok   ratio=1.2907   29.7s
+    s016 p80  discrete_only     ok   ratio=1.4694   49.7s
+    s016 p80  hexspline_cl      ok   ratio=1.4694   49.8s
+    s016 p70  discrete_only     ok   ratio=1.4694   49.4s
+    s016 p70  hexspline_cl      ok   ratio=1.4694   52.5s
+    s016 p60  discrete_only     ok   ratio=1.4694   49.4s
+    s016 p60  hexspline_cl      ok   ratio=1.4694   52.0s
+    s016 p50  hexspline_cl      ok   ratio=1.4694   48.9s
+    s016 p50  discrete_only     ok   ratio=1.4694   50.2s
+    s016 p40  hexspline_cl      ok   ratio=1.4694   48.7s
+    s016 p40  discrete_only     ok   ratio=1.4694   49.2s
+    s016 p30  discrete_only     ok   ratio=1.4694   48.7s
+    s016 p30  hexspline_cl      ok   ratio=1.4694   49.7s
+  s017: D=750 L=2 O=3  L_ref=913.0 U_ref=8.955  (15.7s)  [17/30]
+    s017 p100  straight_cont     FAIL recovery_failed   17.6s
+    s017 p100  discrete_only     ok   ratio=1.1972   17.8s
+    s017 p100  hexspline_cl      ok   ratio=1.0779   19.0s
+    s017: straight_cont failed 1x in a row (through 100%) — dropped, 7 stricter level(s) recorded unrun
+    s017 p90  discrete_only     ok   ratio=1.1972   17.6s
+    s017 p90  hexspline_cl      ok   ratio=1.0743   18.9s
+    s017 p80  discrete_only     ok   ratio=1.1972   17.7s
+    s017 p80  hexspline_cl      ok   ratio=1.0688   19.0s
+    s017 p70  discrete_only     ok   ratio=1.1972   17.6s
+    s017 p70  hexspline_cl      ok   ratio=1.0760   18.9s
+    s017 p60  discrete_only     ok   ratio=1.5909   49.6s
+    s017 p60  hexspline_cl      ok   ratio=1.5395   50.7s
+    s017 p50  discrete_only     ok   ratio=1.5909   50.0s
+    s017 p50  hexspline_cl      ok   ratio=1.5909   50.4s
+    s017 p40  discrete_only     FAIL unc_violated   76.4s
+    s017 p40  hexspline_cl      FAIL recovery_failed   77.8s
+    s017: hexspline_cl failed 1x in a row (through 40%) — dropped, 1 stricter level(s) recorded unrun
+    s017: discrete_only failed 1x in a row (through 40%) — dropped, 1 stricter level(s) recorded unrun
+    s017: every method failed at 1 consecutive levels (down to 40%) — constraint is impossible, moving on
+  s018: D=900 L=4 O=2  L_ref=901.1 U_ref=11.056  (15.7s)  [18/30]
+    s018 p100  discrete_only     ok   ratio=1.1144   16.6s
+    s018 p100  hexspline_cl      ok   ratio=1.0961   18.4s
+    s018 p100  straight_cont     ok   ratio=0.9994   18.8s
+    s018 p90  discrete_only     ok   ratio=1.1144   16.7s
+    s018 p90  hexspline_cl      ok   ratio=1.0963   18.4s
+    s018 p90  straight_cont     ok   ratio=0.9994   18.8s
+    s018 p80  discrete_only     ok   ratio=1.1144   16.8s
+    s018 p80  hexspline_cl      ok   ratio=1.0968   18.4s
+    s018 p80  straight_cont     ok   ratio=0.9994   18.6s
+    s018 p70  discrete_only     ok   ratio=1.1144   16.6s
+    s018 p70  straight_cont     FAIL recovery_failed   17.3s
+    s018 p70  hexspline_cl      ok   ratio=1.0970   18.3s
+    s018: straight_cont failed 1x in a row (through 70%) — dropped, 4 stricter level(s) recorded unrun
+    s018 p60  discrete_only     ok   ratio=1.0960   16.6s
+    s018 p60  hexspline_cl      ok   ratio=1.0554   17.9s
+    s018 p50  discrete_only     ok   ratio=1.0960   16.7s
+    s018 p50  hexspline_cl      ok   ratio=1.0619   18.0s
+    s018 p40  discrete_only     ok   ratio=1.0960   16.6s
+    s018 p40  hexspline_cl      ok   ratio=1.0960   17.3s
+    s018 p30  discrete_only     ok   ratio=1.2605   17.6s
+    s018 p30  hexspline_cl      ok   ratio=1.2605   18.3s
+  s019: D=900 L=2 O=2  L_ref=900.0 U_ref=8.706  (15.2s)  [19/30]
+    s019 p100  discrete_only     ok   ratio=1.0000   16.6s
+    s019 p100  straight_cont     ok   ratio=1.0000   16.9s
+    s019 p100  hexspline_cl      ok   ratio=1.0000   17.6s
+    s019 p90  discrete_only     ok   ratio=1.0793   16.8s
+    s019 p90  hexspline_cl      ok   ratio=1.0793   17.3s
+    s019 p90  straight_cont     FAIL recovery_failed   19.1s
+    s019: straight_cont failed 1x in a row (through 90%) — dropped, 6 stricter level(s) recorded unrun
+    s019 p80  discrete_only     ok   ratio=1.0936   16.7s
+    s019 p80  hexspline_cl      ok   ratio=1.0936   17.1s
+    s019 p70  discrete_only     ok   ratio=1.2624   17.5s
+    s019 p70  hexspline_cl      ok   ratio=1.2334   19.7s
+    s019 p60  discrete_only     ok   ratio=1.2624   17.4s
+    s019 p60  hexspline_cl      ok   ratio=1.2624   18.0s
+    s019 p50  discrete_only     ok   ratio=1.2624   17.5s
+    s019 p50  hexspline_cl      ok   ratio=1.2168   19.4s
+    s019 p40  discrete_only     FAIL unc_violated   79.2s
+    s019 p40  hexspline_cl      FAIL recovery_failed   80.4s
+    s019: hexspline_cl failed 1x in a row (through 40%) — dropped, 1 stricter level(s) recorded unrun
+    s019: discrete_only failed 1x in a row (through 40%) — dropped, 1 stricter level(s) recorded unrun
+    s019: every method failed at 1 consecutive levels (down to 40%) — constraint is impossible, moving on
+  s020: D=600 L=2 O=1  L_ref=615.2 U_ref=8.338  (15.3s)  [20/30]
+    s020 p100  straight_cont     ok   ratio=0.9793   16.6s
+    s020 p100  discrete_only     ok   ratio=1.5905   17.2s
+    s020 p100  hexspline_cl      ok   ratio=1.3935   18.9s
+    s020 p90  straight_cont     ok   ratio=0.9793   16.6s
+    s020 p90  discrete_only     ok   ratio=1.5905   17.2s
+    s020 p90  hexspline_cl      ok   ratio=1.3932   18.8s
+    s020 p80  discrete_only     ok   ratio=1.5905   17.2s
+    s020 p80  straight_cont     FAIL recovery_failed   18.8s
+    s020 p80  hexspline_cl      ok   ratio=1.3933   18.9s
+    s020: straight_cont failed 1x in a row (through 80%) — dropped, 5 stricter level(s) recorded unrun
+    s020 p70  discrete_only     ok   ratio=1.5905   17.0s
+    s020 p70  hexspline_cl      ok   ratio=1.4467   18.0s
+    s020 p60  discrete_only     ok   ratio=1.5905   17.0s
+    s020 p60  hexspline_cl      ok   ratio=1.4583   17.8s
+    s020 p50  discrete_only     ok   ratio=1.9954   20.0s
+    s020 p50  hexspline_cl      ok   ratio=1.9954   20.5s
+    s020 p40  discrete_only     FAIL unc_violated   86.2s
+    s020 p40  hexspline_cl      FAIL recovery_failed   89.9s
+    s020: hexspline_cl failed 1x in a row (through 40%) — dropped, 1 stricter level(s) recorded unrun
+    s020: discrete_only failed 1x in a row (through 40%) — dropped, 1 stricter level(s) recorded unrun
+    s020: every method failed at 1 consecutive levels (down to 40%) — constraint is impossible, moving on
+  s021: D=750 L=2 O=1  L_ref=750.0 U_ref=10.731  (15.5s)  [21/30]
+    s021 p100  discrete_only     ok   ratio=1.1122   16.5s
+    s021 p100  hexspline_cl      ok   ratio=1.0324   18.2s
+    s021 p100  straight_cont     ok   ratio=1.0000   18.2s
+    s021 p90  discrete_only     ok   ratio=1.1122   16.5s
+    s021 p90  hexspline_cl      ok   ratio=1.0322   18.2s
+    s021 p90  straight_cont     ok   ratio=1.0000   18.3s
+    s021 p80  discrete_only     ok   ratio=1.1122   16.5s
+    s021 p80  straight_cont     ok   ratio=1.0000   18.1s
+    s021 p80  hexspline_cl      ok   ratio=1.0326   18.3s
+    s021 p70  discrete_only     ok   ratio=1.1122   16.4s
+    s021 p70  straight_cont     FAIL recovery_failed   17.1s
+    s021 p70  hexspline_cl      ok   ratio=1.0330   18.2s
+    s021: straight_cont failed 1x in a row (through 70%) — dropped, 4 stricter level(s) recorded unrun
+    s021 p60  discrete_only     ok   ratio=1.1122   16.3s
+    s021 p60  hexspline_cl      ok   ratio=1.0329   17.7s
+    s021 p50  discrete_only     ok   ratio=1.1122   16.3s
+    s021 p50  hexspline_cl      ok   ratio=1.0330   17.8s
+    s021 p40  discrete_only     ok   ratio=1.3128   17.0s
+    s021 p40  hexspline_cl      ok   ratio=1.2900   17.6s
+    s021 p30  discrete_only     FAIL unc_violated   82.8s
+    s021 p30  hexspline_cl      FAIL recovery_failed   83.6s
+    s021: every method failed at 1 consecutive levels (down to 30%) — constraint is impossible, moving on
+  s022: D=750 L=2 O=2  L_ref=750.7 U_ref=10.742  (15.6s)  [22/30]
+    s022 p100  discrete_only     ok   ratio=1.1136   16.6s
+    s022 p100  hexspline_cl      ok   ratio=0.9992   18.2s
+    s022 p100  straight_cont     ok   ratio=0.9991   18.6s
+    s022 p90  discrete_only     ok   ratio=1.1136   16.5s
+    s022 p90  hexspline_cl      ok   ratio=0.9992   18.2s
+    s022 p90  straight_cont     ok   ratio=0.9991   18.7s
+    s022 p80  discrete_only     ok   ratio=1.1136   16.6s
+    s022 p80  hexspline_cl      ok   ratio=0.9992   18.2s
+    s022 p80  straight_cont     ok   ratio=0.9991   18.8s
+    s022 p70  discrete_only     ok   ratio=1.1136   16.6s
+    s022 p70  hexspline_cl      ok   ratio=1.0076   17.8s
+    s022 p70  straight_cont     FAIL recovery_failed   18.1s
+    s022: straight_cont failed 1x in a row (through 70%) — dropped, 4 stricter level(s) recorded unrun
+    s022 p60  discrete_only     ok   ratio=1.1136   16.4s
+    s022 p60  hexspline_cl      ok   ratio=1.0077   17.5s
+    s022 p50  discrete_only     ok   ratio=1.1136   16.5s
+    s022 p50  hexspline_cl      ok   ratio=0.9992   17.7s
+    s022 p40  discrete_only     ok   ratio=1.1136   16.4s
+    s022 p40  hexspline_cl      ok   ratio=1.1136   16.9s
+    s022 p30  discrete_only     ok   ratio=1.1136   16.5s
+    s022 p30  hexspline_cl      ok   ratio=1.1136   16.9s
+  s023: D=600 L=3 O=3  L_ref=635.8 U_ref=5.096  (15.3s)  [23/30]
+    s023 p100  discrete_only     ok   ratio=1.3123   16.6s
+    s023 p100  straight_cont     FAIL recovery_failed   17.5s
+    s023 p100  hexspline_cl      ok   ratio=1.2322   17.5s
+    s023: straight_cont failed 1x in a row (through 100%) — dropped, 7 stricter level(s) recorded unrun
+    s023 p90  discrete_only     ok   ratio=1.3123   16.4s
+    s023 p90  hexspline_cl      ok   ratio=1.2335   17.3s
+    s023 p80  discrete_only     ok   ratio=1.3123   16.4s
+    s023 p80  hexspline_cl      ok   ratio=1.3123   17.2s
+    s023 p70  discrete_only     ok   ratio=1.3123   16.4s
+    s023 p70  hexspline_cl      ok   ratio=1.3123   17.2s
+    s023 p60  discrete_only     ok   ratio=1.3123   16.3s
+    s023 p60  hexspline_cl      ok   ratio=1.3123   17.2s
+    s023 p50  discrete_only     ok   ratio=1.3123   16.4s
+    s023 p50  hexspline_cl      ok   ratio=1.3121   17.0s
+    s023 p40  discrete_only     ok   ratio=1.3123   16.3s
+    s023 p40  hexspline_cl      ok   ratio=1.3122   16.9s
+    s023 p30  discrete_only     ok   ratio=1.3123   16.4s
+    s023 p30  hexspline_cl      ok   ratio=1.3123   16.9s
+  s024: D=900 L=4 O=3  L_ref=919.1 U_ref=10.885  (15.6s)  [24/30]
+    s024 p100  discrete_only     ok   ratio=1.0926   16.6s
+    s024 p100  hexspline_cl      ok   ratio=1.0303   18.5s
+    s024 p100  straight_cont     FAIL recovery_failed   18.9s
+    s024: straight_cont failed 1x in a row (through 100%) — dropped, 7 stricter level(s) recorded unrun
+    s024 p90  discrete_only     ok   ratio=1.0926   16.5s
+    s024 p90  hexspline_cl      ok   ratio=1.0303   18.2s
+    s024 p80  discrete_only     ok   ratio=1.0926   16.5s
+    s024 p80  hexspline_cl      ok   ratio=1.0303   18.1s
+    s024 p70  discrete_only     ok   ratio=1.0926   16.5s
+    s024 p70  hexspline_cl      ok   ratio=1.0303   18.1s
+    s024 p60  discrete_only     ok   ratio=1.0926   16.5s
+    s024 p60  hexspline_cl      ok   ratio=1.0304   18.2s
+    s024 p50  discrete_only     ok   ratio=1.0926   16.5s
+    s024 p50  hexspline_cl      ok   ratio=1.0372   17.9s
+    s024 p40  discrete_only     FAIL unc_violated   90.1s
+    s024 p40  hexspline_cl      FAIL recovery_failed   92.4s
+    s024: hexspline_cl failed 1x in a row (through 40%) — dropped, 1 stricter level(s) recorded unrun
+    s024: discrete_only failed 1x in a row (through 40%) — dropped, 1 stricter level(s) recorded unrun
+    s024: every method failed at 1 consecutive levels (down to 40%) — constraint is impossible, moving on
+  s025: D=600 L=4 O=3  L_ref=760.4 U_ref=5.296  (15.3s)  [25/30]
+    s025 p100  discrete_only     ok   ratio=1.1240   16.5s
+    s025 p100  straight_cont     FAIL recovery_failed   17.2s
+    s025 p100  hexspline_cl      ok   ratio=1.0744   17.5s
+    s025: straight_cont failed 1x in a row (through 100%) — dropped, 7 stricter level(s) recorded unrun
+    s025 p90  discrete_only     ok   ratio=1.1240   16.4s
+    s025 p90  hexspline_cl      ok   ratio=1.1160   17.3s
+    s025 p80  discrete_only     ok   ratio=1.1240   16.3s
+    s025 p80  hexspline_cl      ok   ratio=1.1161   17.3s
+    s025 p70  discrete_only     ok   ratio=1.1240   16.3s
+    s025 p70  hexspline_cl      ok   ratio=1.1238   16.9s
+    s025 p60  discrete_only     ok   ratio=1.1240   16.3s
+    s025 p60  hexspline_cl      ok   ratio=1.1238   16.9s
+    s025 p50  discrete_only     ok   ratio=1.1240   16.3s
+    s025 p50  hexspline_cl      ok   ratio=1.1178   17.3s
+    s025 p40  discrete_only     ok   ratio=1.1240   16.3s
+    s025 p40  hexspline_cl      ok   ratio=1.1239   16.9s
+    s025 p30  discrete_only     ok   ratio=1.1240   16.4s
+    s025 p30  hexspline_cl      ok   ratio=1.1239   16.9s
+  s026: D=600 L=4 O=2  L_ref=664.7 U_ref=8.298  (15.6s)  [26/30]
+    s026 p100  straight_cont     ok   ratio=0.9298   16.8s
+    s026 p100  discrete_only     ok   ratio=1.6492   17.6s
+    s026 p100  hexspline_cl      ok   ratio=1.6461   18.4s
+    s026 p90  straight_cont     ok   ratio=0.9154   17.0s
+    s026 p90  discrete_only     ok   ratio=1.6261   17.7s
+    s026 p90  hexspline_cl      ok   ratio=1.6020   20.3s
+    s026 p80  straight_cont     FAIL recovery_failed   17.3s
+    s026 p80  discrete_only     ok   ratio=2.0051   24.5s
+    s026 p80  hexspline_cl      ok   ratio=2.0051   25.3s
+    s026: straight_cont failed 1x in a row (through 80%) — dropped, 5 stricter level(s) recorded unrun
+    s026 p70  discrete_only     ok   ratio=2.2616   37.4s
+    s026 p70  hexspline_cl      ok   ratio=2.2099   41.5s
+    s026 p60  discrete_only     FAIL unc_violated   92.4s
+    s026 p60  hexspline_cl      FAIL recovery_failed   96.7s
+    s026: hexspline_cl failed 1x in a row (through 60%) — dropped, 3 stricter level(s) recorded unrun
+    s026: discrete_only failed 1x in a row (through 60%) — dropped, 3 stricter level(s) recorded unrun
+    s026: every method failed at 1 consecutive levels (down to 60%) — constraint is impossible, moving on
+  s027: D=600 L=4 O=3  L_ref=603.8 U_ref=7.403  (15.2s)  [27/30]
+    s027 p100  discrete_only     ok   ratio=1.1360   16.4s
+    s027 p100  straight_cont     ok   ratio=0.9953   17.7s
+    s027 p100  hexspline_cl      ok   ratio=1.0039   17.8s
+    s027 p90  discrete_only     ok   ratio=1.1360   16.5s
+    s027 p90  hexspline_cl      ok   ratio=1.0036   17.8s
+    s027 p90  straight_cont     FAIL recovery_failed   19.0s
+    s027: straight_cont failed 1x in a row (through 90%) — dropped, 6 stricter level(s) recorded unrun
+    s027 p80  discrete_only     ok   ratio=1.1360   16.2s
+    s027 p80  hexspline_cl      ok   ratio=1.1037   17.1s
+    s027 p70  discrete_only     ok   ratio=1.1360   16.2s
+    s027 p70  hexspline_cl      ok   ratio=1.0404   17.6s
+    s027 p60  discrete_only     ok   ratio=1.1360   16.3s
+    s027 p60  hexspline_cl      ok   ratio=1.0629   17.6s
+    s027 p50  discrete_only     ok   ratio=1.1360   16.2s
+    s027 p50  hexspline_cl      ok   ratio=1.1158   17.7s
+    s027 p40  discrete_only     ok   ratio=1.8483   16.8s
+    s027 p40  hexspline_cl      ok   ratio=1.8483   17.6s
+    s027 p30  discrete_only     ok   ratio=1.8483   16.8s
+    s027 p30  hexspline_cl      ok   ratio=1.8483   17.5s
+  s028: D=750 L=3 O=3  L_ref=778.7 U_ref=5.311  (15.6s)  [28/30]
+    s028 p100  discrete_only     ok   ratio=1.2902   16.9s
+    s028 p100  hexspline_cl      ok   ratio=1.2902   17.5s
+    s028 p100  straight_cont     FAIL recovery_failed   18.3s
+    s028: straight_cont failed 1x in a row (through 100%) — dropped, 7 stricter level(s) recorded unrun
+    s028 p90  discrete_only     ok   ratio=1.2902   16.7s
+    s028 p90  hexspline_cl      ok   ratio=1.2902   17.3s
+    s028 p80  discrete_only     ok   ratio=1.2902   16.6s
+    s028 p80  hexspline_cl      ok   ratio=1.2902   17.3s
+    s028 p70  discrete_only     ok   ratio=1.2902   16.7s
+    s028 p70  hexspline_cl      ok   ratio=1.2885   17.5s
+    s028 p60  discrete_only     ok   ratio=1.4427   17.6s
+    s028 p60  hexspline_cl      ok   ratio=1.4427   18.0s
+    s028 p50  discrete_only     ok   ratio=1.4427   17.5s
+    s028 p50  hexspline_cl      ok   ratio=1.4427   18.0s
+    s028 p40  discrete_only     ok   ratio=1.4427   17.6s
+    s028 p40  hexspline_cl      ok   ratio=1.4427   18.0s
+    s028 p30  discrete_only     ok   ratio=1.4427   17.6s
+    s028 p30  hexspline_cl      ok   ratio=1.4427   18.1s
+  s029: D=900 L=4 O=2  L_ref=990.7 U_ref=5.002  (15.6s)  [29/30]
+    s029 p100  discrete_only     ok   ratio=1.1465   17.7s
+    s029 p100  straight_cont     FAIL recovery_failed   19.3s
+    s029 p100  hexspline_cl      ok   ratio=1.1277   19.4s
+    s029: straight_cont failed 1x in a row (through 100%) — dropped, 7 stricter level(s) recorded unrun
+    s029 p90  discrete_only     ok   ratio=1.1465   17.5s
+    s029 p90  hexspline_cl      ok   ratio=1.1246   19.2s
+    s029 p80  discrete_only     ok   ratio=1.1465   17.5s
+    s029 p80  hexspline_cl      ok   ratio=1.1259   19.3s
+    s029 p70  discrete_only     ok   ratio=1.1298   17.5s
+    s029 p70  hexspline_cl      ok   ratio=1.1241   18.8s
+    s029 p60  discrete_only     ok   ratio=1.1465   17.7s
+    s029 p60  hexspline_cl      ok   ratio=1.1358   19.3s
+    s029 p50  discrete_only     ok   ratio=1.1465   17.5s
+    s029 p50  hexspline_cl      ok   ratio=1.1357   19.2s
+    s029 p40  discrete_only     ok   ratio=1.1465   17.6s
+    s029 p40  hexspline_cl      ok   ratio=1.1355   19.2s
+    s029 p30  discrete_only     ok   ratio=1.1465   17.5s
+    s029 p30  hexspline_cl      ok   ratio=1.1357   19.1s
+  s030: D=750 L=3 O=3  L_ref=817.4 U_ref=8.75  (15.3s)  [30/30]
+    s030 p100  discrete_only     ok   ratio=1.2292   16.8s
+    s030 p100  hexspline_cl      ok   ratio=1.0958   18.3s
+    s030 p100  straight_cont     FAIL recovery_failed   18.7s
+    s030: straight_cont failed 1x in a row (through 100%) — dropped, 7 stricter level(s) recorded unrun
+    s030 p90  discrete_only     ok   ratio=1.2292   16.7s
+    s030 p90  hexspline_cl      ok   ratio=1.0916   18.2s
+    s030 p80  discrete_only     ok   ratio=1.2292   16.6s
+    s030 p80  hexspline_cl      ok   ratio=1.0918   18.2s
+    s030 p70  discrete_only     ok   ratio=1.2292   16.9s
+    s030 p70  hexspline_cl      ok   ratio=1.0898   18.1s
+    s030 p60  discrete_only     ok   ratio=1.1628   16.9s
+    s030 p60  hexspline_cl      ok   ratio=1.0476   17.8s
+    s030 p50  discrete_only     ok   ratio=1.1628   16.9s
+    s030 p50  hexspline_cl      ok   ratio=1.1503   17.4s
+    s030 p40  discrete_only     FAIL unc_violated   84.9s
+    s030 p40  hexspline_cl      FAIL recovery_failed   85.5s
+    s030: hexspline_cl failed 1x in a row (through 40%) — dropped, 1 stricter level(s) recorded unrun
+    s030: discrete_only failed 1x in a row (through 40%) — dropped, 1 stricter level(s) recorded unrun
+    s030: every method failed at 1 consecutive levels (down to 40%) — constraint is impossible, moving on
+── done: /home/tonyzhang/projects/landmark_planning/constraint_sweep/ablation_2026-08-17 ──

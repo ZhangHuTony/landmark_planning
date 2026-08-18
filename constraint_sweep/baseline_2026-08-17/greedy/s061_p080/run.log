@@ -1,0 +1,41 @@
+Landmark scenario: random — 2 landmarks, 3 obstacles, start (0.0, 0.0) → goal (600.0, 0.0)
+Hex graph: 297 nodes (294 heading-states + 2 sensors + goal), radius=86.60254037844388m, directed_edges=726, grid=9x11, start_cell=(2, 5), goal_cell=(6, 5), start_heading=0
+
+── GREEDY PLANNING ──
+  Primary: shortest obstacle-clear route (single-agent A*, no uncertainty bound)
+
+  ✓ FEASIBLE SOLUTION at iter 7: dist=750.0, unc=8.9677
+  [Constraint A*] Single-agent complete: 7 iterations, final_dist=750.0
+  Helpers: greedy placement, minimising the primary's uncertainty per step
+  Support 1: dist=750.0m, goal_unc=0.9398m
+  Primary  : dist=750.0m, goal_unc=4.9451m (threshold 7.174148632 ✓)
+
+=== Continuous Spline Optimization (threshold=7.1741) ===
+  Initial (discrete→spline): prim_len=704.202, unc=4.9451
+  Barrier stage 1/15: μ=20.0
+  Barrier stage 2/15: μ=7.0
+  → Converged at iter 75 (Δlen=0.000834)
+  Barrier stage 3/15: μ=2.45
+  → Converged at iter 76 (Δlen=0.000587)
+  Barrier stage 4/15: μ=0.8575
+  → Converged at iter 77 (Δlen=0.000848)
+  Barrier stage 5/15: μ=0.3001
+  Barrier stage 6/15: μ=0.105
+  Barrier stage 7/15: μ=0.0368
+  Barrier stage 8/15: μ=0.0129
+  Barrier stage 9/15: μ=0.0045
+  Barrier stage 10/15: μ=0.0016
+  Barrier stage 11/15: μ=0.0006
+  Barrier stage 12/15: μ=0.0002
+  Barrier stage 13/15: μ=0.0001
+  → Converged at iter 617 (Δlen=0.000315)
+  Barrier stage 14/15: μ=0.0
+  [Spline barrier] line search stalled; stopping at stage 14
+  Barrier stage 15/15: μ=0.0
+  [Spline barrier] line search stalled; stopping at stage 15
+  Final: prim_len=698.875, unc=4.9718, threshold=7.1741, status=optimized, min_slack=0.0
+  Obstacle re-verification: mean path clears all obstacles ✓
+Fig combined (main) saved: Discrete Len=704.2 → Continuous Len=698.88
+Fig uncertainty profile (main) saved: /home/tonyzhang/projects/landmark_planning/constraint_sweep/baseline_2026-08-17/greedy/s061_p080/greedy/figures/main_unc_profile.png
+
+[greedy] produced 1 solution(s) -> /home/tonyzhang/projects/landmark_planning/constraint_sweep/baseline_2026-08-17/greedy/s061_p080/greedy

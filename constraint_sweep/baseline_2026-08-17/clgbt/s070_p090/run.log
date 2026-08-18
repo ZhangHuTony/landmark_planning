@@ -1,0 +1,45 @@
+Landmark scenario: random — 2 landmarks, 3 obstacles, start (0.0, 0.0) → goal (750.0, 0.0)
+Hex graph: 339 nodes (336 heading-states + 2 sensors + goal), radius=86.60254037844388m, directed_edges=840, grid=10x11, start_cell=(2, 5), goal_cell=(7, 5), start_heading=0
+
+── CL-GBT PLANNING (sampling-based joint tree, continuous R²) ──
+  [CL-GBT] iter 200/200000  tree=144  elapsed=0.1s     [CL-GBT] iter 400/200000  tree=300  elapsed=0.1s     [CL-GBT] iter 600/200000  tree=459  elapsed=0.1s     [CL-GBT] iter 800/200000  tree=614  elapsed=0.1s     [CL-GBT] iter 1000/200000  tree=756  elapsed=0.1s     [CL-GBT] iter 1200/200000  tree=914  elapsed=0.1s     [CL-GBT] iter 1400/200000  tree=1072  elapsed=0.1s     [CL-GBT] iter 1600/200000  tree=1227  elapsed=0.2s     [CL-GBT] iter 1800/200000  tree=1383  elapsed=0.2s     [CL-GBT] iter 2000/200000  tree=1528  elapsed=0.2s     [CL-GBT] iter 2200/200000  tree=1678  elapsed=0.2s     [CL-GBT] iter 2400/200000  tree=1814  elapsed=0.2s     [CL-GBT] iter 2600/200000  tree=1959  elapsed=0.2s     [CL-GBT] iter 2800/200000  tree=2104  elapsed=0.2s     [CL-GBT] iter 3000/200000  tree=2246  elapsed=0.2s     [CL-GBT] iter 3200/200000  tree=2390  elapsed=0.2s     [CL-GBT] iter 3400/200000  tree=2530  elapsed=0.3s     [CL-GBT] iter 3600/200000  tree=2680  elapsed=0.3s     [CL-GBT] iter 3800/200000  tree=2825  elapsed=0.3s     [CL-GBT] iter 4000/200000  tree=2970  elapsed=0.3s     [CL-GBT] iter 4200/200000  tree=3112  elapsed=0.4s     [CL-GBT] iter 4400/200000  tree=3252  elapsed=0.4s     [CL-GBT] iter 4600/200000  tree=3398  elapsed=0.4s     [CL-GBT] iter 4800/200000  tree=3546  elapsed=0.4s     [CL-GBT] iter 5000/200000  tree=3683  elapsed=0.4s     [CL-GBT] iter 5200/200000  tree=3829  elapsed=0.4s     [CL-GBT] iter 5400/200000  tree=3959  elapsed=0.5s     [CL-GBT] iter 5600/200000  tree=4088  elapsed=0.5s     [CL-GBT] iter 5800/200000  tree=4233  elapsed=0.5s     [CL-GBT] iter 6000/200000  tree=4361  elapsed=0.5s     [CL-GBT] iter 6200/200000  tree=4492  elapsed=0.5s     [CL-GBT] iter 6400/200000  tree=4619  elapsed=0.6s   ┌ Warning: Seed is feasible but not strictly interior (min_slack=1.000090638775264e-9, ε=0.001); the barrier is past its knee and steps will be small.
+└ @ Main ~/projects/landmark_planning/planners/hexspline_cl.jl:1209
+
+  Support 1: dist=1500.0m, goal_unc=7.7513m
+  Primary  : dist=1534.6m, goal_unc=7.9927m (threshold 8.808601853) — 6410 iterations, tree size 4628
+
+=== Continuous Spline Optimization (threshold=8.8086) ===
+  Initial (discrete→spline): prim_len=1348.961, unc=7.9927
+  Barrier stage 1/15: μ=20.0
+  Barrier stage 2/15: μ=7.0
+  → Converged at iter 79 (Δlen=0.000188)
+  Barrier stage 3/15: μ=2.45
+  [Spline barrier] line search stalled; stopping at stage 3
+  Barrier stage 4/15: μ=0.8575
+  Barrier stage 5/15: μ=0.3001
+  Barrier stage 6/15: μ=0.105
+  → Converged at iter 282 (Δlen=0.000605)
+  Barrier stage 7/15: μ=0.0368
+  → Converged at iter 283 (Δlen=0.000681)
+  Barrier stage 8/15: μ=0.0129
+  → Converged at iter 284 (Δlen=0.00072)
+  Barrier stage 9/15: μ=0.0045
+  [Spline barrier] line search stalled; stopping at stage 9
+  Barrier stage 10/15: μ=0.0016
+  [Spline barrier] line search stalled; stopping at stage 10
+  Barrier stage 11/15: μ=0.0006
+  [Spline barrier] line search stalled; stopping at stage 11
+  Barrier stage 12/15: μ=0.0002
+  [Spline barrier] line search stalled; stopping at stage 12
+  Barrier stage 13/15: μ=0.0001
+  [Spline barrier] line search stalled; stopping at stage 13
+  Barrier stage 14/15: μ=0.0
+  [Spline barrier] line search stalled; stopping at stage 14
+  Barrier stage 15/15: μ=0.0
+  [Spline barrier] line search stalled; stopping at stage 15
+  Final: prim_len=1277.957, unc=8.2356, threshold=8.8086, status=optimized, min_slack=0.0
+  Obstacle re-verification: mean path clears all obstacles ✓
+Fig combined (main) saved: Discrete Len=1348.96 → Continuous Len=1277.96
+Fig uncertainty profile (main) saved: /home/tonyzhang/projects/landmark_planning/constraint_sweep/baseline_2026-08-17/clgbt/s070_p090/clgbt/figures/main_unc_profile.png
+
+[clgbt] produced 1 solution(s) -> /home/tonyzhang/projects/landmark_planning/constraint_sweep/baseline_2026-08-17/clgbt/s070_p090/clgbt

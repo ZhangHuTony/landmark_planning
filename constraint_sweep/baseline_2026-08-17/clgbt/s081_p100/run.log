@@ -1,0 +1,46 @@
+Landmark scenario: random — 3 landmarks, 1 obstacles, start (0.0, 0.0) → goal (750.0, 0.0)
+Hex graph: 340 nodes (336 heading-states + 3 sensors + goal), radius=86.60254037844388m, directed_edges=840, grid=10x11, start_cell=(2, 5), goal_cell=(7, 5), start_heading=0
+
+── CL-GBT PLANNING (sampling-based joint tree, continuous R²) ──
+  [CL-GBT] iter 200/200000  tree=171  elapsed=0.0s     [CL-GBT] iter 400/200000  tree=346  elapsed=0.1s     [CL-GBT] iter 600/200000  tree=520  elapsed=0.1s     [CL-GBT] iter 800/200000  tree=681  elapsed=0.1s     [CL-GBT] iter 1000/200000  tree=840  elapsed=0.1s     [CL-GBT] iter 1200/200000  tree=1000  elapsed=0.2s     [CL-GBT] iter 1400/200000  tree=1151  elapsed=0.2s     [CL-GBT] iter 1600/200000  tree=1298  elapsed=0.2s     [CL-GBT] iter 1800/200000  tree=1452  elapsed=0.2s     [CL-GBT] iter 2000/200000  tree=1603  elapsed=0.2s     [CL-GBT] iter 2200/200000  tree=1761  elapsed=0.2s     [CL-GBT] iter 2400/200000  tree=1908  elapsed=0.2s     [CL-GBT] iter 2600/200000  tree=2053  elapsed=0.2s     [CL-GBT] iter 2800/200000  tree=2202  elapsed=0.2s     [CL-GBT] iter 3000/200000  tree=2342  elapsed=0.2s     [CL-GBT] iter 3200/200000  tree=2488  elapsed=0.3s     [CL-GBT] iter 3400/200000  tree=2643  elapsed=0.3s     [CL-GBT] iter 3600/200000  tree=2793  elapsed=0.3s     [CL-GBT] iter 3800/200000  tree=2942  elapsed=0.3s     [CL-GBT] iter 4000/200000  tree=3091  elapsed=0.3s     [CL-GBT] iter 4200/200000  tree=3248  elapsed=0.4s     [CL-GBT] iter 4400/200000  tree=3398  elapsed=0.4s     [CL-GBT] iter 4600/200000  tree=3543  elapsed=0.4s     [CL-GBT] iter 4800/200000  tree=3701  elapsed=0.4s     [CL-GBT] iter 5000/200000  tree=3848  elapsed=0.4s     [CL-GBT] iter 5200/200000  tree=4002  elapsed=0.5s     [CL-GBT] iter 5400/200000  tree=4132  elapsed=0.5s     [CL-GBT] iter 5600/200000  tree=4277  elapsed=0.5s     [CL-GBT] iter 5800/200000  tree=4435  elapsed=0.5s   
+  Support 1: dist=1050.0m, goal_unc=4.8572m
+  Primary  : dist=1112.0m, goal_unc=4.9782m (threshold 5.265653863) — 5985 iterations, tree size 4567
+
+=== Continuous Spline Optimization (threshold=5.2657) ===
+  Initial (discrete→spline): prim_len=1075.895, unc=4.9782
+  Barrier stage 1/15: μ=20.0
+  → Converged at iter 21 (Δlen=0.000434)
+  Barrier stage 2/15: μ=7.0
+  [Spline barrier] line search stalled; stopping at stage 2
+  Barrier stage 3/15: μ=2.45
+  [Spline barrier] line search stalled; stopping at stage 3
+  Barrier stage 4/15: μ=0.8575
+  [Spline barrier] line search stalled; stopping at stage 4
+  Barrier stage 5/15: μ=0.3001
+  [Spline barrier] line search stalled; stopping at stage 5
+  Barrier stage 6/15: μ=0.105
+  [Spline barrier] line search stalled; stopping at stage 6
+  Barrier stage 7/15: μ=0.0368
+  [Spline barrier] line search stalled; stopping at stage 7
+  Barrier stage 8/15: μ=0.0129
+  [Spline barrier] line search stalled; stopping at stage 8
+  Barrier stage 9/15: μ=0.0045
+  [Spline barrier] line search stalled; stopping at stage 9
+  Barrier stage 10/15: μ=0.0016
+  [Spline barrier] line search stalled; stopping at stage 10
+  Barrier stage 11/15: μ=0.0006
+  [Spline barrier] line search stalled; stopping at stage 11
+  Barrier stage 12/15: μ=0.0002
+  [Spline barrier] line search stalled; stopping at stage 12
+  Barrier stage 13/15: μ=0.0001
+  [Spline barrier] line search stalled; stopping at stage 13
+  Barrier stage 14/15: μ=0.0
+  [Spline barrier] line search stalled; stopping at stage 14
+  Barrier stage 15/15: μ=0.0
+  [Spline barrier] line search stalled; stopping at stage 15
+  Final: prim_len=1075.895, unc=4.9782, threshold=5.2657, status=seed_only, min_slack=0.011371
+  Obstacle re-verification: mean path clears all obstacles ✓
+Fig combined (main) saved: Discrete Len=1075.9 → Continuous Len=1075.9
+Fig uncertainty profile (main) saved: /home/tonyzhang/projects/landmark_planning/constraint_sweep/baseline_2026-08-17/clgbt/s081_p100/clgbt/figures/main_unc_profile.png
+
+[clgbt] produced 1 solution(s) -> /home/tonyzhang/projects/landmark_planning/constraint_sweep/baseline_2026-08-17/clgbt/s081_p100/clgbt

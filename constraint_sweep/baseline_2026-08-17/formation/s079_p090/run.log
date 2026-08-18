@@ -1,0 +1,44 @@
+Landmark scenario: random — 4 landmarks, 3 obstacles, start (0.0, 0.0) → goal (900.0, 0.0)
+Hex graph: 383 nodes (378 heading-states + 4 sensors + goal), radius=86.60254037844388m, directed_edges=954, grid=11x11, start_cell=(2, 5), goal_cell=(8, 5), start_heading=0
+
+── FORMATION PLANNING ──
+  Primary: own A* (formation_primary_astar); a goal candidate is accepted on the primary's uncertainty WITH its supports attached (threshold 7.483650646).
+  One support: both lateral slots (+1 = 60° left, -1 = 60° right) tried per candidate.
+
+    ✓ escorted-feasible at iter 77: dist=1200.0, unc=5.1281 (slot [-1])
+  → Chose slot [-1]
+  Support 1 (slot -1): dist=1200.0m, goal_unc=4.2705m, arc drift vs primary=0.0m
+  Primary : dist=1200.0m, goal_unc=5.1281m (threshold 7.483650646 ✓)
+
+=== Continuous Spline Optimization (threshold=7.4837) ===
+  Initial (discrete→spline): prim_len=1154.736, unc=5.1281
+  Barrier stage 1/15: μ=20.0
+  [Spline barrier] line search stalled; stopping at stage 1
+  Barrier stage 2/15: μ=7.0
+  [Spline barrier] line search stalled; stopping at stage 2
+  Barrier stage 3/15: μ=2.45
+  [Spline barrier] line search stalled; stopping at stage 3
+  Barrier stage 4/15: μ=0.8575
+  [Spline barrier] line search stalled; stopping at stage 4
+  Barrier stage 5/15: μ=0.3001
+  [Spline barrier] line search stalled; stopping at stage 5
+  Barrier stage 6/15: μ=0.105
+  Barrier stage 7/15: μ=0.0368
+  Barrier stage 8/15: μ=0.0129
+  Barrier stage 9/15: μ=0.0045
+  Barrier stage 10/15: μ=0.0016
+  Barrier stage 11/15: μ=0.0006
+  Barrier stage 12/15: μ=0.0002
+  → Converged at iter 468 (Δlen=0.000989)
+  Barrier stage 13/15: μ=0.0001
+  → Converged at iter 470 (Δlen=0.000951)
+  Barrier stage 14/15: μ=0.0
+  → Converged at iter 472 (Δlen=0.000915)
+  Barrier stage 15/15: μ=0.0
+  → Converged at iter 474 (Δlen=0.000878)
+  Final: prim_len=1090.302, unc=6.1499, threshold=7.4837, status=optimized, min_slack=0.006132
+  Obstacle re-verification: mean path clears all obstacles ✓
+Fig combined (main) saved: Discrete Len=1154.74 → Continuous Len=1090.3
+Fig uncertainty profile (main) saved: /home/tonyzhang/projects/landmark_planning/constraint_sweep/baseline_2026-08-17/formation/s079_p090/formation/figures/main_unc_profile.png
+
+[formation] produced 1 solution(s) -> /home/tonyzhang/projects/landmark_planning/constraint_sweep/baseline_2026-08-17/formation/s079_p090/formation

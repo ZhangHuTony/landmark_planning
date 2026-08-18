@@ -1,0 +1,42 @@
+Landmark scenario: random — 4 landmarks, 3 obstacles, start (0.0, 0.0) → goal (900.0, 0.0)
+Hex graph: 383 nodes (378 heading-states + 4 sensors + goal), radius=86.60254037844388m, directed_edges=954, grid=11x11, start_cell=(2, 5), goal_cell=(8, 5), start_heading=0
+
+── CL-GBT PLANNING (sampling-based joint tree, continuous R²) ──
+  [CL-GBT] iter 200/200000  tree=170  elapsed=0.1s     [CL-GBT] iter 400/200000  tree=341  elapsed=0.1s     [CL-GBT] iter 600/200000  tree=504  elapsed=0.1s     [CL-GBT] iter 800/200000  tree=676  elapsed=0.1s     [CL-GBT] iter 1000/200000  tree=839  elapsed=0.1s     [CL-GBT] iter 1200/200000  tree=1006  elapsed=0.2s     [CL-GBT] iter 1400/200000  tree=1167  elapsed=0.2s     [CL-GBT] iter 1600/200000  tree=1325  elapsed=0.2s     [CL-GBT] iter 1800/200000  tree=1477  elapsed=0.2s     [CL-GBT] iter 2000/200000  tree=1634  elapsed=0.2s     [CL-GBT] iter 2200/200000  tree=1799  elapsed=0.2s     [CL-GBT] iter 2400/200000  tree=1950  elapsed=0.2s     [CL-GBT] iter 2600/200000  tree=2100  elapsed=0.2s     [CL-GBT] iter 2800/200000  tree=2259  elapsed=0.2s     [CL-GBT] iter 3000/200000  tree=2411  elapsed=0.3s     [CL-GBT] iter 3200/200000  tree=2557  elapsed=0.3s     [CL-GBT] iter 3400/200000  tree=2706  elapsed=0.3s     [CL-GBT] iter 3600/200000  tree=2850  elapsed=0.3s   
+  Support 1: dist=1200.0m, goal_unc=5.5809m
+  Primary  : dist=1335.2m, goal_unc=6.0424m (threshold 6.838037967) — 3797 iterations, tree size 3011
+
+=== Continuous Spline Optimization (threshold=6.838) ===
+  Initial (discrete→spline): prim_len=1290.23, unc=6.0424
+  Barrier stage 1/15: μ=20.0
+  → Converged at iter 33 (Δlen=0.000586)
+  Barrier stage 2/15: μ=7.0
+  → Converged at iter 34 (Δlen=0.000285)
+  Barrier stage 3/15: μ=2.45
+  → Converged at iter 64 (Δlen=0.000848)
+  Barrier stage 4/15: μ=0.8575
+  Barrier stage 5/15: μ=0.3001
+  Barrier stage 6/15: μ=0.105
+  Barrier stage 7/15: μ=0.0368
+  [Spline barrier] line search stalled; stopping at stage 7
+  Barrier stage 8/15: μ=0.0129
+  Barrier stage 9/15: μ=0.0045
+  [Spline barrier] line search stalled; stopping at stage 9
+  Barrier stage 10/15: μ=0.0016
+  [Spline barrier] line search stalled; stopping at stage 10
+  Barrier stage 11/15: μ=0.0006
+  → Converged at iter 414 (Δlen=0.000437)
+  Barrier stage 12/15: μ=0.0002
+  → Converged at iter 415 (Δlen=0.000471)
+  Barrier stage 13/15: μ=0.0001
+  → Converged at iter 416 (Δlen=0.000494)
+  Barrier stage 14/15: μ=0.0
+  [Spline barrier] line search stalled; stopping at stage 14
+  Barrier stage 15/15: μ=0.0
+  [Spline barrier] line search stalled; stopping at stage 15
+  Final: prim_len=1176.906, unc=5.56, threshold=6.838, status=optimized, min_slack=8.0e-6
+  Obstacle re-verification: mean path clears all obstacles ✓
+Fig combined (main) saved: Discrete Len=1290.23 → Continuous Len=1176.91
+Fig uncertainty profile (main) saved: /home/tonyzhang/projects/landmark_planning/constraint_sweep/baseline_2026-08-17/clgbt/s012_p090/clgbt/figures/main_unc_profile.png
+
+[clgbt] produced 1 solution(s) -> /home/tonyzhang/projects/landmark_planning/constraint_sweep/baseline_2026-08-17/clgbt/s012_p090/clgbt

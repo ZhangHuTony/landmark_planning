@@ -1,0 +1,8 @@
+main:
+  primary_length: 704.2015064666964
+  primary_unc: 5.768066820073987
+  astar_iterations: 28
+  discrete_uncertainties: [1.0589, 5.7681]
+  primary_disc_unc: 5.768066820073987
+  continuous_primary_length: 704.202
+  continuous_uncertainties: [1.0589, 5.7681]

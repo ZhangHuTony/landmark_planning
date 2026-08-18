@@ -1,0 +1,33 @@
+Landmark scenario: random — 2 landmarks, 2 obstacles, start (0.0, 0.0) → goal (750.0, 0.0)
+Hex graph: 339 nodes (336 heading-states + 2 sensors + goal), radius=86.60254037844388m, directed_edges=840, grid=10x11, start_cell=(2, 5), goal_cell=(7, 5), start_heading=0
+
+── CL-GBT PLANNING (sampling-based joint tree, continuous R²) ──
+  [CL-GBT] iter 200/200000  tree=176  elapsed=0.1s     [CL-GBT] iter 400/200000  tree=345  elapsed=0.1s     [CL-GBT] iter 600/200000  tree=506  elapsed=0.1s     [CL-GBT] iter 800/200000  tree=678  elapsed=0.1s     [CL-GBT] iter 1000/200000  tree=838  elapsed=0.1s     [CL-GBT] iter 1200/200000  tree=994  elapsed=0.2s     [CL-GBT] iter 1400/200000  tree=1147  elapsed=0.2s     [CL-GBT] iter 1600/200000  tree=1307  elapsed=0.2s     [CL-GBT] iter 1800/200000  tree=1460  elapsed=0.2s     [CL-GBT] iter 2000/200000  tree=1612  elapsed=0.2s     [CL-GBT] iter 2200/200000  tree=1771  elapsed=0.2s     [CL-GBT] iter 2400/200000  tree=1928  elapsed=0.2s     [CL-GBT] iter 2600/200000  tree=2078  elapsed=0.2s     [CL-GBT] iter 2800/200000  tree=2224  elapsed=0.3s     [CL-GBT] iter 3000/200000  tree=2380  elapsed=0.3s   
+  Support 1: dist=1050.0m, goal_unc=9.0548m
+  Primary  : dist=1176.4m, goal_unc=9.7493m (threshold 10.15939081) — 3170 iterations, tree size 2514
+
+=== Continuous Spline Optimization (threshold=10.1594) ===
+  Initial (discrete→spline): prim_len=1102.749, unc=9.7493
+  Barrier stage 1/15: μ=20.0
+  → Converged at iter 2 (Δlen=0.000541)
+  Barrier stage 2/15: μ=7.0
+  → Converged at iter 3 (Δlen=0.000262)
+  Barrier stage 3/15: μ=2.45
+  Barrier stage 4/15: μ=0.8575
+  Barrier stage 5/15: μ=0.3001
+  Barrier stage 6/15: μ=0.105
+  Barrier stage 7/15: μ=0.0368
+  Barrier stage 8/15: μ=0.0129
+  Barrier stage 9/15: μ=0.0045
+  Barrier stage 10/15: μ=0.0016
+  Barrier stage 11/15: μ=0.0006
+  Barrier stage 12/15: μ=0.0002
+  Barrier stage 13/15: μ=0.0001
+  Barrier stage 14/15: μ=0.0
+  Barrier stage 15/15: μ=0.0
+  Final: prim_len=1058.844, unc=9.542, threshold=10.1594, status=optimized, min_slack=0.009026
+  Obstacle re-verification: mean path clears all obstacles ✓
+Fig combined (main) saved: Discrete Len=1102.75 → Continuous Len=1058.84
+Fig uncertainty profile (main) saved: /home/tonyzhang/projects/landmark_planning/constraint_sweep/baseline_2026-08-17/clgbt/s064_p100/clgbt/figures/main_unc_profile.png
+
+[clgbt] produced 1 solution(s) -> /home/tonyzhang/projects/landmark_planning/constraint_sweep/baseline_2026-08-17/clgbt/s064_p100/clgbt

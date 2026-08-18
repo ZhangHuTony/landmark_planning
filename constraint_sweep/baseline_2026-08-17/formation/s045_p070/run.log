@@ -1,0 +1,50 @@
+Landmark scenario: random — 3 landmarks, 3 obstacles, start (0.0, 0.0) → goal (750.0, 0.0)
+Hex graph: 340 nodes (336 heading-states + 3 sensors + goal), radius=86.60254037844388m, directed_edges=840, grid=10x11, start_cell=(2, 5), goal_cell=(7, 5), start_heading=0
+
+── FORMATION PLANNING ──
+  Primary: own A* (formation_primary_astar); a goal candidate is accepted on the primary's uncertainty WITH its supports attached (threshold 6.146563586).
+  One support: both lateral slots (+1 = 60° left, -1 = 60° right) tried per candidate.
+
+    ✓ escorted-feasible at iter 70: dist=1200.0, unc=4.794 (slot [-1])
+  → Chose slot [-1]
+  Support 1 (slot -1): dist=1200.0m, goal_unc=4.7925m, arc drift vs primary=0.0m
+  Primary : dist=1200.0m, goal_unc=4.794m (threshold 6.146563586 ✓)
+
+=== Continuous Spline Optimization (threshold=6.1466) ===
+  Initial (discrete→spline): prim_len=1128.454, unc=4.794
+  Barrier stage 1/15: μ=20.0
+  [Spline barrier] line search stalled; stopping at stage 1
+  Barrier stage 2/15: μ=7.0
+  [Spline barrier] line search stalled; stopping at stage 2
+  Barrier stage 3/15: μ=2.45
+  [Spline barrier] line search stalled; stopping at stage 3
+  Barrier stage 4/15: μ=0.8575
+  [Spline barrier] line search stalled; stopping at stage 4
+  Barrier stage 5/15: μ=0.3001
+  [Spline barrier] line search stalled; stopping at stage 5
+  Barrier stage 6/15: μ=0.105
+  [Spline barrier] line search stalled; stopping at stage 6
+  Barrier stage 7/15: μ=0.0368
+  [Spline barrier] line search stalled; stopping at stage 7
+  Barrier stage 8/15: μ=0.0129
+  → Converged at iter 27 (Δlen=0.000819)
+  Barrier stage 9/15: μ=0.0045
+  → Converged at iter 30 (Δlen=0.000599)
+  Barrier stage 10/15: μ=0.0016
+  → Converged at iter 42 (Δlen=0.000533)
+  Barrier stage 11/15: μ=0.0006
+  → Converged at iter 43 (Δlen=0.000684)
+  Barrier stage 12/15: μ=0.0002
+  [Spline barrier] line search stalled; stopping at stage 12
+  Barrier stage 13/15: μ=0.0001
+  [Spline barrier] line search stalled; stopping at stage 13
+  Barrier stage 14/15: μ=0.0
+  [Spline barrier] line search stalled; stopping at stage 14
+  Barrier stage 15/15: μ=0.0
+  [Spline barrier] line search stalled; stopping at stage 15
+  Final: prim_len=1116.801, unc=4.7384, threshold=6.1466, status=optimized, min_slack=1.0e-6
+  Obstacle re-verification: mean path clears all obstacles ✓
+Fig combined (main) saved: Discrete Len=1128.45 → Continuous Len=1116.8
+Fig uncertainty profile (main) saved: /home/tonyzhang/projects/landmark_planning/constraint_sweep/baseline_2026-08-17/formation/s045_p070/formation/figures/main_unc_profile.png
+
+[formation] produced 1 solution(s) -> /home/tonyzhang/projects/landmark_planning/constraint_sweep/baseline_2026-08-17/formation/s045_p070/formation

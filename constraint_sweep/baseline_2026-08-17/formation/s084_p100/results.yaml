@@ -1,0 +1,12 @@
+main:
+  primary_length: 688.8131661233148
+  primary_unc: 1.8096955489267614
+  astar_iterations: 15
+  discrete_uncertainties: [1.3034, 6.5665]
+  primary_disc_unc: 6.566485672617146
+  continuous_primary_length: 688.813
+  continuous_uncertainties: [1.2222, 1.8097]
+  refinement_status: optimized
+  refinement_min_slack: 1.5992993942018363e-7
+  formation_offsets: [1]
+  formation_arc_drift: [0.0]

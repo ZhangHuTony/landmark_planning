@@ -1,0 +1,48 @@
+Landmark scenario: random — 4 landmarks, 3 obstacles, start (0.0, 0.0) → goal (900.0, 0.0)
+Hex graph: 383 nodes (378 heading-states + 4 sensors + goal), radius=86.60254037844388m, directed_edges=954, grid=11x11, start_cell=(2, 5), goal_cell=(8, 5), start_heading=0
+
+── FORMATION PLANNING ──
+  Primary: own A* (formation_primary_astar); a goal candidate is accepted on the primary's uncertainty WITH its supports attached (threshold 3.425659181).
+  One support: both lateral slots (+1 = 60° left, -1 = 60° right) tried per candidate.
+  [A*] iter 1000/1000000 (0.1%)  left=999000  elapsed=0.1s     [A*] iter 2000/1000000 (0.2%)  left=998000  elapsed=0.2s     [A*] iter 3000/1000000 (0.3%)  left=997000  elapsed=0.2s     [A*] iter 4000/1000000 (0.4%)  left=996000  elapsed=0.2s     [A*] iter 5000/1000000 (0.5%)  left=995000  elapsed=0.2s     [A*] iter 6000/1000000 (0.6%)  left=994000  elapsed=0.2s     [A*] iter 7000/1000000 (0.7%)  left=993000  elapsed=0.3s     [A*] iter 8000/1000000 (0.8%)  left=992000  elapsed=0.3s     [A*] iter 9000/1000000 (0.9%)  left=991000  elapsed=0.3s     [A*] iter 10000/1000000 (1.0%)  left=990000  elapsed=0.3s     [A*] iter 11000/1000000 (1.1%)  left=989000  elapsed=0.3s     [A*] iter 12000/1000000 (1.2%)  left=988000  elapsed=0.3s     [A*] iter 13000/1000000 (1.3%)  left=987000  elapsed=0.3s     [A*] iter 14000/1000000 (1.4%)  left=986000  elapsed=0.3s     [A*] iter 15000/1000000 (1.5%)  left=985000  elapsed=0.3s     [A*] iter 16000/1000000 (1.6%)  left=984000  elapsed=0.4s     [A*] iter 17000/1000000 (1.7%)  left=983000  elapsed=0.4s     [A*] iter 18000/1000000 (1.8%)  left=982000  elapsed=0.4s     [A*] iter 19000/1000000 (1.9%)  left=981000  elapsed=0.4s   ┌ Warning: Seed is infeasible (min_slack=-1.2170321180856383, ε=0.001); the barrier will try to recover it before shortening. Expected for the straight_cont ablation, and for a discrete seed that A* returned as its best incumbent after exhausting its budget.
+└ @ Main ~/projects/landmark_planning/planners/hexspline_cl.jl:1207
+
+    nothing cleared the escorted bound; handing the best attempt to the barrier: unc=4.6427 (slot [1])
+  → Chose slot [1]
+  Support 1 (slot 1): dist=1200.0m, goal_unc=3.8553m, arc drift vs primary=0.0m
+  Primary : dist=1200.0m, goal_unc=4.6427m (threshold 3.425659181 ✗)
+
+=== Continuous Spline Optimization (threshold=3.4257) ===
+  Initial (discrete→spline): prim_len=1154.736, unc=4.6427
+  Barrier stage 1/15: μ=20.0
+  Barrier stage 2/15: μ=20.0
+  Barrier stage 3/15: μ=20.0
+  Barrier stage 4/15: μ=20.0
+  Barrier stage 5/15: μ=20.0
+  [Spline barrier] line search stalled; stopping at stage 5
+  Barrier stage 6/15: μ=20.0
+  [Spline barrier] line search stalled; stopping at stage 6
+  Barrier stage 7/15: μ=20.0
+  [Spline barrier] line search stalled; stopping at stage 7
+  Barrier stage 8/15: μ=20.0
+  [Spline barrier] line search stalled; stopping at stage 8
+  Barrier stage 9/15: μ=20.0
+  [Spline barrier] line search stalled; stopping at stage 9
+  Barrier stage 10/15: μ=20.0
+  [Spline barrier] line search stalled; stopping at stage 10
+  Barrier stage 11/15: μ=20.0
+  [Spline barrier] line search stalled; stopping at stage 11
+  Barrier stage 12/15: μ=20.0
+  [Spline barrier] line search stalled; stopping at stage 12
+  Barrier stage 13/15: μ=20.0
+  [Spline barrier] line search stalled; stopping at stage 13
+  Barrier stage 14/15: μ=20.0
+  [Spline barrier] line search stalled; stopping at stage 14
+  Barrier stage 15/15: μ=20.0
+  [Spline barrier] line search stalled; stopping at stage 15
+  Final: prim_len=1143.423, unc=3.8319, threshold=3.4257, status=recovery_failed, min_slack=-0.406285
+  Obstacle re-verification: mean path clears all obstacles ✓
+Fig combined (main) saved: Discrete Len=1154.74 → Continuous Len=1143.42
+Fig uncertainty profile (main) saved: /home/tonyzhang/projects/landmark_planning/constraint_sweep/baseline_2026-08-17/formation/s049_p030/formation/figures/main_unc_profile.png
+
+[formation] produced 1 solution(s) -> /home/tonyzhang/projects/landmark_planning/constraint_sweep/baseline_2026-08-17/formation/s049_p030/formation

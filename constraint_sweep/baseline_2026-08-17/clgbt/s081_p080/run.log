@@ -1,0 +1,48 @@
+Landmark scenario: random — 3 landmarks, 1 obstacles, start (0.0, 0.0) → goal (750.0, 0.0)
+Hex graph: 340 nodes (336 heading-states + 3 sensors + goal), radius=86.60254037844388m, directed_edges=840, grid=10x11, start_cell=(2, 5), goal_cell=(7, 5), start_heading=0
+
+── CL-GBT PLANNING (sampling-based joint tree, continuous R²) ──
+  [CL-GBT] iter 200/200000  tree=171  elapsed=0.0s     [CL-GBT] iter 400/200000  tree=346  elapsed=0.1s     [CL-GBT] iter 600/200000  tree=520  elapsed=0.1s     [CL-GBT] iter 800/200000  tree=681  elapsed=0.1s     [CL-GBT] iter 1000/200000  tree=840  elapsed=0.1s     [CL-GBT] iter 1200/200000  tree=1000  elapsed=0.1s     [CL-GBT] iter 1400/200000  tree=1151  elapsed=0.2s     [CL-GBT] iter 1600/200000  tree=1298  elapsed=0.2s     [CL-GBT] iter 1800/200000  tree=1452  elapsed=0.2s     [CL-GBT] iter 2000/200000  tree=1603  elapsed=0.2s     [CL-GBT] iter 2200/200000  tree=1761  elapsed=0.2s     [CL-GBT] iter 2400/200000  tree=1908  elapsed=0.2s     [CL-GBT] iter 2600/200000  tree=2053  elapsed=0.2s     [CL-GBT] iter 2800/200000  tree=2202  elapsed=0.2s     [CL-GBT] iter 3000/200000  tree=2342  elapsed=0.2s     [CL-GBT] iter 3200/200000  tree=2488  elapsed=0.3s     [CL-GBT] iter 3400/200000  tree=2643  elapsed=0.3s     [CL-GBT] iter 3600/200000  tree=2793  elapsed=0.3s     [CL-GBT] iter 3800/200000  tree=2942  elapsed=0.3s     [CL-GBT] iter 4000/200000  tree=3091  elapsed=0.3s     [CL-GBT] iter 4200/200000  tree=3248  elapsed=0.4s     [CL-GBT] iter 4400/200000  tree=3398  elapsed=0.4s     [CL-GBT] iter 4600/200000  tree=3543  elapsed=0.4s     [CL-GBT] iter 4800/200000  tree=3701  elapsed=0.4s     [CL-GBT] iter 5000/200000  tree=3848  elapsed=0.4s     [CL-GBT] iter 5200/200000  tree=4002  elapsed=0.4s     [CL-GBT] iter 5400/200000  tree=4132  elapsed=0.5s     [CL-GBT] iter 5600/200000  tree=4277  elapsed=0.5s     [CL-GBT] iter 5800/200000  tree=4435  elapsed=0.5s     [CL-GBT] iter 6000/200000  tree=4575  elapsed=0.5s     [CL-GBT] iter 6200/200000  tree=4716  elapsed=0.6s     [CL-GBT] iter 6400/200000  tree=4860  elapsed=0.6s     [CL-GBT] iter 6600/200000  tree=5015  elapsed=0.6s     [CL-GBT] iter 6800/200000  tree=5146  elapsed=0.6s     [CL-GBT] iter 7000/200000  tree=5290  elapsed=0.7s     [CL-GBT] iter 7200/200000  tree=5437  elapsed=0.7s     [CL-GBT] iter 7400/200000  tree=5584  elapsed=0.8s     [CL-GBT] iter 7600/200000  tree=5722  elapsed=0.8s     [CL-GBT] iter 7800/200000  tree=5860  elapsed=0.8s     [CL-GBT] iter 8000/200000  tree=6010  elapsed=0.9s     [CL-GBT] iter 8200/200000  tree=6163  elapsed=0.9s     [CL-GBT] iter 8400/200000  tree=6307  elapsed=0.9s     [CL-GBT] iter 8600/200000  tree=6449  elapsed=1.0s     [CL-GBT] iter 8800/200000  tree=6592  elapsed=1.0s     [CL-GBT] iter 9000/200000  tree=6738  elapsed=1.0s     [CL-GBT] iter 9200/200000  tree=6888  elapsed=1.1s     [CL-GBT] iter 9400/200000  tree=7027  elapsed=1.1s     [CL-GBT] iter 9600/200000  tree=7178  elapsed=1.2s     [CL-GBT] iter 9800/200000  tree=7316  elapsed=1.2s     [CL-GBT] iter 10000/200000  tree=7450  elapsed=1.3s     [CL-GBT] iter 10200/200000  tree=7601  elapsed=1.3s     [CL-GBT] iter 10400/200000  tree=7735  elapsed=1.4s     [CL-GBT] iter 10600/200000  tree=7877  elapsed=1.6s     [CL-GBT] iter 10800/200000  tree=8015  elapsed=1.7s     [CL-GBT] iter 11000/200000  tree=8166  elapsed=1.7s     [CL-GBT] iter 11200/200000  tree=8295  elapsed=1.8s     [CL-GBT] iter 11400/200000  tree=8439  elapsed=1.8s     [CL-GBT] iter 11600/200000  tree=8571  elapsed=1.9s     [CL-GBT] iter 11800/200000  tree=8710  elapsed=2.0s     [CL-GBT] iter 12000/200000  tree=8855  elapsed=2.0s     [CL-GBT] iter 12200/200000  tree=8994  elapsed=2.1s     [CL-GBT] iter 12400/200000  tree=9141  elapsed=2.1s     [CL-GBT] iter 12600/200000  tree=9268  elapsed=2.2s     [CL-GBT] iter 12800/200000  tree=9411  elapsed=2.2s     [CL-GBT] iter 13000/200000  tree=9547  elapsed=2.3s     [CL-GBT] iter 13200/200000  tree=9685  elapsed=2.4s     [CL-GBT] iter 13400/200000  tree=9827  elapsed=2.4s     [CL-GBT] iter 13600/200000  tree=9965  elapsed=2.5s     [CL-GBT] iter 13800/200000  tree=10106  elapsed=2.6s     [CL-GBT] iter 14000/200000  tree=10242  elapsed=2.6s     [CL-GBT] iter 14200/200000  tree=10379  elapsed=2.7s     [CL-GBT] iter 14400/200000  tree=10523  elapsed=2.8s     [CL-GBT] iter 14600/200000  tree=10664  elapsed=2.8s     [CL-GBT] iter 14800/200000  tree=10805  elapsed=2.9s     [CL-GBT] iter 15000/200000  tree=10947  elapsed=3.0s     [CL-GBT] iter 15200/200000  tree=11080  elapsed=3.1s   ┌ Warning: Seed is feasible but not strictly interior (min_slack=1.0000906075502414e-9, ε=0.001); the barrier is past its knee and steps will be small.
+└ @ Main ~/projects/landmark_planning/planners/hexspline_cl.jl:1209
+
+  Support 1: dist=2250.0m, goal_unc=1.9246m
+  Primary  : dist=2387.0m, goal_unc=3.9357m (threshold 4.212523091) — 15365 iterations, tree size 11188
+
+=== Continuous Spline Optimization (threshold=4.2125) ===
+  Initial (discrete→spline): prim_len=1932.702, unc=3.4558
+  Barrier stage 1/15: μ=20.0
+  [Spline barrier] line search stalled; stopping at stage 1
+  Barrier stage 2/15: μ=7.0
+  [Spline barrier] line search stalled; stopping at stage 2
+  Barrier stage 3/15: μ=2.45
+  [Spline barrier] line search stalled; stopping at stage 3
+  Barrier stage 4/15: μ=0.8575
+  [Spline barrier] line search stalled; stopping at stage 4
+  Barrier stage 5/15: μ=0.3001
+  [Spline barrier] line search stalled; stopping at stage 5
+  Barrier stage 6/15: μ=0.105
+  [Spline barrier] line search stalled; stopping at stage 6
+  Barrier stage 7/15: μ=0.0368
+  [Spline barrier] line search stalled; stopping at stage 7
+  Barrier stage 8/15: μ=0.0129
+  [Spline barrier] line search stalled; stopping at stage 8
+  Barrier stage 9/15: μ=0.0045
+  [Spline barrier] line search stalled; stopping at stage 9
+  Barrier stage 10/15: μ=0.0016
+  [Spline barrier] line search stalled; stopping at stage 10
+  Barrier stage 11/15: μ=0.0006
+  [Spline barrier] line search stalled; stopping at stage 11
+  Barrier stage 12/15: μ=0.0002
+  [Spline barrier] line search stalled; stopping at stage 12
+  Barrier stage 13/15: μ=0.0001
+  [Spline barrier] line search stalled; stopping at stage 13
+  Barrier stage 14/15: μ=0.0
+  [Spline barrier] line search stalled; stopping at stage 14
+  Barrier stage 15/15: μ=0.0
+  [Spline barrier] line search stalled; stopping at stage 15
+  Final: prim_len=1932.702, unc=3.4558, threshold=4.2125, status=seed_only, min_slack=0.0
+  Obstacle re-verification: mean path clears all obstacles ✓
+Fig combined (main) saved: Discrete Len=1932.7 → Continuous Len=1932.7
+Fig uncertainty profile (main) saved: /home/tonyzhang/projects/landmark_planning/constraint_sweep/baseline_2026-08-17/clgbt/s081_p080/clgbt/figures/main_unc_profile.png
+
+[clgbt] produced 1 solution(s) -> /home/tonyzhang/projects/landmark_planning/constraint_sweep/baseline_2026-08-17/clgbt/s081_p080/clgbt

@@ -1,0 +1,43 @@
+┌ Warning: Seed is feasible but not strictly interior (min_slack=1.0000906214280292e-9, ε=0.001); the barrier is past its knee and steps will be small.
+└ @ Main ~/projects/landmark_planning/planners/hexspline_cl.jl:1209
+Landmark scenario: random — 4 landmarks, 2 obstacles, start (0.0, 0.0) → goal (600.0, 0.0)
+Hex graph: 299 nodes (294 heading-states + 4 sensors + goal), radius=86.60254037844388m, directed_edges=726, grid=9x11, start_cell=(2, 5), goal_cell=(6, 5), start_heading=0
+
+── CL-GBT PLANNING (sampling-based joint tree, continuous R²) ──
+
+  Support 1: dist=1050.0m, goal_unc=3.9665m
+  Primary  : dist=1118.6m, goal_unc=4.3134m (threshold 4.926801218) — 32 iterations, tree size 27
+
+=== Continuous Spline Optimization (threshold=4.9268) ===
+  Initial (discrete→spline): prim_len=1038.001, unc=4.302
+  Barrier stage 1/15: μ=20.0
+  → Converged at iter 15 (Δlen=0.000229)
+  Barrier stage 2/15: μ=7.0
+  [Spline barrier] line search stalled; stopping at stage 2
+  Barrier stage 3/15: μ=2.45
+  [Spline barrier] line search stalled; stopping at stage 3
+  Barrier stage 4/15: μ=0.8575
+  [Spline barrier] line search stalled; stopping at stage 4
+  Barrier stage 5/15: μ=0.3001
+  [Spline barrier] line search stalled; stopping at stage 5
+  Barrier stage 6/15: μ=0.105
+  → Converged at iter 36 (Δlen=0.000846)
+  Barrier stage 7/15: μ=0.0368
+  Barrier stage 8/15: μ=0.0129
+  Barrier stage 9/15: μ=0.0045
+  Barrier stage 10/15: μ=0.0016
+  Barrier stage 11/15: μ=0.0006
+  Barrier stage 12/15: μ=0.0002
+  → Converged at iter 381 (Δlen=0.000149)
+  Barrier stage 13/15: μ=0.0001
+  → Converged at iter 382 (Δlen=0.000223)
+  Barrier stage 14/15: μ=0.0
+  [Spline barrier] line search stalled; stopping at stage 14
+  Barrier stage 15/15: μ=0.0
+  [Spline barrier] line search stalled; stopping at stage 15
+  Final: prim_len=945.14, unc=3.6775, threshold=4.9268, status=optimized, min_slack=4.0e-6
+  Obstacle re-verification: mean path clears all obstacles ✓
+Fig combined (main) saved: Discrete Len=1038.0 → Continuous Len=945.14
+Fig uncertainty profile (main) saved: /home/tonyzhang/projects/landmark_planning/constraint_sweep/baseline_2026-08-17/clgbt/s068_p100/clgbt/figures/main_unc_profile.png
+
+[clgbt] produced 1 solution(s) -> /home/tonyzhang/projects/landmark_planning/constraint_sweep/baseline_2026-08-17/clgbt/s068_p100/clgbt

@@ -1,0 +1,64 @@
+┌ Warning: Seed is infeasible (min_slack=-8.222573377133697, ε=0.001); the barrier will try to recover it before shortening. Expected for the straight_cont ablation, and for a discrete seed that A* returned as its best incumbent after exhausting its budget.
+└ @ Main ~/projects/landmark_planning/planners/hexspline_cl.jl:1207
+Landmark scenario: random — 3 landmarks, 2 obstacles, start (0.0, 0.0) → goal (900.0, 0.0)
+Hex graph: 382 nodes (378 heading-states + 3 sensors + goal), radius=86.60254037844388m, directed_edges=954, grid=11x11, start_cell=(2, 5), goal_cell=(8, 5), start_heading=0
+Conditional ε-bound: ε_sample=1.1925, w=1.0, ε_total=1.1925
+  Bound form (conditional): L_returned ≤ (1+ε_total) L* with assumptions documented in comments.
+
+── MULTI-AGENT PLANNING (Synchronized Kalman) ──
+
+  seed_mode=:straight — skipping discrete search and using direct start→goal seed
+
+✓ Multi-agent solution with synchronized Kalman fusion:
+  Support agent 1: node=382, dist=900.0m, goal_unc=8.7046m
+  Primary agent: node=382, dist=900.0m, goal_unc=8.7046m
+  ├─ Communication: every 100.0m, sigmoid taper range=300.0m width=20.0m
+  └─ All agents' uncertainties benefit from synchronized Kalman fusion at checkpoints
+
+--- Final Results ---
+Support agent 1 : [1, 382]  dist=900.0  goal_unc=8.7046  ✗  (Kalman-fused)
+Primary agent : [1, 382]  dist=900.0  goal_unc=8.7046  threshold=5.139717039 ✗ not met  (Kalman-fused)
+
+=== Kalman Filtering Summary ===
+All 2 agents performing synchronized Kalman filtering:
+  • Dead-reckoning propagation: DIR=0.05/m, PERP=0.016666666666666666/m
+  • Landmark fusion: Information filter (Joseph form) at every waypoint
+  • SYNCHRONIZED inter-agent communication: every 100.0m of travel
+  • Tapered sigmoid weighting: range=300.0m, width=20.0m (soft plateau + rolloff)
+  • Bidirectional Kalman fusion: all agent pairs within range at each checkpoint
+  • Measurement model: bearing-angle sensor with noise=0.038, ratio=2.2
+  └─ Support agents: goal_unc=8.7046m (improved by inter-agent fusion)
+  └─ Primary agent: goal_unc=8.7046m (direct path with landmark updates)
+Converged at iteration : 0
+Figure path-role mapping: supports = paths[1:1], primary = paths[2]
+Discrete evaluation: prim_len=900.0, unc=8.7046
+Fig 1 saved.
+
+=== Continuous Spline Optimization (threshold=5.1397) ===
+  Initial (discrete→spline): prim_len=900.0, unc=8.7046
+  Barrier stage 1/15: μ=20.0
+  [Spline barrier] line search stalled; stopping at stage 1
+  Barrier stage 2/15: μ=20.0
+  [Spline barrier] line search stalled; stopping at stage 2
+  Barrier stage 3/15: μ=20.0
+  [Spline barrier] line search stalled; stopping at stage 3
+  Barrier stage 4/15: μ=20.0
+  [Spline barrier] line search stalled; stopping at stage 4
+  Barrier stage 5/15: μ=20.0
+  [Spline barrier] line search stalled; stopping at stage 5
+  Barrier stage 6/15: μ=20.0
+  Barrier stage 7/15: μ=20.0
+  Barrier stage 8/15: μ=20.0
+  Barrier stage 9/15: μ=20.0
+  Barrier stage 10/15: μ=20.0
+  Barrier stage 11/15: μ=20.0
+  Barrier stage 12/15: μ=20.0
+  Barrier stage 13/15: μ=20.0
+  Barrier stage 14/15: μ=20.0
+  Barrier stage 15/15: μ=20.0
+  Final: prim_len=900.893, unc=8.567, threshold=5.1397, status=recovery_failed, min_slack=-3.427279
+  Obstacle re-verification: mean path clears all obstacles ✓
+Fig combined (main) saved: Discrete Len=900.0 → Continuous Len=900.89
+Fig uncertainty profile (main) saved: /home/tonyzhang/projects/landmark_planning/constraint_sweep/baseline_2026-08-17/screen/s057/straight_cont/figures/main_unc_profile.png
+
+[straight_cont] produced 1 solution(s) -> /home/tonyzhang/projects/landmark_planning/constraint_sweep/baseline_2026-08-17/screen/s057/straight_cont

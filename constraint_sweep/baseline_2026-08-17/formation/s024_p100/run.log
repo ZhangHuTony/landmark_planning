@@ -1,0 +1,43 @@
+Landmark scenario: random — 4 landmarks, 3 obstacles, start (0.0, 0.0) → goal (900.0, 0.0)
+Hex graph: 383 nodes (378 heading-states + 4 sensors + goal), radius=86.60254037844388m, directed_edges=954, grid=11x11, start_cell=(2, 5), goal_cell=(8, 5), start_heading=0
+
+── FORMATION PLANNING ──
+  Primary: own A* (formation_primary_astar); a goal candidate is accepted on the primary's uncertainty WITH its supports attached (threshold 10.88498626).
+  One support: both lateral slots (+1 = 60° left, -1 = 60° right) tried per candidate.
+
+    ✓ escorted-feasible at iter 20: dist=1050.0, unc=10.4837 (slot [-1])
+  → Chose slot [-1]
+  Support 1 (slot -1): dist=1050.0m, goal_unc=10.4858m, arc drift vs primary=0.0m
+  Primary : dist=1050.0m, goal_unc=10.4837m (threshold 10.88498626 ✓)
+
+=== Continuous Spline Optimization (threshold=10.885) ===
+  Initial (discrete→spline): prim_len=985.952, unc=10.4837
+  Barrier stage 1/15: μ=20.0
+  Barrier stage 2/15: μ=7.0
+  → Converged at iter 73 (Δlen=0.000132)
+  Barrier stage 3/15: μ=2.45
+  → Converged at iter 88 (Δlen=0.000646)
+  Barrier stage 4/15: μ=0.8575
+  → Converged at iter 89 (Δlen=0.000973)
+  Barrier stage 5/15: μ=0.3001
+  Barrier stage 6/15: μ=0.105
+  Barrier stage 7/15: μ=0.0368
+  Barrier stage 8/15: μ=0.0129
+  Barrier stage 9/15: μ=0.0045
+  Barrier stage 10/15: μ=0.0016
+  Barrier stage 11/15: μ=0.0006
+  → Converged at iter 558 (Δlen=0.000229)
+  Barrier stage 12/15: μ=0.0002
+  → Converged at iter 559 (Δlen=0.000286)
+  Barrier stage 13/15: μ=0.0001
+  → Converged at iter 560 (Δlen=0.000315)
+  Barrier stage 14/15: μ=0.0
+  → Converged at iter 561 (Δlen=0.000329)
+  Barrier stage 15/15: μ=0.0
+  → Converged at iter 562 (Δlen=0.000336)
+  Final: prim_len=946.807, unc=8.4045, threshold=10.885, status=optimized, min_slack=0.0
+  Obstacle re-verification: mean path clears all obstacles ✓
+Fig combined (main) saved: Discrete Len=985.95 → Continuous Len=946.81
+Fig uncertainty profile (main) saved: /home/tonyzhang/projects/landmark_planning/constraint_sweep/baseline_2026-08-17/formation/s024_p100/formation/figures/main_unc_profile.png
+
+[formation] produced 1 solution(s) -> /home/tonyzhang/projects/landmark_planning/constraint_sweep/baseline_2026-08-17/formation/s024_p100/formation
