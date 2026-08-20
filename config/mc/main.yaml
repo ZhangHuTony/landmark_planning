@@ -30,6 +30,7 @@
 #       behind_wall   the only landmark is hidden behind a wall; detour or no fix
 #       maze          13 obstacles, three double-gapped walls + plugs; two homotopies
 #       long_sparse   1400 m corridor, two sparse landmarks (slowest: big A* space)
+#       showcase      1800 m constraint-ladder demo; hex_width_m: 150 ONLY (config/mc)
 #     Overridable per run with the SCENARIO env var.
 #   `manual` instead defines a scenario inline, right here — set start, goal,
 #   landmarks and obstacles (see the encodings below); anything omitted is empty.

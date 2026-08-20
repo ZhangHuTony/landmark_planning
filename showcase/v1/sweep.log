@@ -1,0 +1,19 @@
+── constraint sweep v1 ──
+  methods: hexspline_cl
+  ladder:  75, 70, 65, 60, 55, 50, 45, 40, 35, 30, 25, 20%   patience=2   method_patience=0   timeout=2400s
+  scenarios: the fixed preset `showcase` (n_scenarios and the geometry ranges are ignored)
+  output:  /home/tonyzhang/projects/landmark_planning/showcase/v1
+  s001: scenario=showcase  L_ref=1821.8 U_ref=12.703  (17.0s)  [1/1]
+    s001 p75  hexspline_cl      ok   ratio=1.0122   20.9s
+    s001 p70  hexspline_cl      ok   ratio=1.0079   21.8s
+    s001 p65  hexspline_cl      ok   ratio=1.0861   20.7s
+    s001 p60  hexspline_cl      ok   ratio=1.0778   38.4s
+    s001 p55  hexspline_cl      ok   ratio=1.0738   55.2s
+    s001 p50  hexspline_cl      ok   ratio=1.0411   56.7s
+    s001 p45  hexspline_cl      ok   ratio=1.0965   100.8s
+    s001 p40  hexspline_cl      ok   ratio=1.1009   102.8s
+    s001 p35  hexspline_cl      ok   ratio=1.1032   103.0s
+    s001 p30  hexspline_cl      FAIL recovery_failed   92.5s
+    s001 p25  hexspline_cl      FAIL recovery_failed   92.4s
+    s001: every method failed at 2 consecutive levels (down to 25%) — constraint is impossible, moving on
+── done: /home/tonyzhang/projects/landmark_planning/showcase/v1 ──

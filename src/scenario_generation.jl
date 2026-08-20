@@ -190,6 +190,86 @@ const SCENARIOS = Dict{Symbol, Function}(
                                Landmark(1050.0, -230.0, random_landmark_cov() * 2)],
                            obstacles = Obstacle[],
                            start = (0.0, 0.0), goal = (1400.0, 0.0)),
+
+    # ── Showcase: what a TIGHTENING constraint buys ──────────────────────────
+    # Built to be run as a LADDER (config/mc/sweep_showcase.yaml), not once: the
+    # point is that the plan changes SHAPE as unc_radius_threshold falls — first
+    # spending the support agent (free, since the objective is PRIMARY length),
+    # then spending primary length, then flipping to the other side of the island.
+    #
+    # ── Two measured facts the geometry is built around ──
+    #
+    # 1. UNCERTAINTY IS ABOUT LATENESS. With no fix, growth_covariance gives
+    #    Q_dir = 0.25 m²/m and Q_perp = 0.0278 m²/m at the config/mc rates, so
+    #        unc_radius = det(Σ)^0.25 ≈ 0.2887 · sqrt(distance since the last fix).
+    #    Measured, not asserted: the 1-agent unconstrained reference over 1950 m
+    #    reported 12.632 against 0.2887·sqrt(1950) = 12.75. A perfect fix 500 m
+    #    from the goal still lands at ~6.5, so a landmark's worth is dominated by
+    #    how LATE it is. The first cut of this scenario spread strong landmarks
+    #    from x=300 to x=1500 and had no headroom below the 5.578 an unconstrained
+    #    2-agent plan already reached (probe showcase_probe/probe1: p100 and p70
+    #    returned the identical plan; p40 found nothing in 300k expansions).
+    #    Everything that matters therefore lives in the last third.
+    #
+    # 2. LATERAL DEPTH IS WHAT COSTS, NOT LATERAL TIME. On this lattice every
+    #    monotone route is the same length: a diagonal advances x by 75 against a
+    #    forward step's 150, so a k-row excursion and its return burn exactly k
+    #    extra steps = 150k m — no matter how long the agent RIDES that row. So
+    #    the primary can sit on row ±129.9 for 600 m for the same 150 m it pays to
+    #    touch it once. The ladder's rungs are therefore built from EXCURSION
+    #    DEPTH (0 / 150 / 300 m), not from distance travelled off-axis.
+    #
+    # ── The rungs ──
+    #   M  (1050,  340) north, mid. Free: the island already puts the primary on
+    #                   row +129.9, from which a support on row +259.8 is in comm.
+    #   A  (1500, -340) south, late. Support on row -259.8; an on-axis primary is
+    #                   259.8 m away, i.e. still in comm — and the primary is back
+    #                   on the axis by then anyway. Costs the PRIMARY nothing; only
+    #                   the SUPPORT's path changes. This is the multi-agent rung.
+    #   B  (1650, -420) south, latest. Support must sit on row -389.7, which is out
+    #                   of comm with an on-axis primary, so the primary has to come
+    #                   down to row -129.9 — after having gone north for the island.
+    #                   Both excursions, +300 m. The fix lands 150 m from the goal.
+    #   L0 ( 300,  200) early and weak. Not a rung: it keeps the first third from
+    #                   being pure dead reckoning, so the top of the ladder is a
+    #                   plan rather than a straight line.
+    # Tightest rungs take A AND B, which is a different plan again from B alone.
+    #
+    # LANDMARK ORDER IS LOAD-BEARING: lms[1].cov is Σ₀ for every agent
+    # (graph.jl:231, covariance.jl:351). B is listed FIRST so the start prior is
+    # ~0.95 m; putting weak L0 there would inflate it ~3x and change the whole
+    # problem. Covariances are explicit literals rather than random_landmark_cov()*k
+    # — the rungs' RELATIVE strength is the tuning knob here, and a random base is
+    # one variable too many.
+    #
+    # Geometry is pinned to the hex_width_m: 150 lattice (config/mc), NOT the 100 m
+    # default: rows land on multiples of 129.9 and corridor_y_max_m: 440 keeps
+    # y ∈ {0, ±129.9, ±259.8, ±389.7}. Row x-parity alternates — rows {0, ±259.8}
+    # at x ≡ 0 (mod 150), rows {±129.9, ±389.7} at x ≡ 75 — so a wall must span
+    # ≥ 225 m in x to cover a column of EACH parity (same rule as :maze); both
+    # below span 240-300 m. Run it at hex_width_m: 100 and the row pitch becomes
+    # 86.6, the walls stop lining up with the rows they are meant to block and the
+    # scenario means nothing. It is a config/mc scenario.
+    :showcase => () -> (landmarks = Landmark[
+                            Landmark(1650.0, -420.0, [1.0 0.0; 0.0 0.8]),   # B, latest (also Σ₀)
+                            Landmark(1500.0, -340.0, [1.5 0.0; 0.0 1.2]),   # A, support-only rung
+                            Landmark(1050.0,  340.0, [3.0 0.0; 0.0 2.4]),   # M, free on the north pass
+                            Landmark( 300.0,  200.0, [8.0 0.0; 0.0 6.4])],  # L0, early freebie
+                        obstacles = Obstacle[
+                            # Island: covers rows 0 and -129.9 over x ∈ [800,1100]
+                            # (row-0 cells 900/1050, row -129.9 cells 825/975), so the
+                            # corridor splits into a CHEAP north pass at +129.9 (+150 m)
+                            # and a DEAR south pass at -259.8 (+300 m). 65 m of clearance
+                            # to each. All the information is south, so this is the
+                            # homotopy decision the tight rungs have to make.
+                            build_obstacle([(800.0,-195.0), (1100.0,-195.0), (1100.0,65.0), (800.0,65.0)]),
+                            # Guard: covers row -259.8 over x ∈ [1200,1440] (cells
+                            # 1200/1350). The south pass has to climb to row -129.9 and
+                            # drop back to reach A's support slot at (1500,-259.8), which
+                            # is what keeps the southern homotopy dearer than the northern
+                            # one rather than merely different.
+                            build_obstacle([(1200.0,-325.0), (1440.0,-325.0), (1440.0,-195.0), (1200.0,-195.0)])],
+                        start = (0.0, 0.0), goal = (1800.0, 0.0)),
 )
 
 # ── Manual scenario: geometry read straight from config/main.yaml ──

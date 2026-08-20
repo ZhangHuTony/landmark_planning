@@ -122,8 +122,8 @@ n_landmarks_max: 4
 # discarded after paying ~19 s for it. Obstacle placement is biased toward the
 # direct line (see random_convex_obstacles), so a handful is enough to make the
 # corridor an actual left-or-right decision most of the time.
-n_obstacles_min: 3
-n_obstacles_max: 5
+n_obstacles_min: 1
+n_obstacles_max: 3
 
 # Constraint ladder. pct_patience stops a scenario after that many CONSECUTIVE
 # levels at which every method failed — the levels that trigger the stop are
@@ -176,7 +176,7 @@ methods: hexspline_cl@algorithms=hexspline_cl,num_agents=2 | straight_cont@algor
 # Debugging: keep the per-run figures / CSVs for every scenario at every
 # constraint level, under <sweep>/<label>/<scenario>_p<pct>/. Off by default —
 # a 20-scenario sweep is several hundred runs and thousands of PNGs.
-save_figures: true
+save_figures: false
 save_csv: false
 
 # Hard wall-clock kill per subprocess. A killed run is recorded as a

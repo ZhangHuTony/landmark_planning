@@ -118,7 +118,7 @@ n_obstacles_max: 3
 # still run and still logged, so the failure tail is never silently truncated.
 # Set 0 to always walk the full ladder.
 pct_start: 100
-pct_step: 5
+pct_step: 10
 # Floor at 30, not 50: the interesting number is where each method finally gives
 # out, and pct_patience already stops a scenario two levels after everything
 # fails — so a deeper floor costs nothing on the easy scenarios and buys

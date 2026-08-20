@@ -1,0 +1,53 @@
+# ==========================================================================
+# ALL-METHOD SMOKE — does every planner still run at HEAD?
+# ==========================================================================
+# Not a measurement, and deliberately smaller than sweep_smoke.yaml: ONE
+# scenario, THREE rungs, but every method that either shipping sweep runs —
+# sweep.yaml's 5 baselines plus sweep_ablation.yaml's 2 ablations. The question
+# it answers is only "does each method start, finish and write rows on today's
+# working tree", before committing a multi-day sweep to it.
+#
+#   julia run_constraint_sweep.jl --sweep config/mc/sweep_smoke_all.yaml --tag smoke_all
+# ==========================================================================
+
+# One scenario, drawn from the real sweep's seed base so it is a scenario the
+# baseline sweep would actually see.
+n_scenarios: 1
+scenario_seed_base: 1067
+max_scenario_draws: 20
+
+# Same geometry ranges as sweep.yaml.
+goal_dist_min: 600.0
+goal_dist_max: 900.0
+n_landmarks_min: 2
+n_landmarks_max: 4
+n_obstacles_min: 1
+n_obstacles_max: 3
+
+# OFF, as in sweep_ablation.yaml: the screen conditions on straight_cont's own
+# outcome, and straight_cont is one of the methods being smoked here.
+reject_trivial_straight: false
+reject_trivial_spec: straight_cont@algorithms=straight_cont,num_agents=2
+
+# Three rungs: 100, 90, 80.
+pct_start: 100
+pct_step: 10
+pct_floor: 80
+pct_patience: 1
+method_patience: 1
+
+# Everything from sweep.yaml + everything from sweep_ablation.yaml.
+methods: hexspline_cl@algorithms=hexspline_cl,num_agents=2 | greedy@algorithms=greedy,num_agents=2 | formation@algorithms=formation,num_agents=2 | sequential@algorithms=sequential,num_agents=2 | clgbt@algorithms=clgbt,num_agents=2 | straight_cont@algorithms=straight_cont,num_agents=2 | discrete_only@algorithms=discrete_only,num_agents=2
+
+# On — the point is to look at the plans.
+save_figures: true
+save_csv: true
+
+# Matches sweep.yaml, so a clgbt run that spends its full parity budget is
+# recorded as budget exhaustion rather than a timeout.
+run_timeout_s: 1200
+
+workers: 4
+heap_hint_gb: 4
+
+outroot: constraint_sweep

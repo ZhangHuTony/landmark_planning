@@ -85,6 +85,16 @@ const SWEEP = load_yaml(flag("--sweep", joinpath(MC_CONFIG_DIR, "sweep.yaml")))
 const TAG   = flag("--tag", Dates.format(now(), "yyyy-mm-dd_HH-MM-SS"))
 const ROOT  = joinpath(_ROOT, String(SWEEP["outroot"]), TAG)
 
+# A fixed, hand-built scenario instead of a random population. `scenario_name:` in
+# the sweep yaml names a preset from src/scenario_generation.jl (`showcase`,
+# `maze`, ...) and the sweep runs exactly ONE scenario down the same ladder: the
+# reference run, the pct schedule, the methods and both early stops are untouched,
+# only where the geometry comes from moves. n_scenarios / max_scenario_draws /
+# goal_dist_* / n_landmarks_* / n_obstacles_* are all ignored in this mode — the
+# preset owns its own geometry, including start/goal. Empty (the default) is the
+# random population, byte-for-byte as before.
+const SCENARIO_NAME = String(get(SWEEP, "scenario_name", ""))
+
 # Bounds concurrent planner subprocesses. Levels are sequential (the early stop
 # depends on their outcome), so this only ever throttles methods within a level.
 const SLOTS = Base.Semaphore(max(1, Int(SWEEP["workers"])))
@@ -461,6 +471,10 @@ function sample_scenario_params(seed::Int)
     # cell, and the discrete A* then certifies its uncertainty at that CELL while
     # seed_control_points ships a spline extended to the true goal — up to half a
     # column of dead reckoning no discrete gate ever sees.
+    # A named preset owns its own geometry, so there is nothing to draw. The zeros
+    # land in scenarios.csv's goal_dist/n_landmarks/n_obstacles columns, which is
+    # honest: those knobs did not decide this scenario.
+    isempty(SCENARIO_NAME) || return (D=0.0, nl=0, no=0)
     dmin = Float64(SWEEP["goal_dist_min"]); dmax = Float64(SWEEP["goal_dist_max"])
     lo, hi = ceil(Int, dmin / HEX_WIDTH_M), floor(Int, dmax / HEX_WIDTH_M)
     hi >= lo || error("goal_dist range [$(dmin), $(dmax)] contains no multiple of " *
@@ -471,11 +485,18 @@ function sample_scenario_params(seed::Int)
     return (D=D, nl=nl, no=no)
 end
 
-scenario_keys(seed, p) = Dict("landmark_scenario" => "random",
-                              "scenario_seed" => string(seed),
-                              "scenario_goal_dist" => string(p.D),
-                              "scenario_n_landmarks" => string(p.nl),
-                              "scenario_n_obstacles" => string(p.no))
+scenario_keys(seed, p) = isempty(SCENARIO_NAME) ?
+    Dict("landmark_scenario" => "random",
+         "scenario_seed" => string(seed),
+         "scenario_goal_dist" => string(p.D),
+         "scenario_n_landmarks" => string(p.nl),
+         "scenario_n_obstacles" => string(p.no)) :
+    Dict("landmark_scenario" => SCENARIO_NAME)
+
+# What identifies a scenario in the log differs by mode: the random draw is its
+# three numbers, a named preset is its name.
+scenario_label(p) = isempty(SCENARIO_NAME) ? "D=$(Int(p.D)) L=$(p.nl) O=$(p.no)" :
+                                             "scenario=$(SCENARIO_NAME)"
 
 function main()
     mkpath(ROOT)
@@ -506,8 +527,11 @@ function main()
     say("  methods: $(join((m.label for m in METHODS), ", "))")
     say("  ladder:  $(join(pcts, ", "))%   patience=$(patience)   " *
         "method_patience=$(method_patience)   timeout=$(Int(timeout))s")
-    say("  scenarios: drawing until $(Int(SWEEP["n_scenarios"])) references succeed " *
-        "(guard: $(Int(get(SWEEP, "max_scenario_draws", 4 * Int(SWEEP["n_scenarios"])))) draws)")
+    say(isempty(SCENARIO_NAME) ?
+        "  scenarios: drawing until $(Int(SWEEP["n_scenarios"])) references succeed " *
+        "(guard: $(Int(get(SWEEP, "max_scenario_draws", 4 * Int(SWEEP["n_scenarios"])))) draws)" :
+        "  scenarios: the fixed preset `$(SCENARIO_NAME)` (n_scenarios and the " *
+        "geometry ranges are ignored)")
     say("  output:  $(ROOT)")
 
     # Draw until n_scenarios have a USABLE reference, rather than drawing exactly
@@ -517,8 +541,9 @@ function main()
     # shrank the sample (this sweep asked for 50 and measured 42). sid stays tied
     # to the DRAW index, not the accepted count, so `seed = base + i` is still
     # recoverable from a scenario_id and rejected draws keep their slot.
-    want  = Int(SWEEP["n_scenarios"])
-    cap   = Int(get(SWEEP, "max_scenario_draws", 4 * want))
+    # A named preset is a population of one; there is nothing to draw more of.
+    want  = isempty(SCENARIO_NAME) ? Int(SWEEP["n_scenarios"]) : 1
+    cap   = isempty(SCENARIO_NAME) ? Int(get(SWEEP, "max_scenario_draws", 4 * want)) : 1
     accepted = 0
     i = 0
     while accepted < want
@@ -548,7 +573,7 @@ function main()
             # value disables the ratio for that scenario instead of erroring.
             wall_ref = something(tryparse(Float64, get(ref, "wall_ref", "")), NaN)
             accepted += 1
-            say("  $(sid): resumed  D=$(Int(p.D)) L=$(p.nl) O=$(p.no)  L_ref=$(round(L_ref,digits=1)) U_ref=$(round(U_ref,digits=3))")
+            say("  $(sid): resumed  $(scenario_label(p))  L_ref=$(round(L_ref,digits=1)) U_ref=$(round(U_ref,digits=3))")
         else
             rdir = joinpath(ROOT, "reference", sid)
             ov = merge(base, Dict("algorithms" => "hexspline_cl", "num_agents" => "1",
@@ -630,7 +655,7 @@ function main()
                 say("  $(sid): screen ok — $(SCREEN.label) fails the $(pcts[1])% bound ($(swhy))")
             end
             accepted += 1
-            say("  $(sid): D=$(Int(p.D)) L=$(p.nl) O=$(p.no)  L_ref=$(round(L_ref,digits=1)) " *
+            say("  $(sid): $(scenario_label(p))  L_ref=$(round(L_ref,digits=1)) " *
                 "U_ref=$(round(U_ref,digits=3))  ($(round(r.wall,digits=1))s)  [$(accepted)/$(want)]")
         end
 

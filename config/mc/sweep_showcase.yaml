@@ -1,0 +1,104 @@
+# ==========================================================================
+# Showcase ladder — read ONLY by run_constraint_sweep.jl
+# ==========================================================================
+# Not a statistical sweep. ONE hand-built scenario (`showcase`, defined in
+# src/scenario_generation.jl), one method, walked down the same constraint
+# ladder the population sweeps use — because the deliverable here is the SHAPE
+# of the plan at each rung, not a mean over draws. plot_showcase.jl turns the
+# per-rung control points into the figures.
+#
+# The scenario is built so the plan changes qualitatively as the bound tightens:
+# a support-only detour first (free — the objective is PRIMARY length), then a
+# detour the primary pays for, then a homotopy flip around the island to the
+# strong landmark pair behind the guard wall. See the :showcase comment block in
+# src/scenario_generation.jl for the geometry and the tier reasoning.
+#
+# Nothing here pools with constraint_sweep/ — different population (one fixed
+# scenario vs. a random draw), different purpose.
+# ==========================================================================
+
+# The fixed preset. Set ⇒ n_scenarios, max_scenario_draws and every geometry
+# range below are ignored: the preset owns its own landmarks, obstacles and
+# start/goal. scenario_seed_base still names the run's RNG seed (:showcase uses
+# explicit landmark covariances, so it changes nothing here — it is read
+# unconditionally by the draw loop).
+scenario_name: showcase
+scenario_seed_base: 1
+
+# OFF, and not optional: the screen exists to discard scenarios a straight line
+# already solves, drawn from a random population. There is one scenario here and
+# it was built on purpose — rejecting it would leave the sweep with nothing.
+reject_trivial_straight: false
+
+# Constraint ladder. Starts at 75, not 100: the reference is a ONE-agent
+# unconstrained run (U_ref ~12.6 here) while the ladder runs two agents, whose
+# unconstrained plan already sits at ~8.7. Every rung from 100 down to ~70 is
+# therefore slack and returns the identical plan — 6 runs measuring nothing. 75
+# puts the top rung just above the free plan, where the ladder starts to bite.
+# The floor at 20 (~2.5 m) is below anything measured as reachable, so the
+# bottom of the ladder is a real failure rather than an arbitrary stop.
+# pct_patience 2 walks one level past the last success so the figure shows where
+# the planner honestly gives out rather than stopping on it.
+pct_start: 75
+pct_step: 5
+pct_floor: 20
+pct_patience: 2
+# 0 = never drop a method early. With one method that is the same as
+# pct_patience, but it also keeps the ~1% non-monotone recoveries (see
+# method_patience in sweep.yaml) visible instead of pruned.
+method_patience: 0
+
+# One method: this file measures hexspline_cl against itself at different bounds.
+# The budget is config/mc's own 1000000 and MUST NOT be raised casually. The joint
+# A* frees nothing until it returns, so the cap is a memory setting as much as a
+# compute one: ~1.8 GB per 300k expansions puts 1e6 near 6 GB and 2e6 near 12 GB.
+# Five concurrent probe runs at a 600k cap took this machine down (30 GB, ~26 free)
+# while tuning the scenario — hence workers: 1 and a hint that leaves real headroom.
+# Raise the cap only together with the hint, and never together with workers.
+#
+# primary_epsilon: 0.25 is NOT tuning, it is what makes an 1800 m corridor searchable
+# at all, and it is the one place this file knowingly trades exactness for reach.
+# Measured on :showcase at threshold 7.0:
+#   eps 0.0,  1e6 expansions, 6m02s -> incumbent unc 8.19, recovery_failed. The result
+#             was BYTE-IDENTICAL to a 150k run: the extra 850k expansions found nothing,
+#             because an exact search must exhaust every joint state below f = 2250 m
+#             before it can reach the +300 m excursion that the information is on. Same
+#             failure config/mc/sweep.yaml documents past ~900 m of goal_dist.
+#   eps 0.3,  500k,  54s -> 2100 m, unc 7.22 (reaches the excursion, still just short)
+#   eps 0.5,  500k,  ~1m -> solves every rung, but returns the SAME 2250 m discrete seed
+#             at every threshold: greedy enough that it takes the deepest route whether
+#             or not the bound needs it, so only the barrier responds and the plan shape
+#             stops being a function of the constraint. That defeats the whole figure.
+#   eps 0.25, 800k       -> discrete seed 1950 m at sigma<=8.5 and 2100 m at sigma<=4.0.
+#             The plan itself responds to the bound, which is the thing being shown.
+# So the seeds here are up to 25% suboptimal in length by construction. This file
+# demonstrates HOW the plan changes with the constraint; it is not a length benchmark,
+# and its length numbers must not be pooled with constraint_sweep/, which runs eps 0.0.
+# track_comm_events / track_landmark_events are off in config/mc (a population
+# sweep reads neither) and are turned back on HERE, per method, because they are
+# the evidence for the claim this scenario exists to make: the _comm and
+# _landmarks figure variants mark every inter-agent CI fusion and every landmark
+# update on the path, so "the support flips sides before the primary does" is
+# something the reader can see rather than infer from a length column.
+methods: hexspline_cl@algorithms=hexspline_cl,num_agents=2,primary_epsilon=0.25,track_comm_events=true,track_landmark_events=true
+
+# The per-rung main_ctrls.csv IS the deliverable — plot_showcase.jl reads it out of
+# <root>/hexspline_cl/s001_p<NNN>/csv/.
+#
+# save_figures is ON here, unlike every population sweep, and the reason is the
+# whole point of this file: a rung's OWN figures (the discrete A* seed, the
+# discrete-vs-continuous compare, the uncertainty profile against that rung's
+# bound) show the plan at that bound in a way the ladder overlay cannot — the
+# overlay draws the shipped splines only, so the seed the search actually
+# certified is invisible in it. 12 rungs of PNGs is nothing; a 30-scenario
+# population sweep is the case the flag defaults off for.
+save_csv: true
+save_figures: true
+
+# One method and a 12 GB heap hint ⇒ one subprocess at a time. The longer corridor
+# also makes each run slower than a population-sweep run, hence the larger timeout.
+workers: 1
+heap_hint_gb: 8
+run_timeout_s: 2400
+
+outroot: showcase
