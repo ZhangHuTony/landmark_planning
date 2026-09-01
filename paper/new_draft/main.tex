@@ -367,20 +367,22 @@ makes the problem a joint one.
 
 \begin{figure}[t]
   \centering
-  \figbox{5cm}{Fig.~3 --- x: constraint level, y: path-length ratio,
-    one line per planner, line opacity = success rate at that level}
-  \caption{Path length versus constraint level across 50 randomized scenarios.
-    Opacity encodes the fraction of scenarios each planner solved at that
-    level; a faint line is a planner reporting short paths on the few easy
-    instances it could still solve. \todo{write real caption}}
+  \includegraphics[width=\linewidth]{fig3_length_vs_constraint}
+  \caption{Median primary path length, normalized by the lone-agent reference
+    length $L_\mathrm{ref}$, as the terminal uncertainty bound tightens
+    (50 randomized scenarios). Line and marker opacity encode the fraction of
+    scenarios each planner solved at that level; a faint line is a planner
+    reporting short paths on the few easy instances it could still solve.
+    Dashed: the unconstrained reference (ratio 1).}
   \label{fig:length_success}
 \end{figure}
 
 \begin{figure}[t]
   \centering
-  \figbox{4cm}{Fig.~4 --- vertical box plot of wall-clock time per planner}
-  \caption{Wall-clock time per planner over all successful runs.
-    \todo{write real caption}}
+  \includegraphics[width=\linewidth]{fig4_wallclock}
+  \caption{Wall-clock time per planner over all successful runs, all
+    constraint levels pooled (log scale). Boxes span the interquartile range;
+    whiskers extend to $1.5\times$ IQR.}
   \label{fig:wall}
 \end{figure}
 
