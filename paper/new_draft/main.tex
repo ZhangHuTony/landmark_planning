@@ -1,0 +1,607 @@
+\documentclass[letterpaper, 10 pt, conference]{ieeeconf}
+\IEEEoverridecommandlockouts
+\overrideIEEEmargins
+
+\usepackage{graphicx}
+\usepackage[T1]{fontenc}   % needed for accents such as \k{a} in bib entries
+% ieeeconf.cls defines \proof; amsthm redefines it -> "already defined".
+\let\proof\relax
+\let\endproof\relax
+\usepackage{amsmath, amssymb, amsfonts, amsthm}
+\usepackage[dvipsnames]{xcolor}
+\usepackage{array, tabularx, booktabs, multirow, makecell}
+\usepackage{algorithm, algpseudocode}
+\usepackage{cleveref}
+
+\graphicspath{{figures/}}
+
+\newtheorem{theorem}{Theorem}
+\newtheorem{proposition}{Proposition}
+
+\crefname{figure}{Fig.}{Fig.}
+\Crefname{figure}{Figure}{Figures}
+\Crefname{equation}{Equation}{Equations}
+\crefname{theorem}{Theorem}{Theorems}
+\crefname{section}{Section}{Sections}
+\crefname{proposition}{Proposition}{Propositions}
+\crefname{algorithm}{Algorithm}{Algorithm}
+\crefname{table}{Table}{Tables}
+
+% ---------------------------------------------------------------------------
+% \todo{...} — inline red note for drafting. Swap the two definitions below to
+% hide every note at once for a submission build.
+% ---------------------------------------------------------------------------
+\newcommand{\todo}[1]{\textcolor{red}{\bfseries [TODO: #1]}}
+%\newcommand{\todo}[1]{}
+
+% ---------------------------------------------------------------------------
+% DRAFT SCAFFOLDING — space budget. Delete this whole block, every \lipsum,
+% every \figbox and every \budget before submission.
+%   \budget{...}            blue marker: target length for the section it heads
+%   \lipsum[a-b]            filler prose, ~100 words per paragraph
+%   \figbox{<h>}{<label>}   grey box the height the final figure will occupy
+%   \nocite{*}              pulls all of refs.bib in so the bibliography has
+%                           real height (final list will be ~2x this long)
+% Calibrated so the whole skeleton lands on exactly 8 pages. As you replace a
+% \lipsum with prose, the page count tells you whether you are over or under.
+% ---------------------------------------------------------------------------
+\usepackage{lipsum}
+\newcommand{\budget}[1]{\textcolor{RoyalBlue}{\bfseries [BUDGET: #1]}}
+\newcommand{\figbox}[2]{%
+  \fcolorbox{gray}{gray!12}{\parbox[c][#1][c]{\dimexpr\linewidth-2\fboxsep-2\fboxrule\relax}%
+    {\centering\ttfamily\footnotesize #2}}}
+
+\title{\LARGE \bf A Multi-Agent Path Planner for Escorted Navigation in GPS-Denied Environments}
+
+% ICRA 2027 uses double-anonymous review: the submitted PDF must carry no
+% author names or affiliations. Restore the real list after acceptance.
+\author{Anonymous Authors}
+
+\begin{document}
+
+\maketitle
+\thispagestyle{empty}
+\pagestyle{empty}
+
+\begin{abstract}
+Centralized multi-agent path planning with cooperative localization in GPS-denied environments is generally computationally 
+intractable when formulated in full belief space due to tightly coupled uncertainty dynamics. Prior work either approximates belief dynamics
+or restricts inter-agent coupling. We study a multi-agent planning problem in which a primary agent must reach a goal in minimum time 
+subject to a chance-constrained collision-avoidance requirement and a terminal bound on localization uncertainty. We obtain a tractable surrogate
+of the underlying belief-space problem by optimizing over the mean-state trajectories of all agents and propagating covariance for terminal constraint evaluation only. 
+We propose a discrete-to-continuous pipeline combining hexagonal-grid joint search with spline-based trajectory refinement. 
+Across 50 randomized scenarios, when the terminal uncertainty constraint is 50\% of the terminal uncertainty of a reference lone primary agent plan, our planner
+finds solutions in 80\% of the scenarios against 54\% for the strongest baseline. We validate these results through the marine robotics simulator HoloOcean \todo{cite it} and show that
+the generated paths satisfy their constraints \todo{figure} of the time through Monte Carlo simulations.
+
+\end{abstract}
+
+% ===========================================================================
+\section{INTRODUCTION}
+% ===========================================================================
+%\budget{$\approx$550 words, 0.7 page incl.\ Fig.~1}
+
+\begin{figure}[t]
+  \centering
+  \figbox{6.5cm}{Fig.~1 --- overview: domain (GPS-denied, escorted primary), the
+    discrete-to-continuous pipeline, and the contribution in one frame}
+  \caption{Overview. A primary agent (\todo{color}) must reach the goal under a
+    terminal localization bound while support agents act as mobile landmarks.
+    Left: the heading-aware hexagonal graph and the joint discrete search.
+    Right: the continuous B-spline refinement of the same plan.
+    \todo{write real caption}}
+  \label{fig:overview}
+\end{figure}
+In environments where GPS signal is unreliable, such as underwater, or in regions subject to spoofing or jamming, agents must rely on other forms of information
+for localization via GPS-denied solutions. In GPS-denied environments, autonomous agents struggle with state uncertainty due to inertial measurement unit (IMU)
+drift. As the estimation error accumulates, an agent's pose uncertainty can grow to a point where waypoint tracking degrades and mission objectives are compromised.
+Common planning strategies ameliorate this by biasing trajectories toward informative landmarks and introducing cooperating agents to utilize inter-agent measurements for 
+cooperative localization \todo{citation?}. Consequently, trajectory planning must account for uncertainty propagation when estimation error impedes task performance. While
+belief-space planning provides a principled formulation for uncertainty-aware decision making, it is typically intractable in multi-agent settings due to the dimensionality of coupled
+belief dynamics \todo{citation?}. This motivates surrogate formulations that optimize mean trajectories while propagating uncertainty only for constraint evaluation.
+
+In this work, we consider a centralized multi-agent planning problem in which a primary agent must reach a goal in minimum time while subjected to a chance-constrained collision-avoidance 
+requirement and a terminal bound on localization uncertainty.
+
+We compute a coordinated discrete plan over a joint state space that captures motion constraints and inter-agent ranging capabilities. This solution is then lifted into
+continuous space and refined into smooth, dynamically feasible trajectories that satisfy kinematic constraints.
+
+Our contributions are as follows:
+\begin{enumerate}
+  \item A formulation of centralized MAPP-CL with obstacles, in which support
+    agents are routed jointly with a primary agent subject to a terminal
+    localization bound and chance-constrained collision avoidance under both
+    agent and obstacle uncertainty.
+  \item A discrete-to-continuous planner---joint search over a heading-aware
+    hexagonal lattice followed by B-spline refinement---that enforces the
+    curvature, collision, and terminal-uncertainty constraints in both stages.
+  \item A benchmark of 50 randomized scenarios against four baselines adapted
+    from adjacent literature, on which the planner solves 80\% of scenarios at
+    the 50\% constraint level against 54\% for the strongest baseline.
+  \item Closed-loop Monte Carlo validation in HoloOcean with an independent
+    factor-graph estimator, showing that the planned constraints hold at
+    \todo{X}\% and \todo{Y}\%.
+\end{enumerate}
+
+In the following sections, we formalize the problem, describe the discrete and continuous planning stages and evaluate our approach in a simulated GPS-denied environment.
+
+
+% ===========================================================================
+\section{RELATED WORK}
+% ===========================================================================
+\budget{$\approx$300 words, 0.3 page}
+
+\lipsum[8-11]
+
+% ===========================================================================
+\section{PROBLEM FORMULATION}
+% ===========================================================================
+%\budget{$\approx$500 words + 6--8 display equations, 0.65 page}
+
+Let $\mathcal{I} = \{1,2,\dots,P\}$ denote a team of $P$ agents. Agent $i=1$
+is the primary agent tasked with reaching a goal location $G \in \mathbb{R}^2$;
+agents $2,\dots,P$ are support agents whose only role is to aid the primary's
+localization. All agents move at a common constant speed $v$, making
+minimization of time equivalent to minimizing trajectory length, and arc
+length $s = vt$ serves as a shared clock. The environment contains $M$ static
+convex obstacles $\mathcal{O}_1,\dots,\mathcal{O}_M$, each the intersection of
+half-planes with unit outward normals $a_j$ and offsets $b_j$ and located only
+up to a covariance $\Sigma_o$, together with a set $\mathcal{L}$ of landmarks
+with known position $\ell$ and map covariance $\Sigma_\ell$.
+
+\subsection{Decision Variables}
+
+The optimization is performed over mean-state trajectories. Specifically, the
+decision variables are the heading profiles $\theta_i(s)$ of all agents and the
+primary's path length $S_1$. Positions are deterministically induced by the
+headings at arc samples $s_k = k\,\Delta s$:
+\begin{equation}
+  x_i(s_{k+1}) = x_i(s_k) + \Delta s
+  \begin{bmatrix} \cos\theta_i(s_k) \\ \sin\theta_i(s_k) \end{bmatrix}.
+  \label{eq:dyn}
+\end{equation}
+
+\subsection{Covariance Propagation}
+
+Let $\Sigma_i(s)$ denote the $2\times2$ position covariance of agent $i$.
+Covariance is not a decision variable and is propagated deterministically along
+the mean trajectories for constraint evaluation. Between measurements the
+agents dead-reckon, and we model the resulting drift as anisotropic process
+noise whose variance grows linearly with distance travelled, larger along the
+direction of travel than across it:
+\begin{equation}
+  \Sigma_i^{-}(s_{k+1}) = \Sigma_i(s_k) + Q\big(\theta_i(s_k)\big)\,\Delta s,
+  \label{eq:prop}
+\end{equation}
+where $Q(\theta) = R(\theta)\,\mathrm{diag}(q_\parallel, q_\perp)\,R(\theta)^{\!\top}$,
+$R(\theta)$ is the planar rotation, and $q_\parallel \ge q_\perp$ are the
+along- and cross-track noise intensities.
+
+\subsection{Landmark Measurements}
+
+A landmark $\ell$ provides a range--bearing fix whose quality decays smoothly
+with the distance $d_{i\ell} = \lVert x_i - \ell \rVert$ through the logistic
+taper
+\begin{equation}
+  q_{i\ell} = \frac{1}{1 + \exp\!\big((d_{i\ell} - r_v)/w_v\big)},
+  \label{eq:taper}
+\end{equation}
+which is near one inside the visibility range $r_v$ and rolls off over a width
+$w_v$; there is no hard sensing cutoff. Every landmark contributes information
+weighted by its quality, and the posterior covariance follows the information
+form of the Kalman update for a direct position measurement (for $H = I$ this
+is identical to the Joseph form):
+\begin{equation}
+  \Sigma_i(s_k) = \Big( \Sigma_i^{-}(s_k)^{-1}
+  + \sum_{\ell \in \mathcal{L}} q_{i\ell}\,\big(S_{i\ell} + \Sigma_\ell\big)^{-1} \Big)^{-1},
+  \label{eq:lm}
+\end{equation}
+where $S_{i\ell} = R(\beta_{i\ell})\,\mathrm{diag}(\sigma_r^2, \sigma_b^2)\,R(\beta_{i\ell})^{\!\top}$
+is the range--bearing sensor noise rotated to the line-of-sight bearing
+$\beta_{i\ell}$.
+
+\subsection{Inter-Agent Fusion}
+
+Agents exchange position estimates at fixed arc-length intervals $\Lambda$.
+Because the estimates of cooperating agents share history, adding their
+information would double count it; we therefore fuse with covariance
+intersection \cite{julier1997cov}, which is consistent for unknown
+cross-correlation. When agents $i$ and $j$ communicate at separation $d_{ij}$,
+agent $i$ receives the transferred estimate $P_{j \to i} = (\Sigma_j + R_c)/w_{ij}$,
+where $R_c = \sigma_c^2 I$ is the communication noise and $w_{ij}$ is a
+logistic taper of the form \eqref{eq:taper} with half-weight at the
+communication range $r_c$, and updates
+\begin{equation}
+  \Sigma_i^{+} = \Big( \omega\,\Sigma_i^{-1} + (1-\omega)\,P_{j \to i}^{-1} \Big)^{-1},
+  \label{eq:ci}
+\end{equation}
+with $\omega \in [0,1]$ chosen to minimize $\det\Sigma_i^{+}$, and symmetrically
+for agent $j$. As $w_{ij} \to 0$ the transferred information
+vanishes, so distant agents do not fuse.
+
+\subsection{Constraints}
+
+\textbf{Terminal uncertainty.} The primary must arrive with bounded
+localization uncertainty,
+\begin{equation}
+  \det\big(\Sigma_1(S_1)\big)^{1/4} \le \bar{u},
+  \label{eq:term}
+\end{equation}
+where $\det(\Sigma)^{1/4}$ equals the standard deviation $\sigma$ for an
+isotropic covariance $\sigma^2 I$ and is therefore expressed in metres.
+
+\textbf{Obstacle avoidance.} Every agent must clear every obstacle with
+probability at least $1-\delta$ at every instant. A sufficient condition is
+that the mean lies outside at least one face of the obstacle with a margin that
+accounts for the vehicle radius $r_a$ and for both the agent's and the
+obstacle's positional uncertainty \todo{cite Blackmore / Ono--Williams}: for
+some face $j$ of $\mathcal{O}_o$,
+\begin{equation}
+  a_j^{\top} x_i(s) \;\ge\; b_j + r_a
+  + z_\delta \sqrt{a_j^{\top}\big(\Sigma_i(s) + \Sigma_o\big)a_j},
+  \label{eq:cc}
+\end{equation}
+for all $i \in \mathcal{I}$, $o \in \{1,\dots,M\}$ and $s$, where
+$z_\delta = \Phi^{-1}(1-\delta)$ and $\Phi$ is the standard normal distribution
+function. A union bound over the $PM$
+agent--obstacle pairs bounds the instantaneous probability of any collision by
+$\Delta = PM\delta$.
+
+\textbf{Kinematics.} Each trajectory respects the vehicles' minimum turn radius
+$r_{\min}$ through the curvature bound $|\kappa_i(s)| \le 1/r_{\min}$, where
+$\kappa_i = \mathrm{d}\theta_i/\mathrm{d}s$.
+
+\textbf{Boundary conditions.} $x_i(0) = x_i^0$ and $\Sigma_i(0) = \Sigma^0$ for
+all $i \in \mathcal{I}$, and $x_1(S_1) = G$.
+
+\subsection{Optimization Problem}
+
+\begin{equation}
+\begin{aligned}
+  \min_{\{\theta_i(\cdot)\},\,S_1}\;\; & S_1 \\
+  \text{s.t.}\;\; & \eqref{eq:dyn}\text{--}\eqref{eq:ci},\;\; \eqref{eq:term},\;\; \eqref{eq:cc},\;\;
+    |\kappa_i(s)| \le 1/r_{\min}, \\
+  & x_i(0) = x_i^0,\;\; \Sigma_i(0) = \Sigma^0,\;\; x_1(S_1) = G .
+\end{aligned}
+\label{eq:opt}
+\end{equation}
+The agents are coupled only through \eqref{eq:ci}: the supports' trajectories
+affect the objective solely by shaping the primary's covariance, which is what
+makes the problem a joint one.
+
+% ===========================================================================
+\section{METHOD}
+% ===========================================================================
+\budget{$\approx$1000 words + Alg.~1, 1.2 pages}
+
+\subsection{Heading-Aware Hexagonal Graph}
+\lipsum[19-20]
+
+\subsection{Joint Discrete Search}
+\lipsum[22-24]
+
+\begin{algorithm}[t]
+  \caption{Joint discrete search \todo{name}}
+  \label{alg:joint}
+  \begin{algorithmic}[1]
+    \Require graph $G$, start/goal, landmarks, bound $\bar{u}$
+    \State \todo{init open set with joint start state, $\Sigma_0$}
+    \While{open set non-empty and budget remains}
+      \State \todo{pop by $f = g + h_{\mathrm{FW}}$}
+      \If{primary on goal cell \textbf{and} spline-clear gate passes}
+        \State \Return joint path
+      \EndIf
+      \ForAll{joint successors}
+        \State \todo{propagate $\Sigma$ per agent; CI fusion at checkpoints}
+        \State \todo{reject if chance constraint violated}
+        \State \todo{dominance test against frontier; push if survives}
+      \EndFor
+    \EndWhile
+    \State \Return best incumbent
+  \end{algorithmic}
+\end{algorithm}
+
+\lipsum[26-27]
+
+% Fig.~2 is a two-column float; LaTeX places figure* at the top of the NEXT
+% page after its source position, so it is issued here to land on the page
+% where Results begins. Move the source if it drifts.
+\begin{figure*}[t]
+  \centering
+  \figbox{6.5cm}{Fig.~2 --- constraint ladder: one scenario, columns = constraint
+    level (100/70/50/30\%), rows = ours vs.\ baselines; shows how the plan
+    adapts as the bound tightens and where each baseline fails}
+  \caption{Constraint ladder on a single scenario. Each column tightens the
+    terminal uncertainty bound; each row is a planner. Our planner reroutes the
+    support agent toward the landmarks as the bound tightens while the
+    baselines \todo{describe failure modes}. Grey cells: no feasible plan found.
+    \todo{write real caption}}
+  \label{fig:ladder}
+\end{figure*}
+
+\subsection{Continuous B-Spline Refinement}
+\lipsum[29-30]
+
+% ===========================================================================
+\section{RESULTS}
+% ===========================================================================
+\budget{$\approx$800 words, 0.85 page of prose (planner-only; simulation is Sec.~VI); the floats add $\approx$0.8 page}
+
+\subsection{Experimental Setup}
+\lipsum[33-34]
+
+\subsection{Baselines}
+\budget{$\approx$400 words for the four descriptions}
+\todo{one paragraph each: name the paradigm, cite it, say how it was
+  adapted to the escort formulation. Greedy = myopic active localization;
+  Formation = leader--follower formation control; Sequential = prioritized
+  planning (MAPF); CL-GBT = direct port from the literature.}
+
+\textit{Greedy.} \todo{primary commits to its shortest obstacle-clear route with
+  no uncertainty reasoning; at each step every support picks, from its
+  $\pm60^\circ$ successors, the move that minimizes the primary's uncertainty
+  at that step. Depth-1 myopia --- removes lookahead. Inspired by myopic /
+  greedy sensor placement.}
+\lipsum[35]
+
+\textit{Formation.} \todo{primary runs its own weighted A* over (cell, belief);
+  supports hold fixed slots in the primary's body frame (one hex out, a
+  $60^\circ$ multiple off its heading); a goal is accepted on the uncertainty
+  the primary has with supports attached. Removes support routing.
+  Inspired by formation keeping / rigid escort.}
+\lipsum[36]
+
+\textit{Sequential.} \todo{prioritized planning: primary planned first with the
+  supports parked at their start poses (slackened bound), supports then planned
+  against the committed primary, then a repair leg. Removes the joint state
+  space. Inspired by prioritized / cooperative pathfinding.}
+\lipsum[37]
+
+\textit{CL-GBT.} \todo{port of the tree-growth strategy of the Cooperative
+  Localization--Guided Belief Tree: one RRT over the joint belief state, goal-
+  and ``besties''-biased sampling. Cite --- theurkauf2025coop? Note what was
+  ported and what was not (our belief model, our constraints).}
+\lipsum[38]
+
+\subsection{Comparison With Baselines}
+
+\begin{figure}[t]
+  \centering
+  \figbox{5cm}{Fig.~3 --- x: constraint level, y: path-length ratio,
+    one line per planner, line opacity = success rate at that level}
+  \caption{Path length versus constraint level across 50 randomized scenarios.
+    Opacity encodes the fraction of scenarios each planner solved at that
+    level; a faint line is a planner reporting short paths on the few easy
+    instances it could still solve. \todo{write real caption}}
+  \label{fig:length_success}
+\end{figure}
+
+\begin{figure}[t]
+  \centering
+  \figbox{4cm}{Fig.~4 --- vertical box plot of wall-clock time per planner}
+  \caption{Wall-clock time per planner over all successful runs.
+    \todo{write real caption}}
+  \label{fig:wall}
+\end{figure}
+
+\lipsum[39-40]
+
+\subsection{Ablation}
+
+\begin{figure}[t]
+  \centering
+  \figbox{5cm}{Fig.~5 --- same axes as Fig.~3 for the ablation:
+    full pipeline vs.\ discrete-only vs.\ straight-line seed + continuous}
+  \caption{Ablation: path length versus constraint level for the full pipeline,
+    the discrete stage alone, and continuous refinement seeded from a straight
+    line. \todo{write real caption}}
+  \label{fig:abl_length_success}
+\end{figure}
+
+\begin{figure}[t]
+  \centering
+  \figbox{4cm}{Fig.~6 --- box plot of wall-clock time for the ablation arms}
+  \caption{Ablation: wall-clock time per arm. \todo{write real caption}}
+  \label{fig:abl_wall}
+\end{figure}
+
+\begin{table}[t]
+  \caption{Success rate / median path-length ratio at selected constraint
+    levels, 50 scenarios. \todo{pick levels; fill from trials\_all.csv}}
+  \label{tab:sweep}
+  \centering
+  \footnotesize
+  \setlength{\tabcolsep}{4pt}
+  \begin{tabular}{@{}lcccc@{}}
+    \toprule
+    & \multicolumn{4}{c}{Constraint level (\% of reference)} \\
+    \cmidrule(l){2-5}
+    Method & 100 & 70 & 50 & 30 \\
+    \midrule
+    Ours          & --\,/\,-- & --\,/\,-- & --\,/\,-- & --\,/\,-- \\
+    Formation     & --\,/\,-- & --\,/\,-- & --\,/\,-- & --\,/\,-- \\
+    Sequential    & --\,/\,-- & --\,/\,-- & --\,/\,-- & --\,/\,-- \\
+    CL-GBT        & --\,/\,-- & --\,/\,-- & --\,/\,-- & --\,/\,-- \\
+    Greedy        & --\,/\,-- & --\,/\,-- & --\,/\,-- & --\,/\,-- \\
+    \midrule
+    Discrete only          & --\,/\,-- & --\,/\,-- & --\,/\,-- & --\,/\,-- \\
+    Straight seed + cont.\ & --\,/\,-- & --\,/\,-- & --\,/\,-- & --\,/\,-- \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\lipsum[42]
+
+% ===========================================================================
+\section{SIMULATION VALIDATION}
+% ===========================================================================
+\budget{$\approx$700 words + 1 eq.\ + \cref{tab:noise}, 0.75 page of prose; floats
+  Fig.~7, Fig.~8, \cref{tab:mc} add $\approx$0.55 page}
+\todo{open with the purpose in one sentence: every planner in Sec.~V propagates
+  the same covariance model, so the simulation is not a planner comparison ---
+  it asks whether that model is \emph{calibrated} against a vehicle, controller
+  and estimator that do not share its equations. Each plan is flown $N$ times
+  with different noise seeds.}
+
+\subsection{Simulator and Vehicle}
+\budget{$\approx$150 words}
+\todo{HoloOcean \todo{cite Potokar et al.\ (verify)}: 6-DOF Fossen AUV dynamics
+  with the simulator's stock depth/heading autopilot at 30\,Hz; an outer-loop
+  waypoint follower tracks the planned B-spline resampled every 25\,m (arrival
+  radius 15\,m, set by the turn radius); the vehicle steers on the
+  \emph{estimated} position, dead-reckoned forward between fixes. Three
+  cadences, all scheduled on arc length accumulated from ground truth so that
+  events land where the planner assumed them: control every tick, an estimator
+  node every 5\,m, an acoustic comm every 100\,m (the planner's comm interval,
+  range-gated with the planner's comm weight). Landmarks, obstacles, start and
+  goal are imported from the plan; the 2-D field is lifted onto one depth plane.}
+\lipsum[52]
+
+\subsection{Factor-Graph State Estimator}
+\budget{$\approx$350 words + \cref{eq:fg} + \cref{tab:noise}}
+\todo{Credit: this is the collaborator's existing GTSAM \todo{cite GTSAM /
+  iSAM2 (Kaess et al.), verify} stack, used essentially unchanged; say so.}
+\todo{What it is (from \texttt{factor\_graph.py} / \texttt{main.py}):
+  (a) iSAM2 incremental smoother over $SE(3)$ pose nodes, one node per 5\,m of
+      arc, per agent;
+  (b) \emph{anchor-node parameterization}: each agent estimates a local
+      trajectory $\mathbf T^{\ell}_k$ plus an anchor $\mathbf T^{a}$, world pose
+      $\mathbf T^{w}_k=\mathbf T^{a}\mathbf T^{\ell}_k$, Gaussian priors on both
+      at deployment; the planner's 2-D $\Sigma$ corresponds to the $xy$ block of
+      the \emph{world-pose} marginal;
+  (c) two layers of graph: a per-agent dead-reckoning graph (own odometry
+      between-factors, unary depth and 3-DOF orientation factors, and
+      azimuth/elevation/range factors to landmarks within visibility range,
+      each landmark carrying a prior with the planner's $\Sigma_\ell$ --- a
+      known map, not SLAM) whose output is the relative pose and marginal the
+      agent transmits acoustically; and the primary's multi-agent graph, which
+      adds at every comm event the sender's compounded between-factor (its
+      motion since the last comm, covariance $S_{jk}$) and an inter-agent
+      acoustic bearing factor;
+  (d) measurement synthesis: all measurements are ground truth from HoloOcean
+      plus additive Gaussian noise (\cref{tab:noise}) --- no DVL/IMU sensor models;
+      this tests the belief model's consistency, not sensor realism (say so,
+      and repeat in Sec.~VII).}
+\todo{OPEN --- write this against what is actually flown for the final numbers.
+  Pending in \texttt{multiagent\_base/ESTIMATOR\_REVIEW.md}: E1 report the
+  world-pose marginal, not the anchor-relative local one; E2 the inter-agent
+  factor is bearing-only today while the planner models a range-gated
+  position transfer (CI) --- either land the relative-position factor or
+  state the mismatch as a limitation; E3 path for a support's landmark fix
+  into the primary's graph; E4 transmitted-covariance bookkeeping; E6 noise
+  parameters calibrated to the planner's dead-reckoning rates (plan A2--A4).}
+\begin{equation}
+  \hat{\mathcal X}=\arg\min_{\mathcal X}\;\sum_{i\in\mathcal F}
+    \big\lVert r_i(\mathcal X)\big\rVert^{2}_{\Sigma_i},
+  \qquad
+  \mathbf T^{w}_{k}=\mathbf T^{a}\,\mathbf T^{\ell}_{k}
+  \label{eq:fg}
+\end{equation}
+
+\begin{table}[t]
+  \caption{Simulated sensor and factor noise. \todo{values are the current
+    \texttt{factor\_graph.py} constants --- replace after calibration to the
+    planner's dead-reckoning rates (A2--A4); note the depth factor $\sigma$
+    (0.5\,m) differs from the injected noise (0.01\,m)}}
+  \label{tab:noise}
+  \centering
+  \scriptsize
+  \setlength{\tabcolsep}{4pt}
+  \begin{tabular}{@{}llc@{}}
+    \toprule
+    Factor & Variables & $\sigma$ \\
+    \midrule
+    Odometry (between, per 5\,m node) & $\mathbf T_{k-1},\mathbf T_k$ & 1$^\circ$/axis; 0.02, 0.02, 0.01\,m \\
+    Depth (unary) & $\mathbf T_k,\mathbf T^{a}$ & 0.5\,m \\
+    Orientation (unary) & $\mathbf T_k,\mathbf T^{a}$ & 1$^\circ$/axis \\
+    Landmark az./el./range & $\mathbf T_k,\mathbf T^{a},\ell$ & 1$^\circ$, 1$^\circ$, 2\,m; $r<100$\,m \\
+    Inter-agent bearing az./el. & $\mathbf T^{s}_k,\mathbf T^{p}_k,\mathbf T^{a}_{s,p}$ & 10$^\circ$, 15$^\circ$ \\
+    Anchor / initial pose prior & $\mathbf T^{a}$, $\mathbf T_0$ & 10$^\circ$, 1\,m \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+\lipsum[54-55]
+
+\subsection{Monte Carlo Results}
+\budget{$\approx$200 words; Fig.~7, Fig.~8 and \cref{tab:mc} live here}
+\todo{report per trial: goal reached, obstacle penetration vs.\ the
+  allocated $\Delta$, terminal $\det(\Sigma)^{1/4}$ predicted vs.\ empirical
+  (planner model on the flown track vs.\ estimator marginal vs.\ sample
+  covariance of the true error); one sentence on why baselines are not
+  re-flown (shared belief model, see Sec.~VII)}
+
+\begin{figure}[t]
+  \centering
+  \figbox{4cm}{Fig.~7 --- HoloOcean screenshot: what the simulated
+    environment looks like}
+  \caption{The HoloOcean \todo{cite} environment used for validation.
+    \todo{write real caption}}
+  \label{fig:holoocean}
+\end{figure}
+
+\begin{figure}[t]
+  \centering
+  \figbox{4.5cm}{Fig.~8 --- planned path vs.\ mean executed path $\pm$ 1 std.\
+    envelope over Monte Carlo runs, both agents}
+  \caption{Planned trajectories against the mean executed trajectory and one
+    standard-deviation envelope over \todo{N} Monte Carlo runs in HoloOcean.
+    \todo{write real caption}}
+  \label{fig:mc_paths}
+\end{figure}
+
+\begin{table}[t]
+  \caption{Monte Carlo constraint satisfaction in HoloOcean.
+    \todo{choose rows (scenarios or constraint levels) and columns}}
+  \label{tab:mc}
+  \centering
+  \footnotesize
+  \setlength{\tabcolsep}{4pt}
+  \begin{tabular}{@{}lcccc@{}}
+    \toprule
+    Case & Runs & \makecell{Collision\\rate ($\le\Delta$)} & \makecell{Terminal\\bound met} & \makecell{Pred.\,/\,emp.\\$\sigma_T$} \\
+    \midrule
+    \todo{A} & -- & -- & -- & --\,/\,-- \\
+    \todo{B} & -- & -- & -- & --\,/\,-- \\
+    \todo{C} & -- & -- & -- & --\,/\,-- \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\lipsum[44]
+
+% ===========================================================================
+\section{DISCUSSION AND LIMITATIONS}
+% ===========================================================================
+\budget{$\approx$400 words, 0.4 page}
+\todo{cover, roughly one paragraph each:
+  (i) discretization and completeness --- replaces the old optimality
+      guarantee: the lattice phase is exogenous to obstacle geometry, so the
+      discrete feasible set is neither a subset nor a superset of the true one,
+      and refinement cannot rescue it;
+  (ii) Gaussian belief + maximum-likelihood-observation assumption
+      (platt2010belief) --- the simulation validation is what tests whether it
+      is calibrated;
+  (iii) centralized, offline, open-loop plan; replanning not addressed;
+  (iv) cost: 1.3--1.9$\times$ the reference wall clock; Floyd--Warshall
+      $O(n^3)$ bounds the graph; joint space exponential in agents, two tested;
+  (v) 2-D, static, convex obstacles with known $\Sigma_o$;
+  (vi) why the baselines are not re-run in simulation (shared belief model);
+  (vii) simulated measurements are ground truth plus Gaussian noise ---
+      the simulation tests belief-model consistency, not sensor realism.}
+
+\lipsum[47-48]
+
+% ===========================================================================
+\section{CONCLUSION}
+% ===========================================================================
+\budget{$\approx$150 words, 0.15 page}
+
+\lipsum[51]
+
+% DRAFT: \nocite{*} makes the bibliography non-empty so its height is counted.
+% Remove it once the text carries real \cite commands.
+\nocite{*}
+\bibliographystyle{IEEEtran}
+\bibliography{refs}
+
+\end{document}
