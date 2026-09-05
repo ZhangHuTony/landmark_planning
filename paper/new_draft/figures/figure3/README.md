@@ -2,7 +2,7 @@
 
 Every version of `fig3_length_vs_constraint` we rendered, in order. Numbered
 files are the ones that shipped (commit given); `x*` are explorations that never
-did. `07_` is what is currently in the paper.
+did. `08_` is what is currently in the paper.
 
 All are 300 dpi previews of a 3.5 in column figure — judge them at that size,
 not zoomed.
@@ -18,7 +18,8 @@ not zoomed.
 | `04_shared-viridis_on-markers_dashed-lines.png` | `1a8991b3` | Per-planner ramps abandoned. **One** shared ramp on the marker fills; identity by marker shape + dash; lines neutral gray. |
 | `05_shared-viridis_on-lines.png` | `39b17928` | Ramp moved from the markers to the **lines** (a 3 pt glyph is mostly outline). Dashes lost — see note below. |
 | `06_plasma-r_on-lines_neutral-glyphs.png` | `79a02245` | Plasma reversed and trimmed, so **dark = long detour**. Larger glyphs, single neutral fill `#dfddd6`. |
-| `07_viridis-trim_green-short.png` | current | Back to viridis, reversed and cut at 0.74 so it never reaches yellow: **green = at the reference length**, through teal and blue, to dark violet for the worst detours. |
+| `07_viridis-trim_green-short.png` | `9d3a5301` | Back to viridis, reversed and cut at 0.74 so it never reaches yellow: **green = at the reference length**, through teal and blue, to dark violet for the worst detours. |
+| `08_coral-diamond-primary.png` | current | Ours takes the diamond (CL-GBT the circle it vacated), a coral `#e8503a` fill instead of the shared neutral, and its glyphs draw on top of everyone's. |
 
 ## Alternates worth keeping
 
@@ -55,8 +56,9 @@ separate at all.
 
 ## Output formats
 
-`make_figs_baseline.py` writes each figure three ways: **PDF** is what LaTeX
-includes, **SVG** is the Illustrator-editable copy, **PNG** is a preview.
+`make_figs_baseline.py` writes each figure four ways: **PDF** is what LaTeX
+includes, **SVG** and **EPS** both open in Illustrator, **PNG** is a preview.
+Prefer the SVG for editing — it is the one that keeps live text.
 
 Two things about the SVG, both deliberate:
 
@@ -65,6 +67,17 @@ Two things about the SVG, both deliberate:
   font-family falls back through Times New Roman and Liberation Serif.
 - The colorbar is a `pcolormesh`, not an `imshow`. `imshow` embeds the bar as a
   raster block, which arrives in Illustrator resolution-locked and uneditable.
+
+And two about the EPS:
+
+- It uses **Type 3** fonts while the PDF uses Type 42. Matplotlib's Type 42
+  embedding of Nimbus Roman writes a font Ghostscript rejects outright
+  (`invalidfont in definefont`) and the file will not open at all. Type 3
+  renders correctly, but text arrives as outlines — hence "prefer the SVG".
+  Only the PDF goes into the paper, and it keeps Type 42.
+- PostScript has no transparency, so Fig. 4's box fills are **pre-blended onto
+  white** (`over_white`) rather than given an alpha. Do not reintroduce
+  `set_alpha` there; it comes out opaque in the EPS and stops matching the PDF.
 
 The one rough edge: Fig. 3's gradient lines arrive as a run of short stroked
 segments (32 per data interval), not one path each. That is what a per-vertex

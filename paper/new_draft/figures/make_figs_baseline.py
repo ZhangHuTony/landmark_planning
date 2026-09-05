@@ -1,17 +1,17 @@
 #!/usr/bin/env python3
 """Fig. 3 and Fig. 4 of the paper, from constraint_sweep/baseline_2026-08-17.
 
-Fig. 3  fig3_length_vs_constraint.{pdf,svg,png}
+Fig. 3  fig3_length_vs_constraint.{pdf,svg,eps,png}
         success rate vs. constraint level, one line per planner. Planner
         identity is marker shape; the line itself carries one shared viridis
         ramp (green = short, dark violet = long) encoding the median
         path-length ratio along it.
-Fig. 4  fig4_wallclock.{pdf,svg,png}
+Fig. 4  fig4_wallclock.{pdf,svg,eps,png}
         box plot of wall-clock time per planner over all successful runs
         (log scale; CL-GBT's tail spans 12.5 -> 730 s).
 
-Each figure is written three ways: PDF is what LaTeX includes, SVG is the
-Illustrator-editable copy (see `save`), PNG is a preview.
+Each figure is written four ways: PDF is what LaTeX includes, SVG and EPS both
+open in Illustrator (SVG keeps live text; see `save`), PNG is a preview.
 
 Run with any python that has matplotlib, e.g.:
   ~/Research/multiagent_base/.venv/bin/python make_figs_baseline.py
@@ -34,10 +34,10 @@ SWEEP = os.path.normpath(os.path.join(HERE, "../../../constraint_sweep/baseline_
 # Fixed identity -> color assignment (dataviz reference palette, slots 1-5).
 # Keep this order/color per method in EVERY figure of the paper.
 METHODS = [
-    ("hexspline_cl", "Ours",       "#2a78d6", "o"),
+    ("hexspline_cl", "Ours",       "#2a78d6", "D"),
     ("formation",    "Formation",  "#eb6834", "s"),
     ("sequential",   "Sequential", "#1baf7a", "^"),
-    ("clgbt",        "CL-GBT",     "#eda100", "D"),
+    ("clgbt",        "CL-GBT",     "#eda100", "o"),
     ("greedy",       "Greedy",     "#e87ba4", "v"),
 ]
 
@@ -73,6 +73,13 @@ LEN_CMAP = LinearSegmentedColormap.from_list(
 # against every step from green to dark violet.
 MARKER_FACE = "#dfddd6"
 
+# Ours gets its own fill so it is findable at a glance. Coral is the only
+# candidate that clears both gates: worst CVD dE 8.2 against the ramp (gold
+# managed 4.8 -- it collides with the green end under deuteranopia) and 3.7:1
+# against white, the only one of the candidates that stands on its own. It is
+# warm, so it cannot be mistaken for a step of a green-to-violet ramp.
+PRIMARY_FACE = "#e8503a"
+
 LEN_MIN, LEN_MAX = 1.10, 2.45
 LEN_NORM = PowerNorm(gamma=0.5, vmin=LEN_MIN, vmax=LEN_MAX, clip=True)
 LEN_TICKS = [1.2, 1.4, 1.7, 2.0, 2.4]
@@ -92,20 +99,39 @@ plt.rcParams.update({
     "xtick.major.size": 2.5,
     "ytick.major.size": 2.5,
     "pdf.fonttype": 42,
+    # Type 3 for PS, unlike the PDF above: matplotlib's Type 42 embedding of
+    # Nimbus Roman writes a font Ghostscript rejects outright ("invalidfont in
+    # definefont"), so the EPS would not open. Type 3 renders correctly; text
+    # arrives in Illustrator as outlines rather than live text -- use the SVG
+    # if you need to edit the labels. Only the PDF goes into the paper, and it
+    # keeps Type 42.
+    "ps.fonttype": 3,
     # keep SVG text as text, not outlines, so labels stay editable in
     # Illustrator; it substitutes a font only if Nimbus Roman is missing there
     "svg.fonttype": "none",
 })
 
 
+def over_white(color, alpha):
+    """Flatten `color` at `alpha` onto white.
+
+    Used instead of set_alpha: the PostScript backend has no transparency, so
+    an alpha'd patch would come out opaque in the EPS and not match the PDF.
+    Pre-blending keeps all four formats identical.
+    """
+    r, g, b = matplotlib.colors.to_rgb(color)
+    return tuple(1 - alpha * (1 - c) for c in (r, g, b))
+
+
 def save(fig, stem):
-    """PDF for LaTeX, SVG for Illustrator, PNG to eyeball.
+    """PDF for LaTeX, SVG and EPS for Illustrator, PNG to eyeball.
 
     Note for whoever opens the SVG: Fig. 3's gradient lines arrive as a run of
     short stroked segments, not one path -- that is how a per-vertex color ramp
     has to be expressed. Group them before moving a line around.
     """
-    for ext, kw in (("pdf", {}), ("svg", {}), ("png", {"dpi": 300})):
+    for ext, kw in (("pdf", {}), ("svg", {}), ("eps", {}),
+                    ("png", {"dpi": 300})):
         fig.savefig(os.path.join(HERE, f"{stem}.{ext}"), **kw)
 
 
@@ -187,13 +213,17 @@ def fig3(summary):
         primary = m == "hexspline_cl"
         lw = 2.2 if primary else 1.4
         gradient_line(ax, pcts, rate, ratio, lw, zorder=2)
-        ax.plot(pcts, rate, ls="none", marker=marker, ms=4.2 if primary else 3.8,
-                mfc=MARKER_FACE, mec="0.15", mew=0.6, zorder=4)
+        # the primary's line stays *under* the others (they share y = 100% with
+        # it down to the 80% level), but its glyphs sit on top of theirs
+        ax.plot(pcts, rate, ls="none", marker=marker, ms=4.4 if primary else 3.8,
+                mfc=PRIMARY_FACE if primary else MARKER_FACE, mec="0.15",
+                mew=0.6, zorder=6 if primary else 4)
         # marker only: shape is the whole identity channel, so a line swatch
         # here would just imply a line color the plot does not have
         handles.append(plt.Line2D([], [], ls="none", marker=marker,
-                                  ms=4.2 if primary else 3.8, mfc=MARKER_FACE,
-                                  mec="0.15", mew=0.6, label=label))
+                                  ms=4.4 if primary else 3.8, mew=0.6,
+                                  mfc=PRIMARY_FACE if primary else MARKER_FACE,
+                                  mec="0.15", label=label))
 
     ax.invert_xaxis()  # constraint tightens to the right
     ax.set_xticks(pcts)
@@ -225,11 +255,10 @@ def fig4(wall):
                     medianprops=dict(color="0.15", lw=1.0),
                     whiskerprops=dict(lw=0.7, color="0.35"),
                     capprops=dict(lw=0.7, color="0.35"),
-                    flierprops=dict(marker=".", ms=2.0, mfc="0.55", mec="none",
-                                    alpha=0.6))
+                    flierprops=dict(marker=".", ms=2.0, mec="none",
+                                    mfc=over_white("0.55", 0.6)))
     for patch, (_, _, color, _) in zip(bp["boxes"], METHODS):
-        patch.set_facecolor(color)
-        patch.set_alpha(0.45)
+        patch.set_facecolor(over_white(color, 0.45))
         patch.set_edgecolor(color)
         patch.set_linewidth(0.9)
 
