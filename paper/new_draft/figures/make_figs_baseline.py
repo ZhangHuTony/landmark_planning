@@ -3,7 +3,7 @@
 
 Fig. 3  fig3_length_vs_constraint.{pdf,png}
         success rate vs. constraint level, one line per planner. Planner
-        identity is marker shape; the line itself carries one shared viridis
+        identity is marker shape; the line itself carries one shared plasma
         ramp encoding the median path-length ratio along it.
 Fig. 4  fig4_wallclock.{pdf,png}
         box plot of wall-clock time per planner over all successful runs
@@ -21,7 +21,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.collections import LineCollection
-from matplotlib.colors import PowerNorm
+from matplotlib.colors import LinearSegmentedColormap, PowerNorm
 from matplotlib.ticker import NullFormatter
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -53,7 +53,20 @@ METHODS = [
 #
 # The color column above is still the paper-wide identity color and is what
 # Fig. 4 (and Figs. 5-6) paint with; Fig. 3 no longer uses it.
-LEN_CMAP = plt.get_cmap("viridis")
+# plasma, reversed and trimmed at both ends. Reversed so DARK = the long
+# detour, which is the reading a reader expects from a dark color. Trimmed
+# because plasma's own extremes do not survive this chart: the light end stops
+# at amber instead of a near-white yellow that a 1.4 pt line cannot carry on
+# white paper, and the dark end stops short of near-black so the longest paths
+# still read as a color. Perceptually uniform and CVD-safe like viridis.
+LEN_CMAP = LinearSegmentedColormap.from_list(
+    "plasma_r_trim", plt.get_cmap("plasma")(np.linspace(0.85, 0.04, 256)))
+
+# Glyphs are identity only, so they take one neutral fill and stay out of the
+# ramp's way. Painting them the per-planner palette colors was tried and reads
+# worse here: plasma spans amber -> magenta -> violet, so CL-GBT's yellow and
+# Formation's orange land inside the ramp and are read as values, not labels.
+MARKER_FACE = "#dfddd6"
 
 LEN_MIN, LEN_MAX = 1.10, 2.45
 LEN_NORM = PowerNorm(gamma=0.5, vmin=LEN_MIN, vmax=LEN_MAX, clip=True)
@@ -151,13 +164,13 @@ def fig3(summary):
         primary = m == "hexspline_cl"
         lw = 2.2 if primary else 1.4
         gradient_line(ax, pcts, rate, ratio, lw, zorder=2)
-        ax.plot(pcts, rate, ls="none", marker=marker, ms=3.4 if primary else 3.0,
-                mfc="white", mec="0.20", mew=0.55, zorder=4)
+        ax.plot(pcts, rate, ls="none", marker=marker, ms=4.2 if primary else 3.8,
+                mfc=MARKER_FACE, mec="0.15", mew=0.6, zorder=4)
         # marker only: shape is the whole identity channel, so a line swatch
         # here would just imply a line color the plot does not have
         handles.append(plt.Line2D([], [], ls="none", marker=marker,
-                                  ms=3.4 if primary else 3.0, mfc="white",
-                                  mec="0.20", mew=0.55, label=label))
+                                  ms=4.2 if primary else 3.8, mfc=MARKER_FACE,
+                                  mec="0.15", mew=0.6, label=label))
 
     ax.invert_xaxis()  # constraint tightens to the right
     ax.set_xticks(pcts)
