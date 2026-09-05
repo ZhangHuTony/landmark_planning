@@ -2,8 +2,10 @@
 """Fig. 3 and Fig. 4 of the paper, from constraint_sweep/baseline_2026-08-17.
 
 Fig. 3  fig3_length_vs_constraint.{pdf,png}
-        median path-length ratio vs. constraint level, one line per planner,
-        opacity of each segment/marker = success rate at that level.
+        success rate vs. constraint level, one line per planner; the color of
+        each segment/marker runs along that planner's own two-color ramp and
+        encodes the median path-length ratio at that level (base hue = short,
+        dark shade = long).
 Fig. 4  fig4_wallclock.{pdf,png}
         box plot of wall-clock time per planner over all successful runs
         (log scale; CL-GBT's tail spans 12.5 -> 730 s).
@@ -18,6 +20,9 @@ import matplotlib
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+import numpy as np
+from matplotlib.collections import LineCollection
+from matplotlib.colors import LinearSegmentedColormap, PowerNorm
 from matplotlib.ticker import NullFormatter
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -26,12 +31,36 @@ SWEEP = os.path.normpath(os.path.join(HERE, "../../../constraint_sweep/baseline_
 # Fixed identity -> color assignment (dataviz reference palette, slots 1-5).
 # Keep this order/color per method in EVERY figure of the paper.
 METHODS = [
-    ("hexspline_cl", "Ours",       "#2a78d6"),
-    ("formation",    "Formation",  "#eb6834"),
-    ("sequential",   "Sequential", "#1baf7a"),
-    ("clgbt",        "CL-GBT",     "#eda100"),
-    ("greedy",       "Greedy",     "#e87ba4"),
+    ("hexspline_cl", "Ours",       "#2a78d6", "o"),
+    ("formation",    "Formation",  "#eb6834", "s"),
+    ("sequential",   "Sequential", "#1baf7a", "^"),
+    ("clgbt",        "CL-GBT",     "#eda100", "D"),
+    ("greedy",       "Greedy",     "#e87ba4", "v"),
 ]
+
+# Fig. 3 encodes median length ratio as a two-color ramp per method: the
+# method's own palette color (short paths) -> a deep shade of the same OKLCh
+# hue (long paths), 0.28 lower in OKLCh lightness. Hue keeps identity, the
+# lightness run keeps the magnitude readable in grayscale and under CVD; marker
+# shape is the secondary encoding the 5-series palette needs either way.
+# Intermediate stops were stepped in OKLCh, so RGB interpolation between them
+# stays on the perceptual path.
+RAMPS = {
+    "hexspline_cl": ("#2a78d6", "#1f64b5", "#155096", "#0b3d77", "#032b5a"),
+    "formation":    ("#eb6834", "#cc5829", "#ae481d", "#913812", "#752907"),
+    "sequential":   ("#1baf7a", "#169768", "#127f57", "#0d6847", "#095237"),
+    "clgbt":        ("#eda100", "#d08e0f", "#b47a0b", "#99680d", "#7e560d"),
+    "greedy":       ("#e87ba4", "#d2638f", "#bc4c7a", "#a63366", "#901652"),
+}
+CMAPS = {m: LinearSegmentedColormap.from_list(m, stops)
+         for m, stops in RAMPS.items()}
+
+# Length-ratio -> ramp position. The medians pile up in 1.1-1.4 with a thin
+# tail out to 2.44 (sequential at 30%), so a sqrt norm spends the ramp where
+# the data is; the legend strip carries the resulting non-uniform ticks.
+LEN_MIN, LEN_MAX = 1.10, 2.45
+LEN_NORM = PowerNorm(gamma=0.5, vmin=LEN_MIN, vmax=LEN_MAX, clip=True)
+LEN_TICKS = [1.2, 1.4, 1.7, 2.0, 2.4]
 
 plt.rcParams.update({
     "font.family": "serif",
@@ -66,16 +95,11 @@ def read_summary():
 def read_wall():
     """method -> [wall_s of successful runs]"""
     out = {}
-    for m, _, _ in METHODS:
+    for m, _, _, _ in METHODS:
         with open(os.path.join(SWEEP, m, "trials.csv")) as f:
             out[m] = [float(r["wall_s"]) for r in csv.DictReader(f)
                       if r["success"] == "true"]
     return out
-
-
-def alpha(rate):
-    """Success rate -> opacity; floor keeps a 4%-success line printable."""
-    return 0.15 + 0.85 * rate
 
 
 def despine(ax):
@@ -84,38 +108,77 @@ def despine(ax):
 
 
 # ---------------------------------------------------------------- Fig. 3 ----
+def gradient_line(ax, xs, ys, vals, cmap, lw, zorder):
+    """Polyline whose color follows `vals` (one per vertex) along the ramp."""
+    n = 32  # sub-segments per data interval; enough that the ramp reads smooth
+    t = np.linspace(0, 1, n + 1)
+    x, y, v = (np.concatenate([np.interp(t, [0, 1], [a[i], a[i + 1]])[:-1]
+                               for i in range(len(a) - 1)] + [a[-1:]])
+               for a in (np.asarray(xs, float), np.asarray(ys, float),
+                         np.asarray(vals, float)))
+    pts = np.column_stack([x, y]).reshape(-1, 1, 2)
+    segs = np.concatenate([pts[:-1], pts[1:]], axis=1)
+    lc = LineCollection(segs, cmap=cmap, norm=LEN_NORM, lw=lw,
+                        capstyle="round", zorder=zorder)
+    lc.set_array(0.5 * (v[:-1] + v[1:]))
+    ax.add_collection(lc)
+
+
+def ramp_legend(ax):
+    """Legend + colorbar in one: a ramp strip per method, shared value axis."""
+    grad = LEN_NORM(np.linspace(LEN_MIN, LEN_MAX, 256))
+    for i, (m, _, _, marker) in enumerate(METHODS):
+        ax.imshow(CMAPS[m](grad)[None], aspect="auto", interpolation="bilinear",
+                  extent=(LEN_MIN, LEN_MAX, i + 0.33, i - 0.33), zorder=2)
+        ax.plot(-0.022, i, marker=marker, ms=2.8, mec="none", color="0.25",
+                transform=ax.get_yaxis_transform(), clip_on=False, zorder=3)
+
+    ax.set_ylim(len(METHODS) - 0.5, -0.5)
+    ax.set_xlim(LEN_MIN, LEN_MAX)
+    ax.set_yticks(range(len(METHODS)))
+    ax.set_yticklabels([label for _, label, _, _ in METHODS], fontsize=6.5)
+    ax.tick_params(axis="y", length=0, pad=11)
+    ax.set_xticks(LEN_TICKS)
+    ax.set_xticklabels([f"{t:.1f}" for t in LEN_TICKS], fontsize=6.5)
+    ax.tick_params(axis="x", length=2.0, width=0.6, pad=1.5, colors="0.25")
+    ax.set_xlabel(r"median length / $L_\mathrm{ref}$", fontsize=7, labelpad=1.5)
+    for s in ax.spines.values():
+        s.set_visible(False)
+
+
 def fig3(summary):
-    fig, ax = plt.subplots(figsize=(3.5, 2.05))
+    fig = plt.figure(figsize=(3.5, 2.75))
+    ax = fig.add_axes((0.108, 0.395, 0.878, 0.585))
+    cax = fig.add_axes((0.255, 0.120, 0.660, 0.132))
     pcts = sorted(next(iter(summary.values())).keys(), reverse=True)  # 100..30
 
-    ax.axhline(1.0, color="0.55", lw=0.7, ls=(0, (4, 3)), zorder=1)
-
-    handles = []
-    for m, label, color in METHODS:
+    # Ours is drawn widest and *under* the others, so where a baseline sits on
+    # top of it (they share y = 100% down to the 80% level) both still read;
+    # its markers go last so the emphasized series stays legible.
+    for m, _, _, marker in METHODS:
         rows = summary[m]
-        lw = 1.6 if m == "hexspline_cl" else 1.1
-        for a, b in zip(pcts[:-1], pcts[1:]):
-            seg_alpha = alpha(0.5 * (rows[a][1] + rows[b][1]))
-            ax.plot([a, b], [rows[a][0], rows[b][0]], color=color, lw=lw,
-                    alpha=seg_alpha, solid_capstyle="round", zorder=3)
-        for p in pcts:
-            ax.plot(p, rows[p][0], marker="o", ms=2.6, mec="none",
-                    color=color, alpha=alpha(rows[p][1]), zorder=4)
-        handles.append(plt.Line2D([], [], color=color, lw=lw, marker="o",
-                                  ms=2.6, mec="none", label=label))
+        ratio = [rows[p][0] for p in pcts]
+        rate = [rows[p][1] for p in pcts]
+        primary = m == "hexspline_cl"
+        gradient_line(ax, pcts, rate, ratio, CMAPS[m],
+                      lw=1.9 if primary else 1.1, zorder=2 if primary else 3)
+        ax.scatter(pcts, rate, c=ratio, cmap=CMAPS[m], norm=LEN_NORM,
+                   marker=marker, s=14 if primary else 12, linewidths=0.45,
+                   edgecolors="white", zorder=5 if primary else 4)
 
     ax.invert_xaxis()  # constraint tightens to the right
     ax.set_xticks(pcts)
-    ax.set_xlabel(r"constraint level (% of $U_\mathrm{ref}$)")
-    ax.set_ylabel(r"median length / $L_\mathrm{ref}$")
-    ax.set_ylim(0.93, 2.55)
+    ax.set_xlim(103, 27)
+    ax.set_xlabel(r"constraint level (% of $U_\mathrm{ref}$)", labelpad=2)
+    ax.set_ylabel("success rate (%)")
+    ax.set_ylim(-0.04, 1.07)
+    ax.set_yticks([0, 0.25, 0.5, 0.75, 1.0])
+    ax.set_yticklabels(["0", "25", "50", "75", "100"])
     ax.grid(axis="y", color="0.88", lw=0.5, zorder=0)
     ax.set_axisbelow(True)
     despine(ax)
-    ax.legend(handles=handles, loc="upper left", frameon=False,
-              handlelength=1.5, borderaxespad=0.2, labelspacing=0.35)
 
-    fig.tight_layout(pad=0.25)
+    ramp_legend(cax)
     fig.savefig(os.path.join(HERE, "fig3_length_vs_constraint.pdf"))
     fig.savefig(os.path.join(HERE, "fig3_length_vs_constraint.png"), dpi=300)
     plt.close(fig)
@@ -124,7 +187,7 @@ def fig3(summary):
 # ---------------------------------------------------------------- Fig. 4 ----
 def fig4(wall):
     fig, ax = plt.subplots(figsize=(3.5, 1.7))
-    data = [wall[m] for m, _, _ in METHODS]
+    data = [wall[m] for m, _, _, _ in METHODS]
     pos = range(1, len(METHODS) + 1)
 
     bp = ax.boxplot(data, positions=list(pos), widths=0.55, patch_artist=True,
@@ -133,7 +196,7 @@ def fig4(wall):
                     capprops=dict(lw=0.7, color="0.35"),
                     flierprops=dict(marker=".", ms=2.0, mfc="0.55", mec="none",
                                     alpha=0.6))
-    for patch, (_, _, color) in zip(bp["boxes"], METHODS):
+    for patch, (_, _, color, _) in zip(bp["boxes"], METHODS):
         patch.set_facecolor(color)
         patch.set_alpha(0.45)
         patch.set_edgecolor(color)
@@ -146,7 +209,7 @@ def fig4(wall):
     ax.set_ylim(11, 900)
     ax.set_ylabel("wall-clock time (s)")
     ax.set_xticks(list(pos))
-    ax.set_xticklabels([f"{label}\n(n={len(wall[m])})" for m, label, _ in METHODS],
+    ax.set_xticklabels([f"{label}\n(n={len(wall[m])})" for m, label, _, _ in METHODS],
                        fontsize=6.5)
     ax.grid(axis="y", which="major", color="0.88", lw=0.5, zorder=0)
     ax.set_axisbelow(True)

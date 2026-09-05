@@ -368,12 +368,13 @@ makes the problem a joint one.
 \begin{figure}[t]
   \centering
   \includegraphics[width=\linewidth]{fig3_length_vs_constraint}
-  \caption{Median primary path length, normalized by the lone-agent reference
-    length $L_\mathrm{ref}$, as the terminal uncertainty bound tightens
-    (50 randomized scenarios). Line and marker opacity encode the fraction of
-    scenarios each planner solved at that level; a faint line is a planner
-    reporting short paths on the few easy instances it could still solve.
-    Dashed: the unconstrained reference (ratio 1).}
+  \caption{Fraction of the 50 randomized scenarios each planner solved as the
+    terminal uncertainty bound tightens. Color encodes what that success cost:
+    the median primary path length at each level, normalized by the lone-agent
+    reference length $L_\mathrm{ref}$. Every planner has its own two-color
+    ramp, from its base hue (paths at the reference length) to a dark shade of
+    the same hue (long detours); the strip below the axis is the shared scale,
+    and marker shape repeats the planner identity.}
   \label{fig:length_success}
 \end{figure}
 
