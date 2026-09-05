@@ -4,8 +4,8 @@
 Fig. 3  fig3_length_vs_constraint.{pdf,png}
         success rate vs. constraint level, one line per planner; the color of
         each segment/marker runs along that planner's own two-color ramp and
-        encodes the median path-length ratio at that level (base hue = short,
-        dark shade = long).
+        encodes the median path-length ratio at that level (palette hue = short,
+        a deeper, different hue = long).
 Fig. 4  fig4_wallclock.{pdf,png}
         box plot of wall-clock time per planner over all successful runs
         (log scale; CL-GBT's tail spans 12.5 -> 730 s).
@@ -38,19 +38,23 @@ METHODS = [
     ("greedy",       "Greedy",     "#e87ba4", "v"),
 ]
 
-# Fig. 3 encodes median length ratio as a two-color ramp per method: the
-# method's own palette color (short paths) -> a deep shade of the same OKLCh
-# hue (long paths), 0.28 lower in OKLCh lightness. Hue keeps identity, the
-# lightness run keeps the magnitude readable in grayscale and under CVD; marker
-# shape is the secondary encoding the 5-series palette needs either way.
+# Fig. 3 encodes median length ratio as a two-color ramp per method. Each ramp
+# starts at the method's fixed palette color (paths at the reference length) and
+# ends on a genuinely different hue, 0.26 lower in OKLCh lightness: blue ->
+# indigo, orange -> crimson, green -> deep teal, yellow -> olive, pink -> plum.
+# The end hues were rotated apart so the five dark ends stay separable instead
+# of collapsing together -- worst all-pairs deutan dE 6.6 at the ends and 6.0 at
+# mid-ramp, against 5.6 for a same-hue light->dark ramp and 6.1 for the flat
+# palette itself. That is still the 6-8 warn band, which no five-slot palette
+# escapes, so marker shape carries identity as the mandatory second channel.
 # Intermediate stops were stepped in OKLCh, so RGB interpolation between them
 # stays on the perceptual path.
 RAMPS = {
-    "hexspline_cl": ("#2a78d6", "#1f64b5", "#155096", "#0b3d77", "#032b5a"),
-    "formation":    ("#eb6834", "#cc5829", "#ae481d", "#913812", "#752907"),
-    "sequential":   ("#1baf7a", "#169768", "#127f57", "#0d6847", "#095237"),
-    "clgbt":        ("#eda100", "#d08e0f", "#b47a0b", "#99680d", "#7e560d"),
-    "greedy":       ("#e87ba4", "#d2638f", "#bc4c7a", "#a63366", "#901652"),
+    "hexspline_cl": ("#2a78d6", "#305fc3", "#3446af", "#342b9a", "#320983"),
+    "formation":    ("#eb6834", "#d4513b", "#bc3a3f", "#a32541", "#890c40"),
+    "sequential":   ("#1baf7a", "#0d977c", "#0a7f76", "#07696c", "#0a545e"),
+    "clgbt":        ("#eda100", "#c1980f", "#9a8d0c", "#738009", "#4b720f"),
+    "greedy":       ("#e87ba4", "#d0659f", "#b6509b", "#9b3c97", "#802892"),
 }
 CMAPS = {m: LinearSegmentedColormap.from_list(m, stops)
          for m, stops in RAMPS.items()}
