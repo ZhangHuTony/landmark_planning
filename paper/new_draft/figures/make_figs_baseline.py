@@ -3,8 +3,8 @@
 
 Fig. 3  fig3_length_vs_constraint.{pdf,png}
         success rate vs. constraint level, one line per planner. Planner
-        identity is marker shape + dash pattern; marker fill is one shared
-        viridis ramp encoding the median path-length ratio at that level.
+        identity is marker shape; the line itself carries one shared viridis
+        ramp encoding the median path-length ratio along it.
 Fig. 4  fig4_wallclock.{pdf,png}
         box plot of wall-clock time per planner over all successful runs
         (log scale; CL-GBT's tail spans 12.5 -> 730 s).
@@ -20,6 +20,7 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
+from matplotlib.collections import LineCollection
 from matplotlib.colors import PowerNorm
 from matplotlib.ticker import NullFormatter
 
@@ -29,18 +30,21 @@ SWEEP = os.path.normpath(os.path.join(HERE, "../../../constraint_sweep/baseline_
 # Fixed identity -> color assignment (dataviz reference palette, slots 1-5).
 # Keep this order/color per method in EVERY figure of the paper.
 METHODS = [
-    ("hexspline_cl", "Ours",       "#2a78d6", "o", (0, ())),
-    ("formation",    "Formation",  "#eb6834", "s", (0, (4.5, 1.5))),
-    ("sequential",   "Sequential", "#1baf7a", "^", (0, (0.8, 1.5))),
-    ("clgbt",        "CL-GBT",     "#eda100", "D", (0, (5, 1.5, 1, 1.5))),
-    ("greedy",       "Greedy",     "#e87ba4", "v", (0, (1.8, 1.5))),
+    ("hexspline_cl", "Ours",       "#2a78d6", "o"),
+    ("formation",    "Formation",  "#eb6834", "s"),
+    ("sequential",   "Sequential", "#1baf7a", "^"),
+    ("clgbt",        "CL-GBT",     "#eda100", "D"),
+    ("greedy",       "Greedy",     "#e87ba4", "v"),
 ]
 
 # Fig. 3 splits the two channels instead of overloading color with both. Length
-# ratio gets ONE shared ramp, so a marker's color means the same thing on every
-# line and the planners are directly comparable -- which per-planner ramps could
-# not do. Identity moves entirely to marker shape + dash pattern, and the line
-# itself goes neutral gray (Ours darker and solid, so it still leads).
+# ratio gets ONE shared ramp, painted along the line, so a color means the same
+# thing on every line and the planners are directly comparable -- which
+# per-planner ramps could not do. Identity is carried by marker shape alone: the
+# markers stay unfilled so they read as tags on the line rather than a second
+# color channel. (Dash patterns are not an option here -- a gradient line is a
+# LineCollection of sub-segments each shorter than a dash period, so a linestyle
+# on it renders solid.)
 #
 # This is what five per-planner ramps could never buy: 25 colors on a 5-hue
 # budget are not mutually distinguishable at any rotation (best worst-pair CVD
@@ -88,7 +92,7 @@ def read_summary():
 def read_wall():
     """method -> [wall_s of successful runs]"""
     out = {}
-    for m, _, _, _, _ in METHODS:
+    for m, _, _, _ in METHODS:
         with open(os.path.join(SWEEP, m, "trials.csv")) as f:
             out[m] = [float(r["wall_s"]) for r in csv.DictReader(f)
                       if r["success"] == "true"]
@@ -117,6 +121,22 @@ def length_bar(ax):
         s.set_color("0.55")
 
 
+def gradient_line(ax, xs, ys, vals, lw, zorder):
+    """Polyline whose color follows `vals` (one per vertex) along the ramp."""
+    n = 32  # sub-segments per data interval; enough that the ramp reads smooth
+    t = np.linspace(0, 1, n + 1)
+    x, y, v = (np.concatenate([np.interp(t, [0, 1], [a[i], a[i + 1]])[:-1]
+                               for i in range(len(a) - 1)] + [a[-1:]])
+               for a in (np.asarray(xs, float), np.asarray(ys, float),
+                         np.asarray(vals, float)))
+    pts = np.column_stack([x, y]).reshape(-1, 1, 2)
+    lc = LineCollection(np.concatenate([pts[:-1], pts[1:]], axis=1),
+                        cmap=LEN_CMAP, norm=LEN_NORM, lw=lw,
+                        capstyle="round", zorder=zorder)
+    lc.set_array(0.5 * (v[:-1] + v[1:]))
+    ax.add_collection(lc)
+
+
 def fig3(summary):
     fig = plt.figure(figsize=(3.5, 2.55))
     ax = fig.add_axes((0.108, 0.305, 0.878, 0.665))
@@ -124,20 +144,20 @@ def fig3(summary):
     pcts = sorted(next(iter(summary.values())).keys(), reverse=True)  # 100..30
 
     handles = []
-    for m, label, _, marker, dash in METHODS:
+    for m, label, _, marker in METHODS:
         rows = summary[m]
         ratio = [rows[p][0] for p in pcts]
         rate = [rows[p][1] for p in pcts]
         primary = m == "hexspline_cl"
-        lw, ink = (1.5, "0.30") if primary else (1.0, "0.55")
-        ax.plot(pcts, rate, color=ink, lw=lw, ls=dash, zorder=2,
-                solid_capstyle="round")
-        ax.scatter(pcts, rate, c=ratio, cmap=LEN_CMAP, norm=LEN_NORM,
-                   marker=marker, s=17 if primary else 15, linewidths=0.4,
-                   edgecolors="0.25", zorder=4)
-        handles.append(plt.Line2D([], [], color=ink, lw=lw, ls=dash,
-                                  marker=marker, ms=3.2, mfc="0.85",
-                                  mec="0.25", mew=0.4, label=label))
+        lw = 2.2 if primary else 1.4
+        gradient_line(ax, pcts, rate, ratio, lw, zorder=2)
+        ax.plot(pcts, rate, ls="none", marker=marker, ms=3.4 if primary else 3.0,
+                mfc="white", mec="0.20", mew=0.55, zorder=4)
+        # marker only: shape is the whole identity channel, so a line swatch
+        # here would just imply a line color the plot does not have
+        handles.append(plt.Line2D([], [], ls="none", marker=marker,
+                                  ms=3.4 if primary else 3.0, mfc="white",
+                                  mec="0.20", mew=0.55, label=label))
 
     ax.invert_xaxis()  # constraint tightens to the right
     ax.set_xticks(pcts)
@@ -151,7 +171,8 @@ def fig3(summary):
     ax.set_axisbelow(True)
     despine(ax)
     ax.legend(handles=handles, loc="upper right", frameon=False, fontsize=6.5,
-              handlelength=2.2, borderaxespad=0.1, labelspacing=0.28)
+              handlelength=1.0, handletextpad=0.4, borderaxespad=0.1,
+              labelspacing=0.32)
 
     length_bar(cax)
     fig.savefig(os.path.join(HERE, "fig3_length_vs_constraint.pdf"))
@@ -162,7 +183,7 @@ def fig3(summary):
 # ---------------------------------------------------------------- Fig. 4 ----
 def fig4(wall):
     fig, ax = plt.subplots(figsize=(3.5, 1.7))
-    data = [wall[m] for m, _, _, _, _ in METHODS]
+    data = [wall[m] for m, _, _, _ in METHODS]
     pos = range(1, len(METHODS) + 1)
 
     bp = ax.boxplot(data, positions=list(pos), widths=0.55, patch_artist=True,
@@ -171,7 +192,7 @@ def fig4(wall):
                     capprops=dict(lw=0.7, color="0.35"),
                     flierprops=dict(marker=".", ms=2.0, mfc="0.55", mec="none",
                                     alpha=0.6))
-    for patch, (_, _, color, _, _) in zip(bp["boxes"], METHODS):
+    for patch, (_, _, color, _) in zip(bp["boxes"], METHODS):
         patch.set_facecolor(color)
         patch.set_alpha(0.45)
         patch.set_edgecolor(color)
@@ -184,7 +205,7 @@ def fig4(wall):
     ax.set_ylim(11, 900)
     ax.set_ylabel("wall-clock time (s)")
     ax.set_xticks(list(pos))
-    ax.set_xticklabels([f"{label}\n(n={len(wall[m])})" for m, label, _, _, _ in METHODS],
+    ax.set_xticklabels([f"{label}\n(n={len(wall[m])})" for m, label, _, _ in METHODS],
                        fontsize=6.5)
     ax.grid(axis="y", which="major", color="0.88", lw=0.5, zorder=0)
     ax.set_axisbelow(True)
