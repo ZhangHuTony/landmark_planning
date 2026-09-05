@@ -4,8 +4,8 @@
 Fig. 3  fig3_length_vs_constraint.{pdf,png}
         success rate vs. constraint level, one line per planner; the color of
         each segment/marker runs along that planner's own two-color ramp and
-        encodes the median path-length ratio at that level (palette hue = short,
-        a deeper, different hue = long).
+        encodes the median path-length ratio at that level (palette hue =
+        short, a hue ~156 deg away and darker = long).
 Fig. 4  fig4_wallclock.{pdf,png}
         box plot of wall-clock time per planner over all successful runs
         (log scale; CL-GBT's tail spans 12.5 -> 730 s).
@@ -39,22 +39,34 @@ METHODS = [
 ]
 
 # Fig. 3 encodes median length ratio as a two-color ramp per method. Each ramp
-# starts at the method's fixed palette color (paths at the reference length) and
-# ends on a genuinely different hue, 0.26 lower in OKLCh lightness: blue ->
-# indigo, orange -> crimson, green -> deep teal, yellow -> olive, pink -> plum.
-# The end hues were rotated apart so the five dark ends stay separable instead
-# of collapsing together -- worst all-pairs deutan dE 6.6 at the ends and 6.0 at
-# mid-ramp, against 5.6 for a same-hue light->dark ramp and 6.1 for the flat
-# palette itself. That is still the 6-8 warn band, which no five-slot palette
-# escapes, so marker shape carries identity as the mandatory second channel.
-# Intermediate stops were stepped in OKLCh, so RGB interpolation between them
-# stays on the perceptual path.
+# starts on the method's fixed palette color (paths at the reference length) and
+# travels ~156 deg around the OKLCh hue circle while dropping 0.27 in lightness,
+# so the two ends are unmistakably different colors: blue -> plum-brown, orange
+# -> violet, green -> deep crimson, yellow -> blue, pink -> teal.
+#
+# The rotations were searched, not picked. What has to hold is that two methods
+# at *similar* length ratios stay apart, and this set is the best found on that
+# measure: worst same-level CVD dE 6.1, against 5.8 for a 41 deg rotation and
+# 6.1 for the flat palette -- i.e. nearly 4x the hue travel costs nothing.
+# Comparing every color to every color of every other method (a method at t=0
+# does share the plot with another at t=1) no scheme survives: 1.4 here, 2.0 at
+# 41 deg, and 3.1 is the best any rotation achieves. That bar is unsatisfiable
+# for 25 colors on a 5-hue budget, so identity rests on marker shape and on each
+# line being a continuous path -- not on color alone.
+#
+# Stops were stepped in OKLCh, so RGB interpolation between them stays on the
+# perceptual path; 7 of them because the arcs are long.
 RAMPS = {
-    "hexspline_cl": ("#2a78d6", "#305fc3", "#3446af", "#342b9a", "#320983"),
-    "formation":    ("#eb6834", "#d4513b", "#bc3a3f", "#a32541", "#890c40"),
-    "sequential":   ("#1baf7a", "#0d977c", "#0a7f76", "#07696c", "#0a545e"),
-    "clgbt":        ("#eda100", "#c1980f", "#9a8d0c", "#738009", "#4b720f"),
-    "greedy":       ("#e87ba4", "#d0659f", "#b6509b", "#9b3c97", "#802892"),
+    "hexspline_cl": ("#2a78d6", "#645cbc", "#784693", "#7a3665",
+                     "#702c3b", "#5d2919", "#452703"),
+    "formation":    ("#eb6834", "#e14d56", "#ce3774", "#b32990",
+                     "#9220a7", "#6c19b7", "#4014bc"),
+    "sequential":   ("#1baf7a", "#5b9a3e", "#7c810e", "#87680b",
+                     "#8b5008", "#922b06", "#850c31"),
+    "clgbt":        ("#eda100", "#b5a816", "#74a940", "#14a26c",
+                     "#118e87", "#0e7b92", "#1066a0"),
+    "greedy":       ("#e87ba4", "#c177bd", "#9476c4", "#6576ba",
+                     "#3673a1", "#0b6c7f", "#0d615b"),
 }
 CMAPS = {m: LinearSegmentedColormap.from_list(m, stops)
          for m, stops in RAMPS.items()}
