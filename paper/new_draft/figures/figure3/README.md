@@ -2,7 +2,7 @@
 
 Every version of `fig3_length_vs_constraint` we rendered, in order. Numbered
 files are the ones that shipped (commit given); `x*` are explorations that never
-did. `06_` is what is currently in the paper.
+did. `07_` is what is currently in the paper.
 
 All are 300 dpi previews of a 3.5 in column figure — judge them at that size,
 not zoomed.
@@ -17,13 +17,14 @@ not zoomed.
 | `03_ramp-cross-hue-156deg.png` | `ae1249b6` | Rotations widened to ~156°, searched rather than chosen. |
 | `04_shared-viridis_on-markers_dashed-lines.png` | `1a8991b3` | Per-planner ramps abandoned. **One** shared ramp on the marker fills; identity by marker shape + dash; lines neutral gray. |
 | `05_shared-viridis_on-lines.png` | `39b17928` | Ramp moved from the markers to the **lines** (a 3 pt glyph is mostly outline). Dashes lost — see note below. |
-| `06_plasma-r_on-lines_neutral-glyphs.png` | current | Plasma reversed and trimmed, so **dark = long detour**. Larger glyphs, single neutral fill `#dfddd6`. |
+| `06_plasma-r_on-lines_neutral-glyphs.png` | `79a02245` | Plasma reversed and trimmed, so **dark = long detour**. Larger glyphs, single neutral fill `#dfddd6`. |
+| `07_viridis-trim_green-short.png` | current | Back to viridis, reversed and cut at 0.74 so it never reaches yellow: **green = at the reference length**, through teal and blue, to dark violet for the worst detours. |
 
 ## Alternates worth keeping
 
 | file | why it is here |
 |---|---|
-| `06b_plasma-r_palette-glyphs.png` | Same as `06_` but glyphs take each planner's palette color (white halo to separate them from the line). Restores identity consistency with Figs. 4–6 — at the cost of CL-GBT's yellow and Formation's orange landing *inside* the plasma ramp, where they read as values rather than labels. |
+| `06b_plasma-r_palette-glyphs.png` (plasma-era) | Same as `06_` but glyphs take each planner's palette color (white halo to separate them from the line). Restores identity consistency with Figs. 4–6 — at the cost of CL-GBT's yellow and Formation's orange landing *inside* the plasma ramp, where they read as values rather than labels. |
 | `x1_plasma-r_untrimmed.png` | Full plasma. Shows why it is trimmed: the short-path end is a near-white yellow that a 1.4 pt line cannot carry on white paper. |
 | `x2_plasma-r_charcoal-glyphs.png` | Dark glyph fill instead of light. Disappears into the violet end of the ramp. |
 | `x7_shared-viridis_gradient-lines_colored-glyphs.png` | Ramp on both lines *and* marker fills. Redundant, and crossings are hard to trace. |
@@ -52,6 +53,23 @@ over the full rotation space with the dataviz validator. That ceiling is what
 drove the move to a single shared ramp, which has no cross-planner pairs to
 separate at all.
 
-Regenerate the current figure with:
+## Output formats
+
+`make_figs_baseline.py` writes each figure three ways: **PDF** is what LaTeX
+includes, **SVG** is the Illustrator-editable copy, **PNG** is a preview.
+
+Two things about the SVG, both deliberate:
+
+- Text is text, not outlines (`svg.fonttype: none`), so labels stay editable.
+  Illustrator substitutes only if Nimbus Roman is missing there; the
+  font-family falls back through Times New Roman and Liberation Serif.
+- The colorbar is a `pcolormesh`, not an `imshow`. `imshow` embeds the bar as a
+  raster block, which arrives in Illustrator resolution-locked and uneditable.
+
+The one rough edge: Fig. 3's gradient lines arrive as a run of short stroked
+segments (32 per data interval), not one path each. That is what a per-vertex
+color ramp has to be. Group a line's segments before moving it.
+
+Regenerate everything with:
 
     ~/Research/multiagent_base/.venv/bin/python ../make_figs_baseline.py
