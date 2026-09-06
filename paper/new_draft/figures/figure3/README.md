@@ -2,7 +2,7 @@
 
 Every version of `fig3_length_vs_constraint` we rendered, in order. Numbered
 files are the ones that shipped (commit given); `x*` are explorations that never
-did. `09_` is what is currently in the paper.
+did. `10_` is what is currently in the paper.
 
 All are 300 dpi previews of a 3.5 in column figure — judge them at that size,
 not zoomed.
@@ -20,7 +20,8 @@ not zoomed.
 | `06_plasma-r_on-lines_neutral-glyphs.png` | `79a02245` | Plasma reversed and trimmed, so **dark = long detour**. Larger glyphs, single neutral fill `#dfddd6`. |
 | `07_viridis-trim_green-short.png` | `9d3a5301` | Back to viridis, reversed and cut at 0.74 so it never reaches yellow: **green = at the reference length**, through teal and blue, to dark violet for the worst detours. |
 | `08_coral-diamond-primary.png` | `f1b76fef` | Ours takes the diamond (CL-GBT the circle it vacated), a coral `#e8503a` fill instead of the shared neutral, and its glyphs draw on top of everyone's. |
-| `09_axes-swapped_constraint-on-color.png` | current | **Both outcomes onto the axes.** Success rate on x, length ratio on y *inverted*, and the sweep variable — constraint level — into the ramp. The figure now reads as a cost/reliability trade with a best corner (top right), which the previous versions had no way to show. |
+| `09_axes-swapped_constraint-on-color.png` | `f7d6d8c4` | **Both outcomes onto the axes.** Success rate on x, length ratio on y *inverted*, and the sweep variable — constraint level — into the ramp. The figure now reads as a cost/reliability trade with a best corner (top right), which the previous versions had no way to show. |
+| `10_discrete-glyphs_texture-lines.png` | current | **Scale moves off the line and into the marker fills, in eight discrete swatches** — one per sweep level, so a fill can be matched back to the key by eye. That frees the line for identity, and plain lines can be dashed where a gradient line could not: shape + dash carry the planner, no second color channel. Ours keeps the coral, now on its line and marker *ring*. |
 
 ## Alternates worth keeping
 
@@ -42,6 +43,21 @@ not zoomed.
 | `x6_rejected_shared-viridis-no-identity.png` | One shared ramp, identity by marker only, no dashes and no line-weight hierarchy. The whole left half is dark purple, because every planner sits at 1.1–1.5 there. |
 | `x8_rejected_two-color-channels-per-glyph.png` | Palette-colored line + palette-colored marker ring + ramp marker fill. Two color channels on a ~3 pt glyph; illegible at column width. |
 
+## Line treatments tried for `10_`
+
+With the scale in the glyphs, the line was free. Four treatments, same figure
+otherwise:
+
+| file | verdict |
+|---|---|
+| `x13_discrete-glyphs_lines-one-color.png` | All lines one gray. Cleanest possible color story — color means level, full stop — but in the top-right pileup, where four planners converge, there is nothing to trace a line by except following a glyph shape. |
+| `x14_discrete-glyphs_lines-palette.png` | Lines in the paper palette. Strongest identity and consistent with Figs. 4–6, but the palette's blue (Ours) and green (Sequential) fall *inside* the viridis gamut, so two of five identity colors sit where the reader is being asked to read levels. |
+| `x15_discrete-glyphs_texture-no-accent.png` | Per-planner dash, everything gray. Identity without spending any color. Ours is only "the solid, slightly heavier one". |
+| `x16_discrete-glyphs_one-color-plus-accent.png` | `x13_` plus the coral accent on Ours. Ours is findable; the other four still are not separable in the pileup. |
+
+`10_` is `x15_` plus the coral accent: dash carries the four baselines, coral
+carries Ours, and the fill channel stays entirely the level scale's.
+
 ## Colormaps tried for the constraint level (`09_`)
 
 The ramp changed meaning in `09_` — it is the sweep variable now, not the cost —
@@ -59,8 +75,9 @@ green = loose, dark violet = tight) still wins.
 **A gradient line cannot be dashed.** It is a `LineCollection` of 32 sub-segments
 per interval, each shorter than a dash period, so `set_linestyle` renders solid.
 Dash patterns and a gradient line are mutually exclusive; every variant picks one.
-That is why `04_` has dashes and `05_`/`06_` do not (Ours is held apart by line
-weight instead, 2.2 pt vs 1.4).
+That is why `04_` has dashes and `05_`–`09_` do not (Ours is held apart by line
+weight instead, 2.2 pt vs 1.4). It stopped binding at `10_`, which paints the
+scale into the marker fills and leaves the lines plain — plain lines dash fine.
 
 **Per-planner ramps have a hard ceiling.** 25 colors on a 5-hue budget are not
 mutually distinguishable at any rotation — best worst-pair CVD ΔE 3.1, measured

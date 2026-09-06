@@ -5,9 +5,9 @@ Fig. 3  fig3_length_vs_constraint.{pdf,svg,eps,png}
         cost against reliability: median path-length ratio (y, inverted, so
         shorter is higher) against success rate (x). Each planner is one
         trajectory swept out as the constraint tightens; planner identity is
-        marker shape, and the line carries one shared viridis ramp encoding
-        which constraint level each point came from (green = loose, dark
-        violet = tight). Top right is best.
+        marker shape and dash pattern, and the marker fills step through one
+        shared 8-swatch viridis scale saying which constraint level each point
+        came from (green = loose, dark violet = tight). Top right is best.
 Fig. 4  fig4_wallclock.{pdf,svg,eps,png}
         box plot of wall-clock time per planner over all successful runs
         (log scale; CL-GBT's tail spans 12.5 -> 730 s).
@@ -26,8 +26,7 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
-from matplotlib.collections import LineCollection
-from matplotlib.colors import LinearSegmentedColormap, Normalize
+from matplotlib.colors import BoundaryNorm, ListedColormap
 from matplotlib.ticker import NullFormatter
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -47,46 +46,61 @@ METHODS = [
 # ratio -- and hands the sweep variable, the constraint level, to color. So the
 # figure reads as a cost/reliability trade: y is inverted, so up is a shorter
 # path and right is a higher success rate, and the best corner is top right.
-# Each planner is a trajectory through that plane, and the ramp says where along
-# the sweep you are, which position alone cannot (Greedy jumps from 90% to 26%
-# success between two adjacent levels).
+# Each planner is a trajectory through that plane, and the color says where
+# along the sweep you are, which position alone cannot (Greedy jumps from 90% to
+# 26% success between two adjacent levels).
 #
-# Identity is carried by marker shape alone; the markers take a neutral fill so
-# they read as tags on the line rather than a second color channel. (Dash
-# patterns are not an option here -- a gradient line is a LineCollection of
-# sub-segments each shorter than a dash period, so a linestyle on it renders
-# solid.)
+# The scale lives in the marker FILLS, not the line. The sweep has exactly eight
+# levels, so it gets exactly eight swatches: a discrete step is easier to match
+# back to the key than a point on a continuous ramp, and a filled 5 pt glyph
+# carries a flat color far better than a 1.4 pt line does. That also frees the
+# line to carry identity, which a gradient line could not do -- it is a
+# LineCollection of sub-segments each shorter than a dash period, so a linestyle
+# on it renders solid. Plain lines dash fine.
+#
+# Identity is therefore shape + dash, and no second color channel: the paper
+# palette's blue (Ours) and green (Sequential) fall inside the viridis gamut, so
+# coloring the lines by planner would put two identity colors where the reader
+# is being asked to read levels. Lines colored per planner and lines all one
+# gray were both rendered; see figures/figure3/.
 #
 # The color column above is still the paper-wide identity color and is what
 # Fig. 4 (and Figs. 5-6) paint with; Fig. 3 no longer uses it.
-# viridis, cut off below its yellow end. Cut at 0.74 (#58c765) so the ramp tops
-# out at a clear green rather than running on into yellow-green and yellow,
-# which no thin line carries on white paper. DARK = the tight constraint: the
-# loose levels are green, and the ramp runs through teal and blue to viridis's
-# own dark violet at 30%. Perceptually uniform and CVD-safe across the whole
-# span. Tried and rejected against this data: cividis (its midtones are the same
-# gray as the marker fill), magma and inferno (their warm end collides with the
-# coral primary glyph below), and single-hue Blues (its light end is too faint
-# for a 1.4 pt line).
-LVL_CMAP = LinearSegmentedColormap.from_list(
-    "viridis_trim", plt.get_cmap("viridis")(np.linspace(0.0, 0.74, 256)))
+# viridis sampled at the eight sweep levels, cut off below its yellow end. Cut
+# at 0.74 (#58c765) so the scale tops out at a clear green rather than running
+# on into yellow-green and yellow, which no small glyph carries on white paper.
+# DARK = the tight constraint: 100% is green and the scale runs through teal and
+# blue to viridis's own dark violet at 30%. Perceptually uniform and CVD-safe
+# across the whole span. Tried and rejected against this data: cividis (its
+# midtones are the same gray as the plot's neutrals), magma and inferno (their
+# warm end collides with the coral accent below), and single-hue Blues (its
+# light end is too faint).
+LVL_PCTS = [100, 90, 80, 70, 60, 50, 40, 30]
+LVL_CMAP = ListedColormap(
+    plt.get_cmap("viridis")(np.linspace(0.74, 0.0, len(LVL_PCTS))))
+# bin edges at 25, 35, ... 105, so each level falls in the middle of its swatch
+LVL_BOUNDS = np.arange(min(LVL_PCTS) - 5, max(LVL_PCTS) + 6, 10)
+LVL_NORM = BoundaryNorm(LVL_BOUNDS, LVL_CMAP.N)
 
-# Glyphs are identity only, so they take one neutral fill and stay out of the
-# ramp's way. Painting them the per-planner palette colors was tried and reads
-# worse: the palette's green and blue land inside the ramp and are read as
-# values, not labels. A light warm neutral is the one fill that stays legible
-# against every step from green to dark violet.
-MARKER_FACE = "#dfddd6"
+# Identity, all of it non-color. Ours is solid and heavier; the rest are held
+# apart by dash period alone.
+LINE_GRAY = "0.55"
+DASHES = {
+    "hexspline_cl": (None, None),
+    "formation":    (4.2, 1.6),
+    "sequential":   (1.2, 1.3),
+    "clgbt":        (5.0, 1.5, 1.2, 1.5),
+    "greedy":       (2.2, 1.4, 1.2, 1.4, 1.2, 1.4),
+}
 
-# Ours gets its own fill so it is findable at a glance. Coral is the only
-# candidate that clears both gates: worst CVD dE 8.2 against the ramp (gold
-# managed 4.8 -- it collides with the green end under deuteranopia) and 3.7:1
-# against white, the only one of the candidates that stands on its own. It is
-# warm, so it cannot be mistaken for a step of a green-to-violet ramp.
-PRIMARY_FACE = "#e8503a"
-
-LVL_MIN, LVL_MAX = 30, 100
-LVL_NORM = Normalize(vmin=LVL_MIN, vmax=LVL_MAX)
+# Ours gets one accent so it is findable at a glance -- on its line and its
+# marker RING, never the fill, which belongs to the level scale. Coral is the
+# only candidate that clears both gates: worst CVD dE 8.2 against the scale
+# (gold managed 4.8 -- it collides with the green end under deuteranopia) and
+# 3.7:1 against white. It is warm, so it cannot be mistaken for a swatch of a
+# green-to-violet scale.
+ACCENT = "#e8503a"
+LEGEND_FACE = "0.92"  # the key shows shapes; fills are the colorbar's job
 
 plt.rcParams.update({
     "font.family": "serif",
@@ -128,12 +142,7 @@ def over_white(color, alpha):
 
 
 def save(fig, stem):
-    """PDF for LaTeX, SVG and EPS for Illustrator, PNG to eyeball.
-
-    Note for whoever opens the SVG: Fig. 3's gradient lines arrive as a run of
-    short stroked segments, not one path -- that is how a per-vertex color ramp
-    has to be expressed. Group them before moving a line around.
-    """
+    """PDF for LaTeX, SVG and EPS for Illustrator, PNG to eyeball."""
     for ext, kw in (("pdf", {}), ("svg", {}), ("eps", {}),
                     ("png", {"dpi": 300})):
         fig.savefig(os.path.join(HERE, f"{stem}.{ext}"), **kw)
@@ -167,20 +176,19 @@ def despine(ax):
 
 
 # ---------------------------------------------------------------- Fig. 3 ----
-def level_bar(ax, pcts):
-    """The shared constraint-level scale, running loose (left) to tight."""
+def level_bar(ax):
+    """The shared constraint-level key: one swatch per sweep level."""
     # pcolormesh, not imshow: imshow embeds the bar as a raster block, which
     # arrives in Illustrator as a non-editable, resolution-locked image.
-    edges = np.linspace(LVL_MIN, LVL_MAX, 257)
-    mesh = ax.pcolormesh(edges, [0, 1], (0.5 * (edges[:-1] + edges[1:]))[None],
-                         cmap=LVL_CMAP, norm=LVL_NORM, shading="flat")
-    mesh.set_edgecolor("face")  # else hairline seams between quads in vector out
+    ax.pcolormesh(LVL_BOUNDS, [0, 1], np.array(LVL_PCTS, float)[None],
+                  cmap=LVL_CMAP, norm=LVL_NORM, shading="flat",
+                  edgecolors="w", linewidth=0.6)  # white gutters = eight blocks
     ax.set_ylim(0, 1)
     ax.set_yticks([])
-    ax.set_xlim(LVL_MAX, LVL_MIN)  # constraint tightens to the right
-    ax.set_xticks(pcts)
-    ax.set_xticklabels([str(p) for p in pcts], fontsize=6.5)
-    ax.tick_params(axis="x", length=2.0, width=0.6, pad=1.5, colors="0.25")
+    ax.set_xlim(LVL_BOUNDS[-1], LVL_BOUNDS[0])  # constraint tightens to the right
+    ax.set_xticks(LVL_PCTS)
+    ax.set_xticklabels([str(p) for p in LVL_PCTS], fontsize=6.5)
+    ax.tick_params(axis="x", length=0, pad=2.0, colors="0.25")
     ax.set_xlabel(r"constraint level (% of $U_\mathrm{ref}$)", fontsize=7,
                   labelpad=1.5)
     for s in ax.spines.values():
@@ -188,47 +196,36 @@ def level_bar(ax, pcts):
         s.set_color("0.55")
 
 
-def gradient_line(ax, xs, ys, vals, lw, zorder):
-    """Polyline whose color follows `vals` (one per vertex) along the ramp."""
-    n = 32  # sub-segments per data interval; enough that the ramp reads smooth
-    t = np.linspace(0, 1, n + 1)
-    x, y, v = (np.concatenate([np.interp(t, [0, 1], [a[i], a[i + 1]])[:-1]
-                               for i in range(len(a) - 1)] + [a[-1:]])
-               for a in (np.asarray(xs, float), np.asarray(ys, float),
-                         np.asarray(vals, float)))
-    pts = np.column_stack([x, y]).reshape(-1, 1, 2)
-    lc = LineCollection(np.concatenate([pts[:-1], pts[1:]], axis=1),
-                        cmap=LVL_CMAP, norm=LVL_NORM, lw=lw,
-                        capstyle="round", zorder=zorder)
-    lc.set_array(0.5 * (v[:-1] + v[1:]))
-    ax.add_collection(lc)
-
-
 def fig3(summary):
     fig = plt.figure(figsize=(3.5, 2.75))
     ax = fig.add_axes((0.128, 0.285, 0.858, 0.685))
     cax = fig.add_axes((0.305, 0.108, 0.600, 0.048))
-    pcts = sorted(next(iter(summary.values())).keys(), reverse=True)  # 100..30
+
+    assert sorted(next(iter(summary.values())), reverse=True) == LVL_PCTS, \
+        "sweep levels changed -- LVL_PCTS and the eight swatches must follow"
 
     handles = []
     for m, label, _, marker in METHODS:
         rows = summary[m]
-        ratio = [rows[p][0] for p in pcts]
-        rate = [100 * rows[p][1] for p in pcts]
+        ratio = [rows[p][0] for p in LVL_PCTS]
+        rate = [100 * rows[p][1] for p in LVL_PCTS]
         primary = m == "hexspline_cl"
-        lw = 2.2 if primary else 1.4
-        gradient_line(ax, rate, ratio, pcts, lw, zorder=2)
-        # the primary's line stays *under* the others (they converge on the
-        # top-right corner with it), but its glyphs sit on top of theirs
-        ax.plot(rate, ratio, ls="none", marker=marker, ms=4.4 if primary else 3.8,
-                mfc=PRIMARY_FACE if primary else MARKER_FACE, mec="0.15",
-                mew=0.6, zorder=6 if primary else 4)
-        # marker only: shape is the whole identity channel, so a line swatch
-        # here would just imply a line color the plot does not have
-        handles.append(plt.Line2D([], [], ls="none", marker=marker,
-                                  ms=4.4 if primary else 3.8, mew=0.6,
-                                  mfc=PRIMARY_FACE if primary else MARKER_FACE,
-                                  mec="0.15", label=label))
+        lw = 1.6 if primary else 1.0
+        color = ACCENT if primary else LINE_GRAY
+        ax.plot(rate, ratio, color=color, lw=lw, dashes=DASHES[m], zorder=2,
+                solid_capstyle="round", dash_capstyle="round")
+        # fills are the level scale; the ring is where Ours' accent goes, so the
+        # scale keeps the whole of the fill channel to itself
+        ax.scatter(rate, ratio, c=LVL_PCTS, cmap=LVL_CMAP, norm=LVL_NORM,
+                   marker=marker, s=36 if primary else 25,
+                   edgecolors=color if primary else "0.15",
+                   linewidths=0.9 if primary else 0.6,
+                   zorder=6 if primary else 4)
+        handles.append(plt.Line2D([], [], color=color, lw=lw, dashes=DASHES[m],
+                                  marker=marker, ms=5.4 if primary else 4.6,
+                                  mfc=LEGEND_FACE,
+                                  mec=color if primary else "0.15",
+                                  mew=0.9 if primary else 0.6, label=label))
 
     ax.set_xlim(-4, 107)
     ax.set_xticks([0, 25, 50, 75, 100])
@@ -243,10 +240,10 @@ def fig3(summary):
     # lower right is the one empty quadrant -- nothing is both slow-to-succeed
     # and long
     ax.legend(handles=handles, loc="lower right", frameon=False, fontsize=6.5,
-              handlelength=1.0, handletextpad=0.4, borderaxespad=0.2,
+              handlelength=1.9, handletextpad=0.5, borderaxespad=0.2,
               labelspacing=0.32)
 
-    level_bar(cax, pcts)
+    level_bar(cax)
     save(fig, "fig3_length_vs_constraint")
     plt.close(fig)
 
