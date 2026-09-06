@@ -367,18 +367,15 @@ makes the problem a joint one.
 
 \begin{figure}[t]
   \centering
-  \includegraphics[width=\linewidth]{fig3_success_on_y}
-  \caption{What each planner pays for reliability, over the 50 randomized
-    scenarios. Vertically, the fraction solved; horizontally, the median
-    primary path length, normalized by the lone-agent reference length
-    $L_\mathrm{ref}$ --- so \emph{up and to the left is better}: solves the
-    most, walks the least. Ours is the solid black trajectory; the baselines
-    are dotted and told apart by marker shape. Each line is swept out as the
-    terminal uncertainty bound tightens, and the marker fills step through the
-    shared key below, dark at a loose bound to pale at a tight one. Ours holds
-    the top-left corner: it is still solving 80\% of the
-    scenarios at half the reference bound, and pays under $1.31 L_\mathrm{ref}$
-    to do it.}
+  \includegraphics[width=\linewidth]{fig3_length_vs_constraint}
+  \caption{Fraction of the 50 randomized scenarios each planner solved as the
+    terminal uncertainty bound tightens. Marker shape identifies the planner,
+    keyed along the bottom; the color along each line encodes what that success
+    cost --- the median primary path length at that level, normalized by the
+    lone-agent reference length $L_\mathrm{ref}$, on the shared scale at the
+    right. One ramp serves every planner, so the same color means the same
+    detour on every line. Ours (gold) is still solving 80\% of the scenarios at
+    half the reference bound, and pays under $1.31 L_\mathrm{ref}$ to do it.}
   \label{fig:length_success}
 \end{figure}
 

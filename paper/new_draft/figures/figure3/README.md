@@ -2,7 +2,7 @@
 
 Every version of `fig3_length_vs_constraint` we rendered, in order. Numbered
 files are the ones that shipped (commit given); `x*` are explorations that never
-did. `12_` is what is currently in the paper.
+did. `13_` is what is currently in the paper.
 
 All are 300 dpi previews of a 3.5 in column figure — judge them at that size,
 not zoomed.
@@ -23,7 +23,8 @@ not zoomed.
 | `09_axes-swapped_constraint-on-color.png` | `f7d6d8c4` | **Both outcomes onto the axes.** Success rate on x, length ratio on y *inverted*, and the sweep variable — constraint level — into the ramp. The figure now reads as a cost/reliability trade with a best corner (top right), which the previous versions had no way to show. |
 | `10_discrete-glyphs_texture-lines.png` | `1e027ba2` | **Scale moves off the line and into the marker fills, in eight discrete swatches** — one per sweep level, so a fill can be matched back to the key by eye. That frees the line for identity, and plain lines can be dashed where a gradient line could not: shape + dash carry the planner, no second color channel. Ours keeps the coral, now on its line and marker *ring*. |
 | `11_transposed_accent-on-line.png` | `39bcf195` | **Axes transposed** — success rate on y, length ratio on x, so the best corner is top left. Length takes x because that is where the data needs the room. The coral accent comes off the marker rings and goes on Ours' line alone, so every glyph keeps the same dark ring and nothing competes with the fills. Line gray darkened 0.55 → 0.35. |
-| `12_ylgnbu_dotted-baselines_success-on-y.png` | current | Scale switched to **YlGnBu**, dark = the higher constraint number. All four baselines collapse to one **dotted gray**, so they read as a single background population and identity falls entirely to marker shape; Ours becomes **solid black**. Also fixes the reversed key, below. `12b_` is the same figure with the axes swapped — both are generated. |
+| `12_ylgnbu_dotted-baselines_success-on-y.png` | `ea1fd30d` | Scale switched to **YlGnBu**, dark = the higher constraint number. All four baselines collapse to one **dotted gray**, so they read as a single background population and identity falls entirely to marker shape; Ours becomes **solid black**. Also fixes the reversed key, below. `12b_` is the same figure with the axes swapped — both are generated. |
+| `13_gold-diamond_side-key_row-legend.png` | current | **Back to the `08_` layout** — constraint level on x, success rate on y, median length ratio painted along the line. Ours' fill goes coral → gold `#c68a00`, the ramp is trimmed a little greener (0.74 → 0.80), the length key stands vertically at the right, and the planner key is one horizontal row under the plot. `12_`/`12b_` stay generated as spares. |
 
 ## Alternates worth keeping
 
@@ -115,6 +116,33 @@ green = loose, dark violet = tight) still wins.
 | `x9_axes-swapped_cividis.png` | CVD-optimal by construction, and it still fails here: its midtones are the same gray as the `#dfddd6` marker fill, so the middle levels read as "not highlighted" rather than as a value. Its yellow end is also too pale for a 1.4 pt line. |
 | `x10_axes-swapped_magma.png` | The warm end collides with the coral `#e8503a` primary glyph — the one fill chosen specifically to sit *outside* the ramp. Inferno fails the same way. |
 | `x11_axes-swapped_blues.png` | Single hue, so lightness carries the whole scale; the loose end goes so faint that Greedy's and Sequential's 100% segments nearly vanish. |
+
+## Gold fights a greener ramp — pick the deep one
+
+`13_` asked for two things that pull against each other: Ours in gold, and the
+ramp shifted toward green. The greener the ramp's short end, the closer it comes
+to gold, and the brighter golds lose outright (worst-case CVD ΔE to the ramp,
+over normal/protan/deutan, at trim 0.80):
+
+| gold | ΔE to ramp | contrast vs. white |
+|---|---|---|
+| `#ffc300` | 1.6 | 1.61 |
+| `#e8a33d` | 2.1 | 2.16 |
+| `#f2b705` | 3.4 | 1.82 |
+| `#daa520` goldenrod | 3.8 | 2.24 |
+| `#d99b00` | 5.3 | 2.43 |
+| `#cf9200` | 6.7 | 2.24 |
+| **`#c68a00` — shipped** | **7.9** | **2.98** |
+| `#b8860b` darkgoldenrod | 8.8 | 3.25 |
+| `#e8503a` coral, for reference | 7.9 | 3.72 |
+
+`#c68a00` matches the coral it replaced exactly on separation (7.9) and is still
+unambiguously gold rather than brown. The scores plateau for the deep golds,
+because their nearest neighbour on the ramp is no longer the green end — which
+is why the ramp could be pushed greener without costing anything here.
+
+Trim `0.80` puts `#7ad151` at the short-path end, against `#58c765` at `0.74`:
+a visible step toward green, still short of yellow.
 
 ## The key was reversed for three commits — check it if you touch it
 

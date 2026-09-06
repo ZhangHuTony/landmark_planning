@@ -1,15 +1,17 @@
 #!/usr/bin/env python3
 """Fig. 3 and Fig. 4 of the paper, from constraint_sweep/baseline_2026-08-17.
 
-Fig. 3  fig3_success_on_y.{pdf,svg,eps,png}   <- the one in the paper
-        fig3_success_on_x.{pdf,svg,eps,png}   <- same data, axes swapped
-        cost against reliability: success rate against median path-length
-        ratio. Each planner is one trajectory swept out as the constraint
-        tightens; planner identity is marker shape, and the marker fills step
-        through one shared 8-swatch YlGnBu scale saying which constraint level
-        each point came from (dark = a loose bound, pale = a tight one).
-        Both orientations are written so they can be compared at column width;
-        whichever is not in main.tex is a spare.
+Fig. 3  fig3_length_vs_constraint.{pdf,svg,eps,png}   <- the one in the paper
+        success rate against constraint level, one line per planner. Identity
+        is marker shape; the line itself carries a shared viridis ramp (green =
+        at the reference length, dark violet = the worst detour) encoding the
+        median path-length ratio along it, keyed by the vertical bar at the
+        right. Planner key runs along the bottom.
+        fig3_success_on_y.{pdf,svg,eps,png}   <- spare, both outcomes on axes
+        fig3_success_on_x.{pdf,svg,eps,png}   <- spare, same but transposed
+        These two put success rate against median length ratio and hand the
+        constraint level to a discrete 8-swatch YlGnBu fill instead. Generated
+        so the three can be compared at column width.
 Fig. 4  fig4_wallclock.{pdf,svg,eps,png}
         box plot of wall-clock time per planner over all successful runs
         (log scale; CL-GBT's tail spans 12.5 -> 730 s).
@@ -28,7 +30,9 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
-from matplotlib.colors import BoundaryNorm, ListedColormap
+from matplotlib.collections import LineCollection
+from matplotlib.colors import (BoundaryNorm, LinearSegmentedColormap,
+                               ListedColormap, PowerNorm)
 from matplotlib.ticker import NullFormatter
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -75,6 +79,34 @@ LVL_CMAP = ListedColormap(
 LVL_BOUNDS = np.arange(min(LVL_PCTS) - 5, max(LVL_PCTS) + 6, 10)
 LVL_NORM = BoundaryNorm(LVL_BOUNDS, LVL_CMAP.N)
 
+# --- the paper figure's scale: median length ratio, painted along the line ---
+# viridis, reversed and cut off below its yellow end. Reversed so DARK = the
+# long detour; cut at 0.80 (#7ad151) so the ramp tops out at a clear green
+# rather than running on into yellow, which no thin line carries on white
+# paper. So: green = paths at the reference length, through teal and blue, to
+# viridis's own dark violet for the worst detours. Perceptually uniform and
+# CVD-safe across the whole span.
+LEN_CMAP = LinearSegmentedColormap.from_list(
+    "viridis_r_trim", plt.get_cmap("viridis")(np.linspace(0.80, 0.0, 256)))
+LEN_MIN, LEN_MAX = 1.10, 2.45
+# sqrt: most of the data sits in 1.1-1.5, so a linear ramp would spend most of
+# its range on the two planners that blow out past 2.0
+LEN_NORM = PowerNorm(gamma=0.5, vmin=LEN_MIN, vmax=LEN_MAX, clip=True)
+LEN_TICKS = [1.2, 1.4, 1.7, 2.0, 2.4]
+
+# Glyphs are identity only, so they take one neutral fill and stay out of the
+# ramp's way. A light warm neutral is the one fill that stays legible against
+# every step from green to dark violet.
+MARKER_FACE = "#dfddd6"
+
+# Ours gets its own fill so it is findable at a glance. Gold, but a deep one:
+# the brighter golds (#ffc300, #f2b705, #e8a33d) sit at worst-case CVD dE 1.6,
+# 3.4 and 2.1 from this ramp -- the greener the ramp's short end, the harder
+# they collide with it. #c68a00 measures dE 7.9, matching the coral it replaced
+# exactly, and 2.98:1 against white.
+PRIMARY_FACE = "#c68a00"
+
+# --- the spare figures' scale: constraint level, in discrete marker fills ---
 # Identity, all of it non-color: one dotted gray for every baseline, so they
 # read as a single background population, and solid black for Ours.
 BASE_GRAY = "0.55"
@@ -156,6 +188,92 @@ def despine(ax):
 
 
 # ---------------------------------------------------------------- Fig. 3 ----
+def length_bar(ax):
+    """The length-ratio scale, standing vertically beside the plot."""
+    # pcolormesh, not imshow: imshow embeds the bar as a raster block, which
+    # arrives in Illustrator as a non-editable, resolution-locked image.
+    edges = np.linspace(LEN_MIN, LEN_MAX, 257)
+    mesh = ax.pcolormesh([0, 1], edges, (0.5 * (edges[:-1] + edges[1:]))[:, None],
+                         cmap=LEN_CMAP, norm=LEN_NORM, shading="flat")
+    mesh.set_edgecolor("face")  # else hairline seams between quads in vector out
+    ax.set_xlim(0, 1)
+    ax.set_xticks([])
+    ax.set_ylim(LEN_MIN, LEN_MAX)
+    ax.set_yticks(LEN_TICKS)
+    ax.set_yticklabels([f"{t:.1f}" for t in LEN_TICKS], fontsize=6.5)
+    ax.yaxis.tick_right()
+    ax.tick_params(axis="y", length=2.0, width=0.6, pad=1.5, colors="0.25")
+    ax.yaxis.set_label_position("right")
+    ax.set_ylabel(r"median length / $L_\mathrm{ref}$", fontsize=7, labelpad=3)
+    for sp in ax.spines.values():
+        sp.set_linewidth(0.5)
+        sp.set_color("0.55")
+
+
+def gradient_line(ax, xs, ys, vals, lw, zorder):
+    """Polyline whose color follows `vals` (one per vertex) along the ramp."""
+    n = 32  # sub-segments per data interval; enough that the ramp reads smooth
+    t = np.linspace(0, 1, n + 1)
+    x, y, v = (np.concatenate([np.interp(t, [0, 1], [a[i], a[i + 1]])[:-1]
+                               for i in range(len(a) - 1)] + [a[-1:]])
+               for a in (np.asarray(xs, float), np.asarray(ys, float),
+                         np.asarray(vals, float)))
+    pts = np.column_stack([x, y]).reshape(-1, 1, 2)
+    lc = LineCollection(np.concatenate([pts[:-1], pts[1:]], axis=1),
+                        cmap=LEN_CMAP, norm=LEN_NORM, lw=lw,
+                        capstyle="round", zorder=zorder)
+    lc.set_array(0.5 * (v[:-1] + v[1:]))
+    ax.add_collection(lc)
+
+
+def fig3(summary):
+    fig = plt.figure(figsize=(3.5, 2.62))
+    ax = fig.add_axes((0.115, 0.225, 0.685, 0.745))
+    cax = fig.add_axes((0.825, 0.225, 0.035, 0.745))
+    pcts = sorted(next(iter(summary.values())).keys(), reverse=True)  # 100..30
+
+    handles = []
+    for m, label, _, marker in METHODS:
+        rows = summary[m]
+        ratio = [rows[p][0] for p in pcts]
+        rate = [rows[p][1] for p in pcts]
+        primary = m == "hexspline_cl"
+        gradient_line(ax, pcts, rate, ratio, 2.2 if primary else 1.4, zorder=2)
+        # the primary's line stays *under* the others (they share y = 100% with
+        # it down to the 80% level), but its glyphs sit on top of theirs
+        ax.plot(pcts, rate, ls="none", marker=marker, ms=4.4 if primary else 3.8,
+                mfc=PRIMARY_FACE if primary else MARKER_FACE, mec="0.15",
+                mew=0.6, zorder=6 if primary else 4)
+        # marker only: shape is the whole identity channel, so a line swatch
+        # here would just imply a line color the plot does not have
+        handles.append(plt.Line2D([], [], ls="none", marker=marker,
+                                  ms=4.4 if primary else 3.8, mew=0.6,
+                                  mfc=PRIMARY_FACE if primary else MARKER_FACE,
+                                  mec="0.15", label=label))
+
+    ax.invert_xaxis()  # constraint tightens to the right
+    ax.set_xticks(pcts)
+    ax.set_xlim(103, 27)
+    ax.set_xlabel(r"constraint level (% of $U_\mathrm{ref}$)", labelpad=2)
+    ax.set_ylabel("success rate (%)")
+    ax.set_ylim(-0.04, 1.07)
+    ax.set_yticks([0, 0.25, 0.5, 0.75, 1.0])
+    ax.set_yticklabels(["0", "25", "50", "75", "100"])
+    ax.grid(axis="y", color="0.88", lw=0.5, zorder=0)
+    ax.set_axisbelow(True)
+    despine(ax)
+    # one horizontal row under the plot, centred on the axes rather than the
+    # figure -- the colorbar occupies the right margin
+    fig.legend(handles=handles, loc="lower center", ncol=len(METHODS),
+               bbox_to_anchor=(0.115 + 0.685 / 2, -0.008), frameon=False,
+               fontsize=6.5, handlelength=1.0, handletextpad=0.35,
+               columnspacing=1.1, borderaxespad=0.0)
+
+    length_bar(cax)
+    save(fig, "fig3_length_vs_constraint")
+    plt.close(fig)
+
+
 def level_bar(ax):
     """The shared constraint-level key: one swatch per sweep level."""
     # The C row has to ASCEND with x, because LVL_BOUNDS does. Handing it
@@ -181,7 +299,7 @@ def level_bar(ax):
         s.set_color("0.55")
 
 
-def fig3(summary, success_on):
+def fig3_scatter(summary, success_on):
     """One figure; `success_on` is "y" or "x" and picks which axis it takes."""
     fig = plt.figure(figsize=(3.5, 2.75))
     ax = fig.add_axes((0.115 if success_on == "y" else 0.128, 0.285,
@@ -280,7 +398,8 @@ def fig4(wall):
 
 if __name__ == "__main__":
     summary = read_summary()
-    fig3(summary, "y")
-    fig3(summary, "x")
+    fig3(summary)
+    fig3_scatter(summary, "y")
+    fig3_scatter(summary, "x")
     fig4(read_wall())
     print("wrote fig3/fig4 to", HERE)
