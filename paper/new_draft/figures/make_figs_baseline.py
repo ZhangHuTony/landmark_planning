@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
 """Fig. 3 and Fig. 4 of the paper, from constraint_sweep/baseline_2026-08-17.
 
-Fig. 3  fig3_length_vs_constraint.{pdf,svg,eps,png}
-        cost against reliability: success rate (y) against median path-length
-        ratio (x), so the best corner is top left -- solves the most, walks the
-        least. Each planner is one trajectory swept out as the constraint
-        tightens; planner identity is marker shape and dash pattern, and the
-        marker fills step through one shared 8-swatch viridis scale saying
-        which constraint level each point came from (green = loose, dark
-        violet = tight).
+Fig. 3  fig3_success_on_y.{pdf,svg,eps,png}   <- the one in the paper
+        fig3_success_on_x.{pdf,svg,eps,png}   <- same data, axes swapped
+        cost against reliability: success rate against median path-length
+        ratio. Each planner is one trajectory swept out as the constraint
+        tightens; planner identity is marker shape, and the marker fills step
+        through one shared 8-swatch YlGnBu scale saying which constraint level
+        each point came from (dark = a loose bound, pale = a tight one).
+        Both orientations are written so they can be compared at column width;
+        whichever is not in main.tex is a spare.
 Fig. 4  fig4_wallclock.{pdf,svg,eps,png}
         box plot of wall-clock time per planner over all successful runs
         (log scale; CL-GBT's tail spans 12.5 -> 730 s).
@@ -45,69 +46,40 @@ METHODS = [
 
 # Fig. 3 puts both outcomes on the axes -- success rate against median length
 # ratio -- and hands the sweep variable, the constraint level, to color. So the
-# figure reads as a cost/reliability trade, with the best corner at top left:
-# high success, short path. Length goes on x because that is where the data
-# needs the room -- four of five planners live inside 1.1-1.4, and the axis is
-# nearly twice as long as it is tall. (Inverting x to put "best" at top right
-# instead was tried; it jams that cluster into the right edge, under the key.)
-# Each planner is a trajectory through that plane, and the color says where
-# along the sweep you are, which position alone cannot (Greedy jumps from 90% to
-# 26% success between two adjacent levels).
+# figure reads as a cost/reliability trade: the good corner is high success and
+# short path, top left when success is on y and top right when it is on x (that
+# one inverts its length axis so shorter still means higher).
 #
 # The scale lives in the marker FILLS, not the line. The sweep has exactly eight
 # levels, so it gets exactly eight swatches: a discrete step is easier to match
 # back to the key than a point on a continuous ramp, and a filled 5 pt glyph
-# carries a flat color far better than a 1.4 pt line does. That also frees the
-# line to carry identity, which a gradient line could not do -- it is a
-# LineCollection of sub-segments each shorter than a dash period, so a linestyle
-# on it renders solid. Plain lines dash fine.
-#
-# Identity is therefore shape + dash, and no second color channel: the paper
-# palette's blue (Ours) and green (Sequential) fall inside the viridis gamut, so
-# coloring the lines by planner would put two identity colors where the reader
-# is being asked to read levels. Lines colored per planner and lines all one
-# gray were both rendered; see figures/figure3/.
+# carries a flat color far better than a 1 pt line does. That leaves the lines
+# free to be pure structure -- every baseline is the same dotted gray, so the
+# eye groups them as "the others" and identity falls to marker shape, with Ours
+# the one solid black trajectory through them.
 #
 # The color column above is still the paper-wide identity color and is what
 # Fig. 4 (and Figs. 5-6) paint with; Fig. 3 no longer uses it.
-# viridis sampled at the eight sweep levels, cut off below its yellow end. Cut
-# at 0.74 (#58c765) so the scale tops out at a clear green rather than running
-# on into yellow-green and yellow, which no small glyph carries on white paper.
-# DARK = the tight constraint: 100% is green and the scale runs through teal and
-# blue to viridis's own dark violet at 30%. Perceptually uniform and CVD-safe
-# across the whole span. Tried and rejected against this data: cividis (its
-# midtones are the same gray as the plot's neutrals), magma and inferno (their
-# warm end collides with the coral accent below), and single-hue Blues (its
-# light end is too faint).
+# YlGnBu sampled at the eight sweep levels. DARK = the higher number, the
+# ordinary sequential convention: 100% of U_ref is dark navy and the scale runs
+# back through blue, teal and green to a pale yellow-green at 30%. Its measured
+# separation is mid-pack (worst-case CVD dE 4.5 over normal/protan/deutan,
+# against 8.9 for cividis and 6.6 for viridis; see figures/figure3/README.md),
+# which is affordable here because the levels are also ordered along each line
+# -- a reader who cannot separate two adjacent swatches can still read which
+# came first.
 LVL_PCTS = [100, 90, 80, 70, 60, 50, 40, 30]
 LVL_CMAP = ListedColormap(
-    plt.get_cmap("viridis")(np.linspace(0.74, 0.0, len(LVL_PCTS))))
+    plt.get_cmap("YlGnBu")(np.linspace(0.10, 1.0, len(LVL_PCTS))))
 # bin edges at 25, 35, ... 105, so each level falls in the middle of its swatch
 LVL_BOUNDS = np.arange(min(LVL_PCTS) - 5, max(LVL_PCTS) + 6, 10)
 LVL_NORM = BoundaryNorm(LVL_BOUNDS, LVL_CMAP.N)
 
-# Identity, all of it non-color. Ours is solid and heavier; the rest are held
-# apart by dash period alone. 0.35, not a lighter gray: at 0.55 the line is
-# within CVD dE 0.8 of viridis's teal swatch under protanopia, i.e. the same
-# color as one of the fills.
-LINE_GRAY = "0.35"
-DASHES = {
-    "hexspline_cl": (None, None),
-    "formation":    (4.2, 1.6),
-    "sequential":   (1.2, 1.3),
-    "clgbt":        (5.0, 1.5, 1.2, 1.5),
-    "greedy":       (2.2, 1.4, 1.2, 1.4, 1.2, 1.4),
-}
-
-# Ours gets one accent so it is findable at a glance, and it goes on the LINE
-# only -- every marker keeps the same dark ring, so nothing competes with the
-# fills. Coral is the only candidate that clears both gates: worst CVD dE 8.5
-# against the scale (gold managed 4.8 -- it collides with the green end under
-# deuteranopia) and 3.7:1 against white. It is warm, so it cannot be mistaken
-# for a swatch of a green-to-violet scale. This is also what rules out magma,
-# inferno and plasma as the scale: dE 6.1, 4.7 and 6.9 to the accent, close
-# enough that Ours' line reads as one more swatch.
-ACCENT = "#e8503a"
+# Identity, all of it non-color: one dotted gray for every baseline, so they
+# read as a single background population, and solid black for Ours.
+BASE_GRAY = "0.55"
+BASE_DASH = (1.1, 1.35)
+PRIMARY_COLOR = "0.0"
 LEGEND_FACE = "0.92"  # the key shows shapes; fills are the colorbar's job
 
 plt.rcParams.update({
@@ -186,16 +158,21 @@ def despine(ax):
 # ---------------------------------------------------------------- Fig. 3 ----
 def level_bar(ax):
     """The shared constraint-level key: one swatch per sweep level."""
+    # The C row has to ASCEND with x, because LVL_BOUNDS does. Handing it
+    # LVL_PCTS (which runs 100..30) put every block under the wrong tick -- the
+    # swatch labelled 100 was painted with level 30's color, so the whole
+    # figure read backwards. Keep these two in the same order.
+    levels = sorted(LVL_PCTS)
     # pcolormesh, not imshow: imshow embeds the bar as a raster block, which
     # arrives in Illustrator as a non-editable, resolution-locked image.
-    ax.pcolormesh(LVL_BOUNDS, [0, 1], np.array(LVL_PCTS, float)[None],
+    ax.pcolormesh(LVL_BOUNDS, [0, 1], np.array(levels, float)[None],
                   cmap=LVL_CMAP, norm=LVL_NORM, shading="flat",
                   edgecolors="w", linewidth=0.6)  # white gutters = eight blocks
     ax.set_ylim(0, 1)
     ax.set_yticks([])
-    ax.set_xlim(LVL_BOUNDS[-1], LVL_BOUNDS[0])  # constraint tightens to the right
-    ax.set_xticks(LVL_PCTS)
-    ax.set_xticklabels([str(p) for p in LVL_PCTS], fontsize=6.5)
+    ax.set_xlim(LVL_BOUNDS[0], LVL_BOUNDS[-1])  # 30 at the left, 100 at the right
+    ax.set_xticks(levels)
+    ax.set_xticklabels([str(p) for p in levels], fontsize=6.5)
     ax.tick_params(axis="x", length=0, pad=2.0, colors="0.25")
     ax.set_xlabel(r"constraint level (% of $U_\mathrm{ref}$)", fontsize=7,
                   labelpad=1.5)
@@ -204,9 +181,11 @@ def level_bar(ax):
         s.set_color("0.55")
 
 
-def fig3(summary):
+def fig3(summary, success_on):
+    """One figure; `success_on` is "y" or "x" and picks which axis it takes."""
     fig = plt.figure(figsize=(3.5, 2.75))
-    ax = fig.add_axes((0.115, 0.285, 0.871, 0.685))
+    ax = fig.add_axes((0.115 if success_on == "y" else 0.128, 0.285,
+                       0.871 if success_on == "y" else 0.858, 0.685))
     cax = fig.add_axes((0.305, 0.108, 0.600, 0.048))
 
     assert sorted(next(iter(summary.values())), reverse=True) == LVL_PCTS, \
@@ -217,38 +196,50 @@ def fig3(summary):
         rows = summary[m]
         length = [rows[p][0] for p in LVL_PCTS]
         rate = [100 * rows[p][1] for p in LVL_PCTS]
+        xs, ys = (length, rate) if success_on == "y" else (rate, length)
         primary = m == "hexspline_cl"
-        lw = 1.6 if primary else 1.0
-        color = ACCENT if primary else LINE_GRAY
-        ax.plot(length, rate, color=color, lw=lw, dashes=DASHES[m], zorder=2,
-                solid_capstyle="round", dash_capstyle="round")
+        color = PRIMARY_COLOR if primary else BASE_GRAY
+        style = dict(color=color, lw=1.5 if primary else 0.9,
+                     dashes=(None, None) if primary else BASE_DASH)
+        ax.plot(xs, ys, zorder=2, solid_capstyle="round",
+                dash_capstyle="round", **style)
         # fills are the level scale and nothing else touches them; every marker
-        # keeps the same dark ring, so the accent lives on Ours' line alone
-        ax.scatter(length, rate, c=LVL_PCTS, cmap=LVL_CMAP, norm=LVL_NORM,
+        # keeps the same dark ring
+        ax.scatter(xs, ys, c=LVL_PCTS, cmap=LVL_CMAP, norm=LVL_NORM,
                    marker=marker, s=36 if primary else 25, edgecolors="0.15",
                    linewidths=0.6, zorder=6 if primary else 4)
-        handles.append(plt.Line2D([], [], color=color, lw=lw, dashes=DASHES[m],
-                                  marker=marker, ms=5.4 if primary else 4.6,
-                                  mfc=LEGEND_FACE, mec="0.15", mew=0.6,
-                                  label=label))
+        handles.append(plt.Line2D([], [], marker=marker,
+                                  ms=5.4 if primary else 4.6, mfc=LEGEND_FACE,
+                                  mec="0.15", mew=0.6, label=label, **style))
 
-    ax.set_xlim(1.05, 2.55)
-    ax.set_xticks([1.2, 1.4, 1.6, 1.8, 2.0, 2.2, 2.4])
-    ax.set_xlabel(r"median length / $L_\mathrm{ref}$", labelpad=2)
-    ax.set_ylabel(r"success rate (%)")
-    ax.set_ylim(-4, 107)
-    ax.set_yticks([0, 25, 50, 75, 100])
+    length_lim, length_ticks = (1.05, 2.55), [1.2, 1.4, 1.6, 1.8, 2.0, 2.2, 2.4]
+    length_label = r"median length / $L_\mathrm{ref}$"
+    rate_lim, rate_ticks, rate_label = (-4, 107), [0, 25, 50, 75, 100], \
+        r"success rate (%)"
+    if success_on == "y":
+        ax.set_xlim(*length_lim); ax.set_xticks(length_ticks)
+        ax.set_xlabel(length_label, labelpad=2)
+        ax.set_ylim(*rate_lim); ax.set_yticks(rate_ticks)
+        ax.set_ylabel(rate_label)
+    else:
+        ax.set_xlim(*rate_lim); ax.set_xticks(rate_ticks)
+        ax.set_xlabel(rate_label, labelpad=2)
+        ax.set_ylim(*length_lim); ax.set_yticks(length_ticks)
+        ax.set_ylabel(length_label)
+        ax.invert_yaxis()  # shorter paths stay higher up whichever axis they use
     ax.grid(color="0.88", lw=0.5, zorder=0)  # both axes: each is a measurement
     ax.set_axisbelow(True)
     despine(ax)
-    # upper right is the one empty quadrant -- nothing solves nearly everything
-    # while also walking twice the reference distance
-    ax.legend(handles=handles, loc="upper right", frameon=False, fontsize=6.5,
+    # into the corner nothing occupies -- no planner solves nearly everything
+    # while also walking twice the reference distance. Which corner that is
+    # flips with the layout, since inverting the length axis moves it.
+    loc = "upper right" if success_on == "y" else "lower right"
+    ax.legend(handles=handles, loc=loc, frameon=False, fontsize=6.5,
               handlelength=1.9, handletextpad=0.5, borderaxespad=0.2,
               labelspacing=0.32)
 
     level_bar(cax)
-    save(fig, "fig3_length_vs_constraint")
+    save(fig, f"fig3_success_on_{success_on}")
     plt.close(fig)
 
 
@@ -288,6 +279,8 @@ def fig4(wall):
 
 
 if __name__ == "__main__":
-    fig3(read_summary())
+    summary = read_summary()
+    fig3(summary, "y")
+    fig3(summary, "x")
     fig4(read_wall())
     print("wrote fig3/fig4 to", HERE)

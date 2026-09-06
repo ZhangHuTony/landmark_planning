@@ -2,7 +2,7 @@
 
 Every version of `fig3_length_vs_constraint` we rendered, in order. Numbered
 files are the ones that shipped (commit given); `x*` are explorations that never
-did. `11_` is what is currently in the paper.
+did. `12_` is what is currently in the paper.
 
 All are 300 dpi previews of a 3.5 in column figure — judge them at that size,
 not zoomed.
@@ -22,7 +22,8 @@ not zoomed.
 | `08_coral-diamond-primary.png` | `f1b76fef` | Ours takes the diamond (CL-GBT the circle it vacated), a coral `#e8503a` fill instead of the shared neutral, and its glyphs draw on top of everyone's. |
 | `09_axes-swapped_constraint-on-color.png` | `f7d6d8c4` | **Both outcomes onto the axes.** Success rate on x, length ratio on y *inverted*, and the sweep variable — constraint level — into the ramp. The figure now reads as a cost/reliability trade with a best corner (top right), which the previous versions had no way to show. |
 | `10_discrete-glyphs_texture-lines.png` | `1e027ba2` | **Scale moves off the line and into the marker fills, in eight discrete swatches** — one per sweep level, so a fill can be matched back to the key by eye. That frees the line for identity, and plain lines can be dashed where a gradient line could not: shape + dash carry the planner, no second color channel. Ours keeps the coral, now on its line and marker *ring*. |
-| `11_transposed_accent-on-line.png` | current | **Axes transposed** — success rate on y, length ratio on x, so the best corner is top left. Length takes x because that is where the data needs the room. The coral accent comes off the marker rings and goes on Ours' line alone, so every glyph keeps the same dark ring and nothing competes with the fills. Line gray darkened 0.55 → 0.35. |
+| `11_transposed_accent-on-line.png` | `39bcf195` | **Axes transposed** — success rate on y, length ratio on x, so the best corner is top left. Length takes x because that is where the data needs the room. The coral accent comes off the marker rings and goes on Ours' line alone, so every glyph keeps the same dark ring and nothing competes with the fills. Line gray darkened 0.55 → 0.35. |
+| `12_ylgnbu_dotted-baselines_success-on-y.png` | current | Scale switched to **YlGnBu**, dark = the higher constraint number. All four baselines collapse to one **dotted gray**, so they read as a single background population and identity falls entirely to marker shape; Ours becomes **solid black**. Also fixes the reversed key, below. `12b_` is the same figure with the axes swapped — both are generated. |
 
 ## Alternates worth keeping
 
@@ -114,6 +115,29 @@ green = loose, dark violet = tight) still wins.
 | `x9_axes-swapped_cividis.png` | CVD-optimal by construction, and it still fails here: its midtones are the same gray as the `#dfddd6` marker fill, so the middle levels read as "not highlighted" rather than as a value. Its yellow end is also too pale for a 1.4 pt line. |
 | `x10_axes-swapped_magma.png` | The warm end collides with the coral `#e8503a` primary glyph — the one fill chosen specifically to sit *outside* the ramp. Inferno fails the same way. |
 | `x11_axes-swapped_blues.png` | Single hue, so lightness carries the whole scale; the loose end goes so faint that Greedy's and Sequential's 100% segments nearly vanish. |
+
+## The key was reversed for three commits — check it if you touch it
+
+`level_bar` draws the eight swatches with `pcolormesh(LVL_BOUNDS, [0,1], C)`.
+`LVL_BOUNDS` ascends (25, 35, … 105), so **`C` has to ascend too**. It was
+being handed `LVL_PCTS`, which runs 100 → 30, and the axis was then reversed on
+top of that — a double flip that cancelled against the ticks but not against the
+blocks. The swatch printed under the "100" label was painted with level 30's
+color, and vice versa, for the whole of `09_`–`11_`.
+
+Nothing about the data was wrong; every *reading* of those three figures was.
+`level_bar` now sorts explicitly and the axis runs 30 → 100 left to right, so
+the largest number is at the right end where a reader expects it.
+
+If you change either the scale direction or the bar, verify with:
+
+```python
+import matplotlib.colors as mc, make_figs_baseline as M
+[mc.to_hex(M.LVL_CMAP(M.LVL_NORM(p))) for p in M.LVL_PCTS]  # glyph colors
+```
+
+and check that the swatch under each tick matches the glyph color for that
+level.
 
 ## Two things that cost time — don't rediscover them
 
