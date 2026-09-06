@@ -2,12 +2,13 @@
 """Fig. 3 and Fig. 4 of the paper, from constraint_sweep/baseline_2026-08-17.
 
 Fig. 3  fig3_length_vs_constraint.{pdf,svg,eps,png}
-        cost against reliability: median path-length ratio (y, inverted, so
-        shorter is higher) against success rate (x). Each planner is one
-        trajectory swept out as the constraint tightens; planner identity is
-        marker shape and dash pattern, and the marker fills step through one
-        shared 8-swatch viridis scale saying which constraint level each point
-        came from (green = loose, dark violet = tight). Top right is best.
+        cost against reliability: success rate (y) against median path-length
+        ratio (x), so the best corner is top left -- solves the most, walks the
+        least. Each planner is one trajectory swept out as the constraint
+        tightens; planner identity is marker shape and dash pattern, and the
+        marker fills step through one shared 8-swatch viridis scale saying
+        which constraint level each point came from (green = loose, dark
+        violet = tight).
 Fig. 4  fig4_wallclock.{pdf,svg,eps,png}
         box plot of wall-clock time per planner over all successful runs
         (log scale; CL-GBT's tail spans 12.5 -> 730 s).
@@ -44,8 +45,11 @@ METHODS = [
 
 # Fig. 3 puts both outcomes on the axes -- success rate against median length
 # ratio -- and hands the sweep variable, the constraint level, to color. So the
-# figure reads as a cost/reliability trade: y is inverted, so up is a shorter
-# path and right is a higher success rate, and the best corner is top right.
+# figure reads as a cost/reliability trade, with the best corner at top left:
+# high success, short path. Length goes on x because that is where the data
+# needs the room -- four of five planners live inside 1.1-1.4, and the axis is
+# nearly twice as long as it is tall. (Inverting x to put "best" at top right
+# instead was tried; it jams that cluster into the right edge, under the key.)
 # Each planner is a trajectory through that plane, and the color says where
 # along the sweep you are, which position alone cannot (Greedy jumps from 90% to
 # 26% success between two adjacent levels).
@@ -83,8 +87,10 @@ LVL_BOUNDS = np.arange(min(LVL_PCTS) - 5, max(LVL_PCTS) + 6, 10)
 LVL_NORM = BoundaryNorm(LVL_BOUNDS, LVL_CMAP.N)
 
 # Identity, all of it non-color. Ours is solid and heavier; the rest are held
-# apart by dash period alone.
-LINE_GRAY = "0.55"
+# apart by dash period alone. 0.35, not a lighter gray: at 0.55 the line is
+# within CVD dE 0.8 of viridis's teal swatch under protanopia, i.e. the same
+# color as one of the fills.
+LINE_GRAY = "0.35"
 DASHES = {
     "hexspline_cl": (None, None),
     "formation":    (4.2, 1.6),
@@ -93,12 +99,14 @@ DASHES = {
     "greedy":       (2.2, 1.4, 1.2, 1.4, 1.2, 1.4),
 }
 
-# Ours gets one accent so it is findable at a glance -- on its line and its
-# marker RING, never the fill, which belongs to the level scale. Coral is the
-# only candidate that clears both gates: worst CVD dE 8.2 against the scale
-# (gold managed 4.8 -- it collides with the green end under deuteranopia) and
-# 3.7:1 against white. It is warm, so it cannot be mistaken for a swatch of a
-# green-to-violet scale.
+# Ours gets one accent so it is findable at a glance, and it goes on the LINE
+# only -- every marker keeps the same dark ring, so nothing competes with the
+# fills. Coral is the only candidate that clears both gates: worst CVD dE 8.5
+# against the scale (gold managed 4.8 -- it collides with the green end under
+# deuteranopia) and 3.7:1 against white. It is warm, so it cannot be mistaken
+# for a swatch of a green-to-violet scale. This is also what rules out magma,
+# inferno and plasma as the scale: dE 6.1, 4.7 and 6.9 to the accent, close
+# enough that Ours' line reads as one more swatch.
 ACCENT = "#e8503a"
 LEGEND_FACE = "0.92"  # the key shows shapes; fills are the colorbar's job
 
@@ -198,7 +206,7 @@ def level_bar(ax):
 
 def fig3(summary):
     fig = plt.figure(figsize=(3.5, 2.75))
-    ax = fig.add_axes((0.128, 0.285, 0.858, 0.685))
+    ax = fig.add_axes((0.115, 0.285, 0.871, 0.685))
     cax = fig.add_axes((0.305, 0.108, 0.600, 0.048))
 
     assert sorted(next(iter(summary.values())), reverse=True) == LVL_PCTS, \
@@ -207,39 +215,35 @@ def fig3(summary):
     handles = []
     for m, label, _, marker in METHODS:
         rows = summary[m]
-        ratio = [rows[p][0] for p in LVL_PCTS]
+        length = [rows[p][0] for p in LVL_PCTS]
         rate = [100 * rows[p][1] for p in LVL_PCTS]
         primary = m == "hexspline_cl"
         lw = 1.6 if primary else 1.0
         color = ACCENT if primary else LINE_GRAY
-        ax.plot(rate, ratio, color=color, lw=lw, dashes=DASHES[m], zorder=2,
+        ax.plot(length, rate, color=color, lw=lw, dashes=DASHES[m], zorder=2,
                 solid_capstyle="round", dash_capstyle="round")
-        # fills are the level scale; the ring is where Ours' accent goes, so the
-        # scale keeps the whole of the fill channel to itself
-        ax.scatter(rate, ratio, c=LVL_PCTS, cmap=LVL_CMAP, norm=LVL_NORM,
-                   marker=marker, s=36 if primary else 25,
-                   edgecolors=color if primary else "0.15",
-                   linewidths=0.9 if primary else 0.6,
-                   zorder=6 if primary else 4)
+        # fills are the level scale and nothing else touches them; every marker
+        # keeps the same dark ring, so the accent lives on Ours' line alone
+        ax.scatter(length, rate, c=LVL_PCTS, cmap=LVL_CMAP, norm=LVL_NORM,
+                   marker=marker, s=36 if primary else 25, edgecolors="0.15",
+                   linewidths=0.6, zorder=6 if primary else 4)
         handles.append(plt.Line2D([], [], color=color, lw=lw, dashes=DASHES[m],
                                   marker=marker, ms=5.4 if primary else 4.6,
-                                  mfc=LEGEND_FACE,
-                                  mec=color if primary else "0.15",
-                                  mew=0.9 if primary else 0.6, label=label))
+                                  mfc=LEGEND_FACE, mec="0.15", mew=0.6,
+                                  label=label))
 
-    ax.set_xlim(-4, 107)
-    ax.set_xticks([0, 25, 50, 75, 100])
-    ax.set_xlabel(r"success rate (%)", labelpad=2)
-    ax.set_ylabel(r"median length / $L_\mathrm{ref}$")
-    ax.set_ylim(1.05, 2.55)
-    ax.set_yticks([1.2, 1.4, 1.6, 1.8, 2.0, 2.2, 2.4])
-    ax.invert_yaxis()  # shorter paths higher up, so the best corner is top right
-    ax.grid(color="0.88", lw=0.5, zorder=0)  # both axes: x is a measurement now
+    ax.set_xlim(1.05, 2.55)
+    ax.set_xticks([1.2, 1.4, 1.6, 1.8, 2.0, 2.2, 2.4])
+    ax.set_xlabel(r"median length / $L_\mathrm{ref}$", labelpad=2)
+    ax.set_ylabel(r"success rate (%)")
+    ax.set_ylim(-4, 107)
+    ax.set_yticks([0, 25, 50, 75, 100])
+    ax.grid(color="0.88", lw=0.5, zorder=0)  # both axes: each is a measurement
     ax.set_axisbelow(True)
     despine(ax)
-    # lower right is the one empty quadrant -- nothing is both slow-to-succeed
-    # and long
-    ax.legend(handles=handles, loc="lower right", frameon=False, fontsize=6.5,
+    # upper right is the one empty quadrant -- nothing solves nearly everything
+    # while also walking twice the reference distance
+    ax.legend(handles=handles, loc="upper right", frameon=False, fontsize=6.5,
               handlelength=1.9, handletextpad=0.5, borderaxespad=0.2,
               labelspacing=0.32)
 

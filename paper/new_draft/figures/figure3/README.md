@@ -2,7 +2,7 @@
 
 Every version of `fig3_length_vs_constraint` we rendered, in order. Numbered
 files are the ones that shipped (commit given); `x*` are explorations that never
-did. `10_` is what is currently in the paper.
+did. `11_` is what is currently in the paper.
 
 All are 300 dpi previews of a 3.5 in column figure — judge them at that size,
 not zoomed.
@@ -21,7 +21,8 @@ not zoomed.
 | `07_viridis-trim_green-short.png` | `9d3a5301` | Back to viridis, reversed and cut at 0.74 so it never reaches yellow: **green = at the reference length**, through teal and blue, to dark violet for the worst detours. |
 | `08_coral-diamond-primary.png` | `f1b76fef` | Ours takes the diamond (CL-GBT the circle it vacated), a coral `#e8503a` fill instead of the shared neutral, and its glyphs draw on top of everyone's. |
 | `09_axes-swapped_constraint-on-color.png` | `f7d6d8c4` | **Both outcomes onto the axes.** Success rate on x, length ratio on y *inverted*, and the sweep variable — constraint level — into the ramp. The figure now reads as a cost/reliability trade with a best corner (top right), which the previous versions had no way to show. |
-| `10_discrete-glyphs_texture-lines.png` | current | **Scale moves off the line and into the marker fills, in eight discrete swatches** — one per sweep level, so a fill can be matched back to the key by eye. That frees the line for identity, and plain lines can be dashed where a gradient line could not: shape + dash carry the planner, no second color channel. Ours keeps the coral, now on its line and marker *ring*. |
+| `10_discrete-glyphs_texture-lines.png` | `1e027ba2` | **Scale moves off the line and into the marker fills, in eight discrete swatches** — one per sweep level, so a fill can be matched back to the key by eye. That frees the line for identity, and plain lines can be dashed where a gradient line could not: shape + dash carry the planner, no second color channel. Ours keeps the coral, now on its line and marker *ring*. |
+| `11_transposed_accent-on-line.png` | current | **Axes transposed** — success rate on y, length ratio on x, so the best corner is top left. Length takes x because that is where the data needs the room. The coral accent comes off the marker rings and goes on Ours' line alone, so every glyph keeps the same dark ring and nothing competes with the fills. Line gray darkened 0.55 → 0.35. |
 
 ## Alternates worth keeping
 
@@ -31,6 +32,7 @@ not zoomed.
 | `x1_plasma-r_untrimmed.png` | Full plasma. Shows why it is trimmed: the short-path end is a near-white yellow that a 1.4 pt line cannot carry on white paper. |
 | `x2_plasma-r_charcoal-glyphs.png` | Dark glyph fill instead of light. Disappears into the violet end of the ramp. |
 | `x7_shared-viridis_gradient-lines_colored-glyphs.png` | Ramp on both lines *and* marker fills. Redundant, and crossings are hard to trace. |
+| `x17_transposed_x-inverted.png` | `11_` with x inverted, to put the best corner at top right where convention wants it. It jams the 1.1–1.4 cluster — four of five planners — into the right edge, under the key. Best-at-top-left wins on legibility. |
 | `x12_axes-swapped_log-y.png` | `09_` with a log y. It does spread the crowded 1.1–1.4 band, where four of five planners live — but it also flattens Sequential's and CL-GBT's blow-up to 2.0–2.4, which is half the point of the figure. Linear keeps the drama. |
 
 ## Rejected, with the reason
@@ -57,6 +59,49 @@ otherwise:
 
 `10_` is `x15_` plus the coral accent: dash carries the four baselines, coral
 carries Ours, and the fill channel stays entirely the level scale's.
+
+## The colormap sweep (`11_`)
+
+`cm_swatch-comparison.png` is the thirteen candidates as eight-swatch strips;
+`cm_*.png` are the full figures for the ones worth seeing. Every scale was
+scored two ways with a CVD simulation (Machado 2009, severity 1.0, ΔE in OKLab
+×100, worst case over normal / protanopia / deuteranopia):
+
+| scale | min pairwise ΔE | ΔE to the coral accent |
+|---|---|---|
+| cividis | **8.9** | 8.4 |
+| magma | 7.5 | 6.1 |
+| cubehelix | 7.3 | 2.5 |
+| viridis, full | 6.7 | 8.5 |
+| **viridis, trimmed — shipped** | 6.6 | 8.5 |
+| inferno | 6.0 | 4.7 |
+| PuBuGn | 5.8 | 7.0 |
+| Blues | 5.0 | 19.0 |
+| YlOrRd | 5.0 | 3.0 |
+| YlGnBu | 4.5 | 17.4 |
+| GnBu | 3.8 | 18.9 |
+| plasma | 3.3 | 6.9 |
+| turbo | 2.5 | 2.3 |
+
+Reading that table:
+
+- **turbo and plasma are out on the numbers.** Turbo's eight steps collapse to
+  ΔE 2.5 under deuteranopia — a rainbow is the worst possible choice for an
+  ordered variable seen by a CVD reader.
+- **magma, inferno and cubehelix are out on the accent column.** They are warm
+  where the coral is warm, so Ours' line reads as one more swatch of the scale.
+  You can see it in `cm_magma.png` and `cm_inferno.png`.
+- **The ColorBrewer ramps (YlGnBu, GnBu, PuBuGn, Blues) are out on separation.**
+  One or two hues over eight steps leaves lightness to do all the work.
+- **cividis is the measured winner and still was not shipped.** Its middle
+  swatches are literally gray (`#8e8978`, `#6c6e72`), so the 60–70% glyphs read
+  as unfilled rather than as a value, and it has no hue variety to help. See
+  `cm_cividis.png` and judge for yourself — it is a one-word change.
+- **viridis, full range** (`cm_viridis_full.png`) scores a hair above the
+  trimmed version because it spans further. The original reason for the trim —
+  a 1.4 pt line cannot carry pale yellow — stopped applying at `10_`, when the
+  scale moved into filled glyphs. Kept trimmed anyway, per the standing "no
+  yellow" call; the full range is there if that call changes.
 
 ## Colormaps tried for the constraint level (`09_`)
 
