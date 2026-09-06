@@ -2,7 +2,7 @@
 
 Every version of `fig3_length_vs_constraint` we rendered, in order. Numbered
 files are the ones that shipped (commit given); `x*` are explorations that never
-did. `13_` is what is currently in the paper.
+did. `14_` is what is currently in the paper.
 
 All are 300 dpi previews of a 3.5 in column figure — judge them at that size,
 not zoomed.
@@ -24,7 +24,8 @@ not zoomed.
 | `10_discrete-glyphs_texture-lines.png` | `1e027ba2` | **Scale moves off the line and into the marker fills, in eight discrete swatches** — one per sweep level, so a fill can be matched back to the key by eye. That frees the line for identity, and plain lines can be dashed where a gradient line could not: shape + dash carry the planner, no second color channel. Ours keeps the coral, now on its line and marker *ring*. |
 | `11_transposed_accent-on-line.png` | `39bcf195` | **Axes transposed** — success rate on y, length ratio on x, so the best corner is top left. Length takes x because that is where the data needs the room. The coral accent comes off the marker rings and goes on Ours' line alone, so every glyph keeps the same dark ring and nothing competes with the fills. Line gray darkened 0.55 → 0.35. |
 | `12_ylgnbu_dotted-baselines_success-on-y.png` | `ea1fd30d` | Scale switched to **YlGnBu**, dark = the higher constraint number. All four baselines collapse to one **dotted gray**, so they read as a single background population and identity falls entirely to marker shape; Ours becomes **solid black**. Also fixes the reversed key, below. `12b_` is the same figure with the axes swapped — both are generated. |
-| `13_gold-diamond_side-key_row-legend.png` | current | **Back to the `08_` layout** — constraint level on x, success rate on y, median length ratio painted along the line. Ours' fill goes coral → gold `#c68a00`, the ramp is trimmed a little greener (0.74 → 0.80), the length key stands vertically at the right, and the planner key is one horizontal row under the plot. `12_`/`12b_` stay generated as spares. |
+| `13_gold-diamond_side-key_row-legend.png` | `2159e951` | **Back to the `08_` layout** — constraint level on x, success rate on y, median length ratio painted along the line. Ours' fill goes coral → gold `#c68a00`, the ramp is trimmed a little greener (0.74 → 0.80), the length key stands vertically at the right, and the planner key is one horizontal row under the plot. `12_`/`12b_` stay generated as spares. |
+| `14_yellow-diamond_keys-stacked-below.png` | current | Undoes `13_`'s squish. The side key cost the plot 0.4 in of width, so the length key goes back under the x label and the plot returns to `08_`'s exact 3.073 × 1.696 in; the figure grows to 2.75 in tall instead. Ours' fill goes gold → plain yellow `#ffdd00`. |
 
 ## Alternates worth keeping
 
@@ -116,6 +117,40 @@ green = loose, dark violet = tight) still wins.
 | `x9_axes-swapped_cividis.png` | CVD-optimal by construction, and it still fails here: its midtones are the same gray as the `#dfddd6` marker fill, so the middle levels read as "not highlighted" rather than as a value. Its yellow end is also too pale for a 1.4 pt line. |
 | `x10_axes-swapped_magma.png` | The warm end collides with the coral `#e8503a` primary glyph — the one fill chosen specifically to sit *outside* the ramp. Inferno fails the same way. |
 | `x11_axes-swapped_blues.png` | Single hue, so lightness carries the whole scale; the loose end goes so faint that Greedy's and Sequential's 100% segments nearly vanish. |
+
+## The side key does not fit a single column
+
+`13_` stood the length key in the right margin and the plot lost 0.4 in of
+width for it. At 3.5 in there is no room: the y label takes ~0.38 in and the
+bar plus its ticks and rotated label another ~0.45 in, leaving the plot 2.67 in
+against the 3.07 in it has in `08_`. Nor can the figure simply be drawn wider —
+`\includegraphics[width=\linewidth]` scales it straight back down and shrinks
+every label with it. `14_` puts the key back under the x label and stacks the
+planner key beneath that.
+
+## Yellow beats gold here — lightness is what separates
+
+`13_`'s brief was Ours in gold against a greener ramp, and the golds barely
+survived it. Plain yellow, asked for next, does better — the ramp's short end
+is a **mid-lightness** green (`#7ad151`), so separation from it is mostly a
+question of lightness, and the golds sit at exactly the wrong one:
+
+| fill | ΔE to ramp | contrast vs. white |
+|---|---|---|
+| `#ffff00` pure yellow | 14.9 | 1.07 |
+| `#ffe600` | 10.2 | 1.27 |
+| **`#ffdd00` — shipped** | **8.0** | **1.35** |
+| `#ffe14d` | 8.6 | 1.30 |
+| `#c68a00` gold (`13_`) | 7.9 | 2.98 |
+| `#e8503a` coral (`08_`) | 7.9 | 3.72 |
+| `#f2d024` | 4.4 | 1.52 |
+| `#ffc300` | 2.5 | 1.61 |
+
+`#ffdd00` clears the ramp better than either colour it replaced. Its 1.35:1
+against white looks alarming and is not, for this mark: the glyph has a 0.15
+ring, and on a yellow fill the edge rather than the fill is what holds the
+shape. That would not hold for a yellow *line*, which has no edge — the reason
+the ramp itself still stops short of yellow.
 
 ## Gold fights a greener ramp — pick the deep one
 

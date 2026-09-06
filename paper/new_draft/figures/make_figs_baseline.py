@@ -12,9 +12,15 @@ Fig. 3  fig3_length_vs_constraint.{pdf,svg,eps,png}   <- the one in the paper
         These two put success rate against median length ratio and hand the
         constraint level to a discrete 8-swatch YlGnBu fill instead. Generated
         so the three can be compared at column width.
-Fig. 4  fig4_wallclock.{pdf,svg,eps,png}
-        box plot of wall-clock time per planner over all successful runs
-        (log scale; CL-GBT's tail spans 12.5 -> 730 s).
+Fig. 4  fig4_wall_5level_box.{pdf,svg,eps,png}       <- the one in the paper
+        fig4_wall_alllevel_box.{pdf,svg,eps,png}     <- spare, all 8 levels
+        fig4_wall_5level_violin.{pdf,svg,eps,png}    <- spare
+        fig4_wall_alllevel_violin.{pdf,svg,eps,png}  <- spare
+        wall-clock time per planner, split by constraint level rather than
+        pooled over the sweep -- pooling hid that only CL-GBT's cost moves with
+        the bound. Log scale. The 5-level cuts fit a column; the 8-level ones
+        need the full text width. Groups with too few successes to summarize
+        are drawn as their individual runs instead; see MIN_BOX / MIN_VIOLIN.
 
 Each figure is written four ways: PDF is what LaTeX includes, SVG and EPS both
 open in Illustrator (SVG keeps live text; see `save`), PNG is a preview.
@@ -99,12 +105,17 @@ LEN_TICKS = [1.2, 1.4, 1.7, 2.0, 2.4]
 # every step from green to dark violet.
 MARKER_FACE = "#dfddd6"
 
-# Ours gets its own fill so it is findable at a glance. Gold, but a deep one:
-# the brighter golds (#ffc300, #f2b705, #e8a33d) sit at worst-case CVD dE 1.6,
-# 3.4 and 2.1 from this ramp -- the greener the ramp's short end, the harder
-# they collide with it. #c68a00 measures dE 7.9, matching the coral it replaced
-# exactly, and 2.98:1 against white.
-PRIMARY_FACE = "#c68a00"
+# Ours gets its own fill so it is findable at a glance. A plain yellow works
+# here where gold did not, and for a reason worth knowing: the ramp's short end
+# is a mid-lightness green (#7ad151), so separation is mostly a question of
+# lightness. The golds and ambers sit at that same lightness and collide
+# (#ffc300 dE 2.5, #e8c800 2.6, #f2d024 4.4); a light yellow clears it easily.
+# #ffdd00 measures worst-case CVD dE 8.0 against the ramp -- better than the
+# gold it replaced (7.9) and the coral before that (7.9) -- and dE 17.3 from
+# the neutral glyph fill. It is only 1.35:1 against white, which is why the
+# 0.15 ring matters: on a yellow glyph the edge, not the fill, does the work of
+# holding the shape.
+PRIMARY_FACE = "#ffdd00"
 
 # --- the spare figures' scale: constraint level, in discrete marker fills ---
 # Identity, all of it non-color: one dotted gray for every baseline, so they
@@ -173,12 +184,16 @@ def read_summary():
 
 
 def read_wall():
-    """method -> [wall_s of successful runs]"""
+    """method -> pct -> [wall_s of successful runs]"""
     out = {}
     for m, _, _, _ in METHODS:
         with open(os.path.join(SWEEP, m, "trials.csv")) as f:
-            out[m] = [float(r["wall_s"]) for r in csv.DictReader(f)
-                      if r["success"] == "true"]
+            per_level = {}
+            for r in csv.DictReader(f):
+                if r["success"] == "true":
+                    per_level.setdefault(int(r["pct"]), []).append(
+                        float(r["wall_s"]))
+            out[m] = per_level
     return out
 
 
@@ -189,22 +204,27 @@ def despine(ax):
 
 # ---------------------------------------------------------------- Fig. 3 ----
 def length_bar(ax):
-    """The length-ratio scale, standing vertically beside the plot."""
+    r"""The length-ratio scale, lying under the plot.
+
+    It was tried standing in the right margin, and it does not fit: at column
+    width the y label takes ~0.38 in and the bar plus its ticks and rotated
+    label another ~0.45 in, which leaves the plot 2.67 in against the 3.07 in
+    it has here. Growing the figure past \linewidth is not a way out either --
+    \includegraphics scales it straight back down and shrinks the type with it.
+    """
     # pcolormesh, not imshow: imshow embeds the bar as a raster block, which
     # arrives in Illustrator as a non-editable, resolution-locked image.
     edges = np.linspace(LEN_MIN, LEN_MAX, 257)
-    mesh = ax.pcolormesh([0, 1], edges, (0.5 * (edges[:-1] + edges[1:]))[:, None],
+    mesh = ax.pcolormesh(edges, [0, 1], (0.5 * (edges[:-1] + edges[1:]))[None],
                          cmap=LEN_CMAP, norm=LEN_NORM, shading="flat")
     mesh.set_edgecolor("face")  # else hairline seams between quads in vector out
-    ax.set_xlim(0, 1)
-    ax.set_xticks([])
-    ax.set_ylim(LEN_MIN, LEN_MAX)
-    ax.set_yticks(LEN_TICKS)
-    ax.set_yticklabels([f"{t:.1f}" for t in LEN_TICKS], fontsize=6.5)
-    ax.yaxis.tick_right()
-    ax.tick_params(axis="y", length=2.0, width=0.6, pad=1.5, colors="0.25")
-    ax.yaxis.set_label_position("right")
-    ax.set_ylabel(r"median length / $L_\mathrm{ref}$", fontsize=7, labelpad=3)
+    ax.set_ylim(0, 1)
+    ax.set_yticks([])
+    ax.set_xlim(LEN_MIN, LEN_MAX)
+    ax.set_xticks(LEN_TICKS)
+    ax.set_xticklabels([f"{t:.1f}" for t in LEN_TICKS], fontsize=6.5)
+    ax.tick_params(axis="x", length=2.0, width=0.6, pad=1.5, colors="0.25")
+    ax.set_xlabel(r"median length / $L_\mathrm{ref}$", fontsize=7, labelpad=1.5)
     for sp in ax.spines.values():
         sp.set_linewidth(0.5)
         sp.set_color("0.55")
@@ -227,9 +247,12 @@ def gradient_line(ax, xs, ys, vals, lw, zorder):
 
 
 def fig3(summary):
-    fig = plt.figure(figsize=(3.5, 2.62))
-    ax = fig.add_axes((0.115, 0.225, 0.685, 0.745))
-    cax = fig.add_axes((0.825, 0.225, 0.035, 0.745))
+    # the plot itself keeps 08_'s dimensions exactly -- 3.073 x 1.696 in. The
+    # figure is taller instead, and the two keys stack in the space that buys:
+    # length scale under the x label, planner key under that.
+    fig = plt.figure(figsize=(3.5, 2.75))
+    ax = fig.add_axes((0.108, 0.375, 0.878, 1.696 / 2.75))
+    cax = fig.add_axes((0.305, 0.208, 0.600, 0.046))
     pcts = sorted(next(iter(summary.values())).keys(), reverse=True)  # 100..30
 
     handles = []
@@ -265,7 +288,7 @@ def fig3(summary):
     # one horizontal row under the plot, centred on the axes rather than the
     # figure -- the colorbar occupies the right margin
     fig.legend(handles=handles, loc="lower center", ncol=len(METHODS),
-               bbox_to_anchor=(0.115 + 0.685 / 2, -0.008), frameon=False,
+               bbox_to_anchor=(0.108 + 0.878 / 2, -0.004), frameon=False,
                fontsize=6.5, handlelength=1.0, handletextpad=0.35,
                columnspacing=1.1, borderaxespad=0.0)
 
@@ -362,37 +385,106 @@ def fig3_scatter(summary, success_on):
 
 
 # ---------------------------------------------------------------- Fig. 4 ----
-def fig4(wall):
-    fig, ax = plt.subplots(figsize=(3.5, 1.7))
-    data = [wall[m] for m, _, _, _ in METHODS]
-    pos = range(1, len(METHODS) + 1)
+# Wall-clock split by constraint level. Pooling all eight levels into one box
+# per planner, as this figure used to, averaged away the only interesting thing
+# in it: four of the five planners cost the same however tight the bound gets,
+# and CL-GBT's median climbs while its tail runs to 730 s.
+#
+# Success rates fall off a cliff at the tight end (Greedy solves 2 of 50 at
+# 30%), so the tight groups have almost nothing in them. Rather than draw a
+# "box" over two runs, anything below the threshold is drawn as its individual
+# runs -- a tick per successful trial. Violins need more support than boxes
+# because a KDE over eight points is mostly kernel.
+MIN_BOX, MIN_VIOLIN = 5, 10
+LEVELS_5 = [100, 80, 60, 40, 30]  # the cut that fits a single column
+WALL_TICKS = [10, 20, 50, 100, 200, 500]
+WALL_LIM = (11, 900)
 
-    bp = ax.boxplot(data, positions=list(pos), widths=0.55, patch_artist=True,
-                    medianprops=dict(color="0.15", lw=1.0),
-                    whiskerprops=dict(lw=0.7, color="0.35"),
-                    capprops=dict(lw=0.7, color="0.35"),
-                    flierprops=dict(marker=".", ms=2.0, mec="none",
-                                    mfc=over_white("0.55", 0.6)))
-    for patch, (_, _, color, _) in zip(bp["boxes"], METHODS):
-        patch.set_facecolor(over_white(color, 0.45))
-        patch.set_edgecolor(color)
-        patch.set_linewidth(0.9)
 
-    ax.set_yscale("log")
-    ax.set_yticks([10, 20, 50, 100, 200, 500])
-    ax.set_yticklabels(["10", "20", "50", "100", "200", "500"])
-    ax.yaxis.set_minor_formatter(NullFormatter())
-    ax.set_ylim(11, 900)
+def _wall_axes(ax, levels, log_axis):
+    """Shared y scale. `log_axis` False means the data arrived as log10."""
+    if log_axis:
+        ax.set_yscale("log")
+        ax.set_yticks(WALL_TICKS)
+        ax.set_yticklabels([str(t) for t in WALL_TICKS])
+        ax.yaxis.set_minor_formatter(NullFormatter())
+        ax.set_ylim(*WALL_LIM)
+    else:
+        # violins are built on log10(wall) against a linear axis: a KDE has to
+        # be estimated in the space the reader sees it in, and on a log axis a
+        # linear-space KDE turns every distribution into a spike at the bottom
+        ax.set_yticks(np.log10(WALL_TICKS))
+        ax.set_yticklabels([str(t) for t in WALL_TICKS])
+        ax.set_ylim(*np.log10(WALL_LIM))
     ax.set_ylabel("wall-clock time (s)")
-    ax.set_xticks(list(pos))
-    ax.set_xticklabels([f"{label}\n(n={len(wall[m])})" for m, label, _, _ in METHODS],
-                       fontsize=6.5)
     ax.grid(axis="y", which="major", color="0.88", lw=0.5, zorder=0)
     ax.set_axisbelow(True)
     despine(ax)
 
-    fig.tight_layout(pad=0.25)
-    save(fig, "fig4_wallclock")
+
+def fig4(wall, levels, kind, stem, width):
+    """One grouped figure: `kind` is "box" or "violin"."""
+    wide = width > 4
+    fig = plt.figure(figsize=(width, 2.15 if wide else 2.05))
+    ax = fig.add_axes((0.075 if wide else 0.145, 0.245 if wide else 0.235,
+                       0.915 if wide else 0.845, 0.735 if wide else 0.745))
+
+    step = len(METHODS) + 1.3  # one slot per planner, then a gap
+    box_w = 0.78 if wide else 0.70
+    for gi, pct in enumerate(levels):
+        for mi, (m, _, color, _) in enumerate(METHODS):
+            vals = wall[m].get(pct, [])
+            if not vals:
+                continue
+            x = gi * step + mi
+            enough = len(vals) >= (MIN_BOX if kind == "box" else MIN_VIOLIN)
+            if not enough:
+                # every successful run, one tick each
+                ax.plot([x] * len(vals),
+                        vals if kind == "box" else np.log10(vals),
+                        ls="none", marker="_", ms=3.2, mew=0.8, color=color,
+                        zorder=3)
+            elif kind == "box":
+                bp = ax.boxplot([vals], positions=[x], widths=box_w,
+                                patch_artist=True,
+                                medianprops=dict(color="0.15", lw=0.8),
+                                whiskerprops=dict(lw=0.6, color="0.35"),
+                                capprops=dict(lw=0.6, color="0.35"),
+                                flierprops=dict(marker=".", ms=1.6, mec="none",
+                                                mfc=over_white("0.55", 0.6)))
+                patch = bp["boxes"][0]
+                patch.set_facecolor(over_white(color, 0.45))
+                patch.set_edgecolor(color)
+                patch.set_linewidth(0.7)
+            else:
+                lv = np.log10(vals)
+                vp = ax.violinplot([lv], positions=[x], widths=box_w * 1.15,
+                                   showextrema=False, showmedians=True)
+                for body in vp["bodies"]:
+                    body.set_facecolor(over_white(color, 0.45))
+                    body.set_edgecolor(color)
+                    body.set_linewidth(0.7)
+                    body.set_alpha(1.0)  # violinplot defaults to 0.3; no alpha
+                vp["cmedians"].set_color("0.15")
+                vp["cmedians"].set_linewidth(0.8)
+
+    ax.set_xlim(-1.1, (len(levels) - 1) * step + len(METHODS))
+    ax.set_xticks([gi * step + (len(METHODS) - 1) / 2
+                   for gi in range(len(levels))])
+    ax.set_xticklabels([str(p) for p in levels])
+    ax.set_xlabel(r"constraint level (% of $U_\mathrm{ref}$)", labelpad=2)
+    _wall_axes(ax, levels, log_axis=(kind == "box"))
+
+    handles = [plt.Rectangle((0, 0), 1, 1, fc=over_white(c, 0.45), ec=c,
+                             lw=0.7, label=label)
+               for _, label, c, _ in METHODS]
+    fig.legend(handles=handles, loc="lower center", ncol=len(METHODS),
+               bbox_to_anchor=(0.075 + 0.915 / 2 if wide else 0.145 + 0.845 / 2,
+                               -0.008),
+               frameon=False, fontsize=6.5, handlelength=1.1,
+               handletextpad=0.4, columnspacing=1.1, borderaxespad=0.0)
+
+    save(fig, stem)
     plt.close(fig)
 
 
@@ -401,5 +493,8 @@ if __name__ == "__main__":
     fig3(summary)
     fig3_scatter(summary, "y")
     fig3_scatter(summary, "x")
-    fig4(read_wall())
+    wall = read_wall()
+    for kind in ("box", "violin"):
+        fig4(wall, LEVELS_5, kind, f"fig4_wall_5level_{kind}", 3.5)
+        fig4(wall, LVL_PCTS, kind, f"fig4_wall_alllevel_{kind}", 7.16)
     print("wrote fig3/fig4 to", HERE)
