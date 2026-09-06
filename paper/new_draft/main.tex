@@ -381,10 +381,15 @@ makes the problem a joint one.
 
 \begin{figure}[t]
   \centering
-  \includegraphics[width=\linewidth]{fig4_wallclock}
-  \caption{Wall-clock time per planner over all successful runs, all
-    constraint levels pooled (log scale). Boxes span the interquartile range;
-    whiskers extend to $1.5\times$ IQR.}
+  \includegraphics[width=\linewidth]{fig4_wall_5level_box}
+  \caption{Wall-clock time per planner over successful runs, split by
+    constraint level (log scale; five of the eight levels shown). Boxes span
+    the interquartile range, whiskers extend to $1.5\times$ IQR, and dots are
+    individual runs beyond them. Four of the five planners cost the same
+    whatever the bound; only CL-GBT's search grows with it, its median tripling
+    and its tail reaching $730$\,s. Where a planner solved fewer than five
+    scenarios at a level there is nothing to summarize, so those runs are drawn
+    individually, one tick each.}
   \label{fig:wall}
 \end{figure}
 
