@@ -2,10 +2,12 @@
 """Fig. 3 and Fig. 4 of the paper, from constraint_sweep/baseline_2026-08-17.
 
 Fig. 3  fig3_length_vs_constraint.{pdf,svg,eps,png}
-        success rate vs. constraint level, one line per planner. Planner
-        identity is marker shape; the line itself carries one shared viridis
-        ramp (green = short, dark violet = long) encoding the median
-        path-length ratio along it.
+        cost against reliability: median path-length ratio (y, inverted, so
+        shorter is higher) against success rate (x). Each planner is one
+        trajectory swept out as the constraint tightens; planner identity is
+        marker shape, and the line carries one shared viridis ramp encoding
+        which constraint level each point came from (green = loose, dark
+        violet = tight). Top right is best.
 Fig. 4  fig4_wallclock.{pdf,svg,eps,png}
         box plot of wall-clock time per planner over all successful runs
         (log scale; CL-GBT's tail spans 12.5 -> 730 s).
@@ -25,7 +27,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.collections import LineCollection
-from matplotlib.colors import LinearSegmentedColormap, PowerNorm
+from matplotlib.colors import LinearSegmentedColormap, Normalize
 from matplotlib.ticker import NullFormatter
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -41,30 +43,33 @@ METHODS = [
     ("greedy",       "Greedy",     "#e87ba4", "v"),
 ]
 
-# Fig. 3 splits the two channels instead of overloading color with both. Length
-# ratio gets ONE shared ramp, painted along the line, so a color means the same
-# thing on every line and the planners are directly comparable -- which
-# per-planner ramps could not do. Identity is carried by marker shape alone: the
-# markers stay unfilled so they read as tags on the line rather than a second
-# color channel. (Dash patterns are not an option here -- a gradient line is a
-# LineCollection of sub-segments each shorter than a dash period, so a linestyle
-# on it renders solid.)
+# Fig. 3 puts both outcomes on the axes -- success rate against median length
+# ratio -- and hands the sweep variable, the constraint level, to color. So the
+# figure reads as a cost/reliability trade: y is inverted, so up is a shorter
+# path and right is a higher success rate, and the best corner is top right.
+# Each planner is a trajectory through that plane, and the ramp says where along
+# the sweep you are, which position alone cannot (Greedy jumps from 90% to 26%
+# success between two adjacent levels).
 #
-# This is what five per-planner ramps could never buy: 25 colors on a 5-hue
-# budget are not mutually distinguishable at any rotation (best worst-pair CVD
-# dE 3.1, measured), whereas one ramp has no cross-planner pairs to separate at
-# all. Viridis is perceptually uniform and CVD-safe by construction.
+# Identity is carried by marker shape alone; the markers take a neutral fill so
+# they read as tags on the line rather than a second color channel. (Dash
+# patterns are not an option here -- a gradient line is a LineCollection of
+# sub-segments each shorter than a dash period, so a linestyle on it renders
+# solid.)
 #
 # The color column above is still the paper-wide identity color and is what
 # Fig. 4 (and Figs. 5-6) paint with; Fig. 3 no longer uses it.
-# viridis, reversed and cut off below its yellow end. Reversed so DARK = the
-# long detour; cut at 0.74 (#58c765) so the ramp tops out at a clear green
-# rather than running on into yellow-green and yellow, which no thin line
-# carries on white paper. So: green = paths at the reference length, through
-# teal and blue, to viridis's own dark violet for the worst detours.
-# Perceptually uniform and CVD-safe across the whole span.
-LEN_CMAP = LinearSegmentedColormap.from_list(
-    "viridis_r_trim", plt.get_cmap("viridis")(np.linspace(0.74, 0.0, 256)))
+# viridis, cut off below its yellow end. Cut at 0.74 (#58c765) so the ramp tops
+# out at a clear green rather than running on into yellow-green and yellow,
+# which no thin line carries on white paper. DARK = the tight constraint: the
+# loose levels are green, and the ramp runs through teal and blue to viridis's
+# own dark violet at 30%. Perceptually uniform and CVD-safe across the whole
+# span. Tried and rejected against this data: cividis (its midtones are the same
+# gray as the marker fill), magma and inferno (their warm end collides with the
+# coral primary glyph below), and single-hue Blues (its light end is too faint
+# for a 1.4 pt line).
+LVL_CMAP = LinearSegmentedColormap.from_list(
+    "viridis_trim", plt.get_cmap("viridis")(np.linspace(0.0, 0.74, 256)))
 
 # Glyphs are identity only, so they take one neutral fill and stay out of the
 # ramp's way. Painting them the per-planner palette colors was tried and reads
@@ -80,9 +85,8 @@ MARKER_FACE = "#dfddd6"
 # warm, so it cannot be mistaken for a step of a green-to-violet ramp.
 PRIMARY_FACE = "#e8503a"
 
-LEN_MIN, LEN_MAX = 1.10, 2.45
-LEN_NORM = PowerNorm(gamma=0.5, vmin=LEN_MIN, vmax=LEN_MAX, clip=True)
-LEN_TICKS = [1.2, 1.4, 1.7, 2.0, 2.4]
+LVL_MIN, LVL_MAX = 30, 100
+LVL_NORM = Normalize(vmin=LVL_MIN, vmax=LVL_MAX)
 
 plt.rcParams.update({
     "font.family": "serif",
@@ -163,21 +167,22 @@ def despine(ax):
 
 
 # ---------------------------------------------------------------- Fig. 3 ----
-def length_bar(ax):
-    """The one shared length-ratio scale, ticked linearly in the value."""
+def level_bar(ax, pcts):
+    """The shared constraint-level scale, running loose (left) to tight."""
     # pcolormesh, not imshow: imshow embeds the bar as a raster block, which
     # arrives in Illustrator as a non-editable, resolution-locked image.
-    edges = np.linspace(LEN_MIN, LEN_MAX, 257)
+    edges = np.linspace(LVL_MIN, LVL_MAX, 257)
     mesh = ax.pcolormesh(edges, [0, 1], (0.5 * (edges[:-1] + edges[1:]))[None],
-                         cmap=LEN_CMAP, norm=LEN_NORM, shading="flat")
+                         cmap=LVL_CMAP, norm=LVL_NORM, shading="flat")
     mesh.set_edgecolor("face")  # else hairline seams between quads in vector out
     ax.set_ylim(0, 1)
     ax.set_yticks([])
-    ax.set_xlim(LEN_MIN, LEN_MAX)
-    ax.set_xticks(LEN_TICKS)
-    ax.set_xticklabels([f"{t:.1f}" for t in LEN_TICKS], fontsize=6.5)
+    ax.set_xlim(LVL_MAX, LVL_MIN)  # constraint tightens to the right
+    ax.set_xticks(pcts)
+    ax.set_xticklabels([str(p) for p in pcts], fontsize=6.5)
     ax.tick_params(axis="x", length=2.0, width=0.6, pad=1.5, colors="0.25")
-    ax.set_xlabel(r"median length / $L_\mathrm{ref}$", fontsize=7, labelpad=1.5)
+    ax.set_xlabel(r"constraint level (% of $U_\mathrm{ref}$)", fontsize=7,
+                  labelpad=1.5)
     for s in ax.spines.values():
         s.set_linewidth(0.5)
         s.set_color("0.55")
@@ -193,29 +198,29 @@ def gradient_line(ax, xs, ys, vals, lw, zorder):
                          np.asarray(vals, float)))
     pts = np.column_stack([x, y]).reshape(-1, 1, 2)
     lc = LineCollection(np.concatenate([pts[:-1], pts[1:]], axis=1),
-                        cmap=LEN_CMAP, norm=LEN_NORM, lw=lw,
+                        cmap=LVL_CMAP, norm=LVL_NORM, lw=lw,
                         capstyle="round", zorder=zorder)
     lc.set_array(0.5 * (v[:-1] + v[1:]))
     ax.add_collection(lc)
 
 
 def fig3(summary):
-    fig = plt.figure(figsize=(3.5, 2.55))
-    ax = fig.add_axes((0.108, 0.305, 0.878, 0.665))
-    cax = fig.add_axes((0.305, 0.115, 0.600, 0.052))
+    fig = plt.figure(figsize=(3.5, 2.75))
+    ax = fig.add_axes((0.128, 0.285, 0.858, 0.685))
+    cax = fig.add_axes((0.305, 0.108, 0.600, 0.048))
     pcts = sorted(next(iter(summary.values())).keys(), reverse=True)  # 100..30
 
     handles = []
     for m, label, _, marker in METHODS:
         rows = summary[m]
         ratio = [rows[p][0] for p in pcts]
-        rate = [rows[p][1] for p in pcts]
+        rate = [100 * rows[p][1] for p in pcts]
         primary = m == "hexspline_cl"
         lw = 2.2 if primary else 1.4
-        gradient_line(ax, pcts, rate, ratio, lw, zorder=2)
-        # the primary's line stays *under* the others (they share y = 100% with
-        # it down to the 80% level), but its glyphs sit on top of theirs
-        ax.plot(pcts, rate, ls="none", marker=marker, ms=4.4 if primary else 3.8,
+        gradient_line(ax, rate, ratio, pcts, lw, zorder=2)
+        # the primary's line stays *under* the others (they converge on the
+        # top-right corner with it), but its glyphs sit on top of theirs
+        ax.plot(rate, ratio, ls="none", marker=marker, ms=4.4 if primary else 3.8,
                 mfc=PRIMARY_FACE if primary else MARKER_FACE, mec="0.15",
                 mew=0.6, zorder=6 if primary else 4)
         # marker only: shape is the whole identity channel, so a line swatch
@@ -225,22 +230,23 @@ def fig3(summary):
                                   mfc=PRIMARY_FACE if primary else MARKER_FACE,
                                   mec="0.15", label=label))
 
-    ax.invert_xaxis()  # constraint tightens to the right
-    ax.set_xticks(pcts)
-    ax.set_xlim(103, 27)
-    ax.set_xlabel(r"constraint level (% of $U_\mathrm{ref}$)", labelpad=2)
-    ax.set_ylabel("success rate (%)")
-    ax.set_ylim(-0.04, 1.07)
-    ax.set_yticks([0, 0.25, 0.5, 0.75, 1.0])
-    ax.set_yticklabels(["0", "25", "50", "75", "100"])
-    ax.grid(axis="y", color="0.88", lw=0.5, zorder=0)
+    ax.set_xlim(-4, 107)
+    ax.set_xticks([0, 25, 50, 75, 100])
+    ax.set_xlabel(r"success rate (%)", labelpad=2)
+    ax.set_ylabel(r"median length / $L_\mathrm{ref}$")
+    ax.set_ylim(1.05, 2.55)
+    ax.set_yticks([1.2, 1.4, 1.6, 1.8, 2.0, 2.2, 2.4])
+    ax.invert_yaxis()  # shorter paths higher up, so the best corner is top right
+    ax.grid(color="0.88", lw=0.5, zorder=0)  # both axes: x is a measurement now
     ax.set_axisbelow(True)
     despine(ax)
-    ax.legend(handles=handles, loc="upper right", frameon=False, fontsize=6.5,
-              handlelength=1.0, handletextpad=0.4, borderaxespad=0.1,
+    # lower right is the one empty quadrant -- nothing is both slow-to-succeed
+    # and long
+    ax.legend(handles=handles, loc="lower right", frameon=False, fontsize=6.5,
+              handlelength=1.0, handletextpad=0.4, borderaxespad=0.2,
               labelspacing=0.32)
 
-    length_bar(cax)
+    level_bar(cax, pcts)
     save(fig, "fig3_length_vs_constraint")
     plt.close(fig)
 

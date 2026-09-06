@@ -2,7 +2,7 @@
 
 Every version of `fig3_length_vs_constraint` we rendered, in order. Numbered
 files are the ones that shipped (commit given); `x*` are explorations that never
-did. `08_` is what is currently in the paper.
+did. `09_` is what is currently in the paper.
 
 All are 300 dpi previews of a 3.5 in column figure — judge them at that size,
 not zoomed.
@@ -19,7 +19,8 @@ not zoomed.
 | `05_shared-viridis_on-lines.png` | `39b17928` | Ramp moved from the markers to the **lines** (a 3 pt glyph is mostly outline). Dashes lost — see note below. |
 | `06_plasma-r_on-lines_neutral-glyphs.png` | `79a02245` | Plasma reversed and trimmed, so **dark = long detour**. Larger glyphs, single neutral fill `#dfddd6`. |
 | `07_viridis-trim_green-short.png` | `9d3a5301` | Back to viridis, reversed and cut at 0.74 so it never reaches yellow: **green = at the reference length**, through teal and blue, to dark violet for the worst detours. |
-| `08_coral-diamond-primary.png` | current | Ours takes the diamond (CL-GBT the circle it vacated), a coral `#e8503a` fill instead of the shared neutral, and its glyphs draw on top of everyone's. |
+| `08_coral-diamond-primary.png` | `f1b76fef` | Ours takes the diamond (CL-GBT the circle it vacated), a coral `#e8503a` fill instead of the shared neutral, and its glyphs draw on top of everyone's. |
+| `09_axes-swapped_constraint-on-color.png` | current | **Both outcomes onto the axes.** Success rate on x, length ratio on y *inverted*, and the sweep variable — constraint level — into the ramp. The figure now reads as a cost/reliability trade with a best corner (top right), which the previous versions had no way to show. |
 
 ## Alternates worth keeping
 
@@ -29,6 +30,7 @@ not zoomed.
 | `x1_plasma-r_untrimmed.png` | Full plasma. Shows why it is trimmed: the short-path end is a near-white yellow that a 1.4 pt line cannot carry on white paper. |
 | `x2_plasma-r_charcoal-glyphs.png` | Dark glyph fill instead of light. Disappears into the violet end of the ramp. |
 | `x7_shared-viridis_gradient-lines_colored-glyphs.png` | Ramp on both lines *and* marker fills. Redundant, and crossings are hard to trace. |
+| `x12_axes-swapped_log-y.png` | `09_` with a log y. It does spread the crowded 1.1–1.4 band, where four of five planners live — but it also flattens Sequential's and CL-GBT's blow-up to 2.0–2.4, which is half the point of the figure. Linear keeps the drama. |
 
 ## Rejected, with the reason
 
@@ -39,6 +41,18 @@ not zoomed.
 | `x5_rejected_wide-rotation-collides.png` | Per-planner rotations pushed as far as they go. Formation and CL-GBT both arrive at magenta. |
 | `x6_rejected_shared-viridis-no-identity.png` | One shared ramp, identity by marker only, no dashes and no line-weight hierarchy. The whole left half is dark purple, because every planner sits at 1.1–1.5 there. |
 | `x8_rejected_two-color-channels-per-glyph.png` | Palette-colored line + palette-colored marker ring + ramp marker fill. Two color channels on a ~3 pt glyph; illegible at column width. |
+
+## Colormaps tried for the constraint level (`09_`)
+
+The ramp changed meaning in `09_` — it is the sweep variable now, not the cost —
+so the candidates were re-run against the new plot. Viridis (trimmed at 0.74,
+green = loose, dark violet = tight) still wins.
+
+| file | why not |
+|---|---|
+| `x9_axes-swapped_cividis.png` | CVD-optimal by construction, and it still fails here: its midtones are the same gray as the `#dfddd6` marker fill, so the middle levels read as "not highlighted" rather than as a value. Its yellow end is also too pale for a 1.4 pt line. |
+| `x10_axes-swapped_magma.png` | The warm end collides with the coral `#e8503a` primary glyph — the one fill chosen specifically to sit *outside* the ramp. Inferno fails the same way. |
+| `x11_axes-swapped_blues.png` | Single hue, so lightness carries the whole scale; the loose end goes so faint that Greedy's and Sequential's 100% segments nearly vanish. |
 
 ## Two things that cost time — don't rediscover them
 

@@ -368,13 +368,16 @@ makes the problem a joint one.
 \begin{figure}[t]
   \centering
   \includegraphics[width=\linewidth]{fig3_length_vs_constraint}
-  \caption{Fraction of the 50 randomized scenarios each planner solved as the
-    terminal uncertainty bound tightens. Marker shape identifies the planner;
-    the color along each line encodes what that success cost --- the median
-    primary path length at that level, normalized by the lone-agent reference
-    length $L_\mathrm{ref}$, on the shared scale below the axis. One ramp
-    serves every planner, so the same color means the same detour on every
-    line.}
+  \caption{What each planner pays for reliability, over the 50 randomized
+    scenarios. Horizontally, the fraction solved; vertically, the median
+    primary path length, normalized by the lone-agent reference length
+    $L_\mathrm{ref}$ and plotted downward, so \emph{up and to the right is
+    better}. Marker shape identifies the planner, and each line is the
+    trajectory it sweeps out as the terminal uncertainty bound tightens ---
+    read along the shared color scale below, green (loose) to dark violet
+    (tight). Ours holds the top-right corner: it is still solving 80\% of the
+    scenarios at half the reference bound, and pays under $1.31 L_\mathrm{ref}$
+    to do it.}
   \label{fig:length_success}
 \end{figure}
 
