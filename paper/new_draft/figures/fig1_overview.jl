@@ -1,0 +1,169 @@
+# ==========================================================================
+# fig1_overview.jl — Fig. 1: the refined plan with a covariance ellipse at
+# every inter-agent communication point
+# ==========================================================================
+#   julia paper/new_draft/figures/fig1_overview.jl <run_dir> [<out_dir>]
+#
+# <run_dir> is a generate_plan.jl output folder that ran hexspline_cl.
+# Everything is re-derived from what that run wrote — its config snapshot
+# (<run>/config), the landmark field it saw (scenario_landmarks.csv) and the
+# shipped spline (hexspline_cl/csv/main_ctrls.csv). Covariances come from the
+# planner's own evaluate_joint_discrete on the same spline samples
+# optimize_continuous scored (eval_continuous in planners/hexspline_cl.jl),
+# and the script refuses to draw unless that reproduces results.yaml's
+# primary_unc: the ellipses are the run's numbers, not a re-simulation.
+#
+# Drawing only calls existing viz.jl helpers (make_base_plot,
+# draw_covariance_ellipse!, overlay_comm_events!); nothing in src/ changes.
+#
+# Output (<out_dir> defaults to <run_dir>):
+#   fig1_continuous_ellipses.{png,svg,pdf,eps}        paths + ellipses
+#   fig1_continuous_ellipses_comm.{png,svg,pdf,eps}   + the run's comm overlay
+# GR has no EPS writer, so the EPS is Ghostscript's eps2write of the PDF. Note
+# that GR outlines text in EVERY vector format (the SVG has no <text> nodes,
+# only paths — verified), so labels come out as shapes; paths, fills and
+# colours are all editable, labels have to be retyped if changed.
+# ==========================================================================
+
+ENV["GKSwstype"] = "100"
+using Printf
+
+const _ROOT = normpath(joinpath(@__DIR__, "..", "..", ".."))
+length(ARGS) >= 1 || error("usage: julia fig1_overview.jl <run_dir> [<out_dir>]")
+abspath_or(p) = isabspath(p) ? p : joinpath(_ROOT, p)
+const RUN_DIR  = abspath_or(ARGS[1])
+const OUT_DIR  = length(ARGS) >= 2 ? abspath_or(ARGS[2]) : RUN_DIR
+const CFG_DIR  = joinpath(RUN_DIR, "config")
+const ALGO_DIR = joinpath(RUN_DIR, "hexspline_cl")
+isdir(CFG_DIR)  || error("no config snapshot at $(CFG_DIR)")
+isdir(ALGO_DIR) || error("no hexspline_cl output under $(RUN_DIR)")
+
+# Ellipses are 2σ, with σ scaled by this factor for visibility (real σ is
+# ~1–2 m on a 1 km plot). draw_covariance_ellipse!'s display_scale multiplies
+# the COVARIANCE, so it gets the square.
+const SIGMA_SCALE = 10.0
+
+# src/config.jl consumes ARGS[1] as its config DIRECTORY at include time, so
+# the run's snapshot is swapped in before the includes (same dance as
+# plot_showcase.jl / mc_nees.jl). The snapshot pins the hex lattice, the sensor
+# model and — for a `manual` scenario — the geometry itself.
+empty!(ARGS); push!(ARGS, CFG_DIR)
+using Plots, DataStructures, LinearAlgebra, Statistics, Random, Dates
+Random.seed!(42)
+include(joinpath(_ROOT, "src", "config.jl"))
+include(joinpath(_ROOT, "src", "obstacles.jl"))
+include(joinpath(_ROOT, "src", "minvo.jl"))
+include(joinpath(_ROOT, "src", "graph.jl"))
+include(joinpath(_ROOT, "src", "scenario_generation.jl"))   # ACTIVE_SCENARIO, OBSTACLES
+include(joinpath(_ROOT, "src", "covariance.jl"))
+include(joinpath(_ROOT, "src", "viz.jl"))
+include(joinpath(_ROOT, "planners", "hexspline_cl.jl"))     # bspline_sample_path, read_ctrls_csv
+
+# ── What the run saw ─────────────────────────────────────────────────────
+# The CSV is the authority on landmarks (a preset scenario draws random
+# covariances; the snapshot cannot regenerate those, the CSV recorded them).
+landmarks = read_landmarks_csv(joinpath(RUN_DIR, "scenario_landmarks.csv"))
+let sc = ACTIVE_SCENARIO.landmarks
+    same = length(sc) == length(landmarks) &&
+           all(hypot(sc[i].x - landmarks[i].x, sc[i].y - landmarks[i].y) < 1e-9 for i in eachindex(sc))
+    same || @warn "landmark positions in the config snapshot differ from scenario_landmarks.csv; using the CSV"
+end
+START_POS, GOAL_POS = ACTIVE_SCENARIO.start, ACTIVE_SCENARIO.goal
+graph = build_hex_graph(landmarks, START_POS, GOAL_POS; hex_r = HEX_RADIUS_M)
+
+ctrls = read_ctrls_csv(joinpath(ALGO_DIR, "csv", "main_ctrls.csv"))
+na = length(ctrls)
+na == NUM_AGENTS || error("main_ctrls.csv holds $(na) agents, config says $(NUM_AGENTS)")
+
+# Same samples optimize_continuous scored: bspline_sample_path with its
+# config defaults, then the waypoints-or-controls switch of eval_continuous.
+wpts = [first(bspline_sample_path(c)) for c in ctrls]
+eval_paths = CONT_UNC_USE_WAYPOINTS ? ctrls : wpts
+covs, arcs, comm, lm_events = evaluate_joint_discrete(eval_paths, landmarks, na)
+
+# ── Self-check against the run manifest ──────────────────────────────────
+function yaml_value(path::String, key::String)
+    for l in eachline(path)
+        m = match(Regex("^\\s*" * key * ":\\s*(\\S+)"), l)
+        m === nothing && continue
+        return m.captures[1]
+    end
+    return nothing
+end
+results_yaml = joinpath(ALGO_DIR, "results.yaml")
+prim_unc_str = yaml_value(results_yaml, "primary_unc")
+(prim_unc_str === nothing || prim_unc_str == "null") &&
+    error("$(results_yaml) reports no solution (primary_unc null)")
+prim_unc_run = parse(Float64, prim_unc_str)
+prim_unc_here = unc_radius(covs[end][end])
+abs(prim_unc_here - prim_unc_run) <= 1e-6 * max(1.0, abs(prim_unc_run)) ||
+    error("re-evaluated primary uncertainty $(prim_unc_here) ≠ results.yaml primary_unc $(prim_unc_run); " *
+          "the snapshot/CSVs do not reproduce this run")
+println("Self-check ✓ primary goal uncertainty $(round(prim_unc_here, digits = 4)) reproduces results.yaml")
+println("  primary_length=$(yaml_value(results_yaml, "primary_length"))  " *
+        "refinement_status=$(yaml_value(results_yaml, "refinement_status"))  " *
+        "threshold=$(UNC_RADIUS_THRESHOLD)")
+
+# ── Console table: what each comm event did ──────────────────────────────
+# pre = last sample strictly before the checkpoint arc (covariance before the
+# exchange), post = first sample at/after it (fused, plus at most one sample
+# of extra dead reckoning). The same "post" index places the ellipses.
+post_idx(a, t) = something(findfirst(>=(t - 1e-9), arcs[a]), length(arcs[a]))
+pre_idx(a, t)  = max(1, something(findlast(<(t - 1e-9), arcs[a]), 1))
+agent_name(a)  = a == na ? "primary" : "support $(a)"
+println("\nComm events (arc, weight, distance, σ = det(Σ)^¼ before → after):")
+for (t, a, b, w, pa, pb) in comm
+    d = hypot(pa[1] - pb[1], pa[2] - pb[2])
+    @printf("  arc %6.1f  w %.3f  d %6.1f m", t, w, d)
+    for (ag, _) in ((a, pa), (b, pb))
+        @printf("   %-9s %.3f → %.3f", agent_name(ag),
+                unc_radius(covs[ag][pre_idx(ag, t)]), unc_radius(covs[ag][post_idx(ag, t)]))
+    end
+    println()
+end
+let seen = sort(unique(ev[2] for ev in lm_events))
+    println("Landmark observations by: ", isempty(seen) ? "nobody" : join(agent_name.(seen), ", "))
+end
+
+# ── Figure ───────────────────────────────────────────────────────────────
+agent_color(a) = a == na ? :blue : get(agent_colors, a, :gray)
+# Supports are drawn with the same small y offset optimize_continuous uses, so
+# co-located agents stay distinguishable.
+y_offset(a) = a == na ? 0.0 : SUPPORT_PLOT_OFFSET_M * a
+
+plt = make_base_plot(landmarks, graph)
+for a in 1:na
+    xs = [w[1] for w in wpts[a]]; ys = [w[2] + y_offset(a) for w in wpts[a]]
+    plot!(plt, xs, ys, color = agent_color(a), linewidth = (a == na ? 2.2 : 1.3),
+          label = agent_name(a))
+end
+for (t, a, b, w, pa, pb) in comm
+    for (ag, pos) in ((a, pa), (b, pb))
+        draw_covariance_ellipse!(plt, pos[1], pos[2] + y_offset(ag), covs[ag][post_idx(ag, t)];
+                                 nstd = 2, color = agent_color(ag), alpha = 0.22,
+                                 display_scale = SIGMA_SCALE^2)
+    end
+end
+# Legend entry for the ellipses (an off-plot marker; shapes carry no legend key).
+scatter!(plt, [NaN], [NaN], marker = :circle, markersize = 9, color = :blue, alpha = 0.3,
+         markerstrokewidth = 0, label = @sprintf("fused covariance (2σ, ×%d)", Int(SIGMA_SCALE)))
+plot!(plt, xlabel = "x (m)", ylabel = "y (m)", size = (1000, 560))
+
+function save_all(p, stem::String)
+    for ext in ("png", "svg", "pdf")
+        savefig(p, "$(stem).$(ext)")
+    end
+    gs = Sys.which("gs")
+    if gs === nothing
+        @warn "ghostscript (gs) not found — no EPS written for $(stem)"
+    else
+        run(`$(gs) -q -dNOPAUSE -dBATCH -sDEVICE=eps2write -o $(stem).eps $(stem).pdf`)
+    end
+    println("  → $(stem).{png,svg,pdf" * (gs === nothing ? "" : ",eps") * "}")
+end
+
+mkpath(OUT_DIR)
+save_all(plt, joinpath(OUT_DIR, "fig1_continuous_ellipses"))
+plt_comm = deepcopy(plt)
+overlay_comm_events!(plt_comm, comm)
+save_all(plt_comm, joinpath(OUT_DIR, "fig1_continuous_ellipses_comm"))
