@@ -1,8 +1,13 @@
 # ==========================================================================
 # fig1_overview.jl — Fig. 1: the refined plan with a covariance ellipse at
-# every inter-agent communication point
+# every inter-agent communication point, or every <spacing> m of arc
 # ==========================================================================
-#   julia paper/new_draft/figures/fig1_overview.jl <run_dir> [<out_dir>]
+#   julia paper/new_draft/figures/fig1_overview.jl <run_dir> [<out_dir>] [<spacing_m>]
+#
+# <spacing_m> > 0 draws an ellipse for every agent every <spacing_m> m of its
+# own arc length (start and goal included) instead of only at the comm
+# checkpoints; the output stems then carry an `_every<spacing>m` suffix.
+# Default 0 = comm points only.
 #
 # <run_dir> is a generate_plan.jl output folder that ran hexspline_cl.
 # Everything is re-derived from what that run wrote — its config snapshot
@@ -33,6 +38,8 @@ length(ARGS) >= 1 || error("usage: julia fig1_overview.jl <run_dir> [<out_dir>]"
 abspath_or(p) = isabspath(p) ? p : joinpath(_ROOT, p)
 const RUN_DIR  = abspath_or(ARGS[1])
 const OUT_DIR  = length(ARGS) >= 2 ? abspath_or(ARGS[2]) : RUN_DIR
+const ELLIPSE_SPACING_M = length(ARGS) >= 3 ? parse(Float64, ARGS[3]) : 0.0
+ELLIPSE_SPACING_M >= 0 || error("spacing must be ≥ 0 (0 = comm points only)")
 const CFG_DIR  = joinpath(RUN_DIR, "config")
 const ALGO_DIR = joinpath(RUN_DIR, "hexspline_cl")
 isdir(CFG_DIR)  || error("no config snapshot at $(CFG_DIR)")
@@ -137,16 +144,33 @@ for a in 1:na
     plot!(plt, xs, ys, color = agent_color(a), linewidth = (a == na ? 2.2 : 1.3),
           label = agent_name(a))
 end
-for (t, a, b, w, pa, pb) in comm
-    for (ag, pos) in ((a, pa), (b, pb))
-        draw_covariance_ellipse!(plt, pos[1], pos[2] + y_offset(ag), covs[ag][post_idx(ag, t)];
-                                 nstd = 2, color = agent_color(ag), alpha = 0.22,
-                                 display_scale = SIGMA_SCALE^2)
+ellipse!(ag, pos, idx) = draw_covariance_ellipse!(plt, pos[1], pos[2] + y_offset(ag), covs[ag][idx];
+                                                  nstd = 2, color = agent_color(ag), alpha = 0.22,
+                                                  display_scale = SIGMA_SCALE^2)
+if ELLIPSE_SPACING_M > 0
+    # Every <spacing> m of each agent's own arc, at the first sample at/after
+    # that arc (same rule as the comm-point ellipses), start and goal included.
+    # The comm checkpoints sit on this grid too (comm_interval is a multiple),
+    # so the fused states are among these.
+    for ag in 1:na
+        nmax = floor(Int, arcs[ag][end] / ELLIPSE_SPACING_M + 1e-6)
+        for k in 0:nmax
+            idx = post_idx(ag, k * ELLIPSE_SPACING_M)
+            ellipse!(ag, eval_paths[ag][idx], idx)
+        end
     end
+    ell_label = @sprintf("covariance every %d m (2σ, ×%d)", Int(ELLIPSE_SPACING_M), Int(SIGMA_SCALE))
+else
+    for (t, a, b, w, pa, pb) in comm
+        for (ag, pos) in ((a, pa), (b, pb))
+            ellipse!(ag, pos, post_idx(ag, t))
+        end
+    end
+    ell_label = @sprintf("fused covariance (2σ, ×%d)", Int(SIGMA_SCALE))
 end
 # Legend entry for the ellipses (an off-plot marker; shapes carry no legend key).
 scatter!(plt, [NaN], [NaN], marker = :circle, markersize = 9, color = :blue, alpha = 0.3,
-         markerstrokewidth = 0, label = @sprintf("fused covariance (2σ, ×%d)", Int(SIGMA_SCALE)))
+         markerstrokewidth = 0, label = ell_label)
 plot!(plt, xlabel = "x (m)", ylabel = "y (m)", size = (1000, 560))
 
 function save_all(p, stem::String)
@@ -163,7 +187,8 @@ function save_all(p, stem::String)
 end
 
 mkpath(OUT_DIR)
-save_all(plt, joinpath(OUT_DIR, "fig1_continuous_ellipses"))
+suffix = ELLIPSE_SPACING_M > 0 ? @sprintf("_every%dm", Int(ELLIPSE_SPACING_M)) : ""
+save_all(plt, joinpath(OUT_DIR, "fig1_continuous_ellipses" * suffix))
 plt_comm = deepcopy(plt)
 overlay_comm_events!(plt_comm, comm)
-save_all(plt_comm, joinpath(OUT_DIR, "fig1_continuous_ellipses_comm"))
+save_all(plt_comm, joinpath(OUT_DIR, "fig1_continuous_ellipses" * suffix * "_comm"))
