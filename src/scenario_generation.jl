@@ -270,6 +270,64 @@ const SCENARIOS = Dict{Symbol, Function}(
                             # one rather than merely different.
                             build_obstacle([(1200.0,-325.0), (1440.0,-325.0), (1440.0,-195.0), (1200.0,-195.0)])],
                         start = (0.0, 0.0), goal = (1800.0, 0.0)),
+
+    # ── Ladder maze: Fig. 2 constraint ladder, MANY obstacles ────────────────
+    # Built for config/mc/sweep_fig2.yaml (one scenario, every planner, walked down
+    # the constraint ladder). Three full-height walls with two gaps each plus six
+    # plugs that seal the pockets nobody should route through: 14 obstacles. The
+    # corridor splits into a BLIND north lane (rows +1 → +2, 1500 m on the lattice,
+    # no landmark within visibility) and an INFORMATIVE south lane (rows −1 → −2
+    # → −3, all three landmarks) that needs the walls' lower gaps and ends 100 m
+    # short of the goal's x for anyone who wants the last landmark.
+    #
+    # The ladder this produces (hexspline_cl, 2 agents, measured 2026-09-07):
+    #   100–70 %  primary 1500 (north, blind); support A(−1) B(−2) sees L1 only,
+    #             climbs back into comm range → primary σ ≈ 7.6–8.8
+    #    60–30 %  primary 1600 (north + one wiggle before the goal, which buys the
+    #             support one more step); support completes the south sweep
+    #             (L1, L2, L3) and relays at the goal → primary σ ≈ 3.1
+    # greedy holds the blind 1500 m route and passes only at 100 %; formation,
+    # sequential and CL-GBT find nothing the harness accepts at any rung (see
+    # paper/new_draft/figures/figure2/README.md).
+    #
+    # GEOMETRY IS PINNED TO hex_width_m: 100 (rows 0, ±86.6, ±173.2, ±259.8 with
+    # corridor_y_max_m: 300; row parity: rows 0/±173.2 at x ≡ 0 (mod 100), rows
+    # ±86.6/±259.8 at x ≡ 50). It is NOT a config/mc (150 m) scenario — sweep_fig2
+    # overrides the lattice. Rules the layout obeys, learned from the seed gate
+    # (seed_spline_clear, the committed-face MINVO hull): a wall is 150 m wide so
+    # it covers a cell of each parity; gap faces sit 60 m off the gap row's centre
+    # (the blocked neighbour row's cell is still 26.6 m inside); and a lane change
+    # may land no closer than ~100 m before a wall's near face and must be preceded
+    # by one straight cell after its far face — a diagonal that lands at a face puts
+    # the segment's MINVO hull across the block's corner and the gate rejects it.
+    # Plugs sit only in cells no shipped route uses.
+    #
+    # LANDMARK ORDER IS LOAD-BEARING: lms[1].cov is Σ₀. L3 (latest, strongest) first.
+    :ladder_maze => () -> (landmarks = Landmark[
+                              Landmark(1350.0, -233.0, [1.0 0.0; 0.0 0.8]),   # L3: seen from row −2 at x 1300/1400 (also Σ₀)
+                              Landmark(1050.0, -320.0, [1.5 0.0; 0.0 1.2]),   # L2: wall C's row −3 gap
+                              Landmark( 650.0, -240.0, [2.0 0.0; 0.0 1.6])],  # L1: wall B's row −2 gap
+                          obstacles = Obstacle[
+                              # Wall A, x ∈ [200,350] — gaps at rows +1 and −1
+                              build_obstacle([(200.0, 146.6), (350.0, 146.6), (350.0, 330.0), (200.0, 330.0)]),
+                              build_obstacle([(200.0, -26.6), (350.0, -26.6), (350.0, 26.6), (200.0, 26.6)]),
+                              build_obstacle([(200.0,-330.0), (350.0,-330.0), (350.0,-146.6), (200.0,-146.6)]),
+                              # Wall B, x ∈ [600,750] — gaps at rows +1 and −2
+                              build_obstacle([(600.0, 146.6), (750.0, 146.6), (750.0, 330.0), (600.0, 330.0)]),
+                              build_obstacle([(600.0,-113.2), (750.0,-113.2), (750.0, 26.6), (600.0, 26.6)]),
+                              build_obstacle([(600.0,-330.0), (750.0,-330.0), (750.0,-233.2), (600.0,-233.2)]),
+                              # Wall C, x ∈ [1000,1150] — gaps at rows +2 and −3
+                              build_obstacle([(1000.0, 233.2), (1150.0, 233.2), (1150.0, 330.0), (1000.0, 330.0)]),
+                              build_obstacle([(1000.0,-199.8), (1150.0,-199.8), (1150.0, 113.2), (1000.0, 113.2)]),
+                              # Plugs (row 0 and the ±3 pockets of chambers A–B, B–C, and the
+                              # +3 pocket before the goal). Each seals cells no shipped route uses.
+                              build_obstacle([(375.0, -26.6), (525.0, -26.6), (525.0, 26.6), (375.0, 26.6)]),
+                              build_obstacle([(425.0, 233.2), (575.0, 233.2), (575.0, 330.0), (425.0, 330.0)]),
+                              build_obstacle([(425.0,-330.0), (575.0,-330.0), (575.0,-233.2), (425.0,-233.2)]),
+                              build_obstacle([(775.0, -26.6), (925.0, -26.6), (925.0, 26.6), (775.0, 26.6)]),
+                              build_obstacle([(800.0, 233.2), (900.0, 233.2), (900.0, 330.0), (800.0, 330.0)]),
+                              build_obstacle([(1200.0, 233.2), (1400.0, 233.2), (1400.0, 330.0), (1200.0, 330.0)])],
+                          start = (0.0, 0.0), goal = (1400.0, 173.20508075688772)),
 )
 
 # ── Manual scenario: geometry read straight from config/main.yaml ──
