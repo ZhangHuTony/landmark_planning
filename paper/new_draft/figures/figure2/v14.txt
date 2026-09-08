@@ -1,0 +1,13 @@
+start: 0,0
+goal: 1700,173.20508
+# Graded rungs (N_min = 18 steps = blind north lane, 1800 m):
+#   N=18  support visits the north pocket L1 (550,300) from (550,259.8) and rejoins  → weak, early relay
+#   N=19  support takes the south lane to L2 (1250,-320) at wall C's row -3 gap, climbs to (1600,0)
+#   N=20  ... and on to L3 (1750,-233), seen from (1700,-173.2), relays from (1750,-86.6)
+# L3 first (= Σ₀). L3 deliberately WEAK (cov 4): at N=19 the support sees it from (1700,-173.2) but can only relay at w≈0.09 (346 m) — not enough for the 40–30 % rungs; at N=20 it climbs to (1750,-86.6) and relays at w≈0.85.
+landmarks: 1750,-233 @ 4.0,0,0,3.2 | 1250,-320 @ 1.0,0,0,0.8 | 550,300 @ 6.0,0,0,4.8
+# wall A [200,350]: house / stretched hexagon / inverted house (gaps +1, -1)
+# wall B [800,950]: trapezoid / pointed hexagon / trapezoid (gaps +1, -2)
+# wall C [1200,1350]: trapezoid / big hexagon (gaps +2, -3)
+# plugs: row 0 A-B hexagon, row -3 A-B inverted house, row 0 B-C hexagon, row +3 B-C house, row +3 C-goal trapezoid
+obstacles: 200,146.6; 350,146.6; 350,300; 275,330; 200,300 | 185,0; 215,-26.6; 335,-26.6; 365,0; 335,26.6; 215,26.6 | 200,-300; 275,-330; 350,-300; 350,-146.6; 200,-146.6 | 800,146.6; 950,146.6; 915,330; 835,330 | 800,-113.2; 950,-113.2; 975,-43.3; 950,26.6; 800,26.6; 775,-43.3 | 800,-330; 950,-330; 925,-233.2; 825,-233.2 | 1225,233.2; 1325,233.2; 1350,330; 1200,330 | 1200,113.2; 1350,113.2; 1380,-43.3; 1350,-199.8; 1200,-199.8; 1170,-43.3 | 360,0; 390,-26.6; 710,-26.6; 740,0; 710,26.6; 390,26.6 | 425,-330; 775,-330; 775,-300; 740,-233.2; 460,-233.2; 425,-300 | 960,0; 990,-26.6; 1110,-26.6; 1140,0; 1110,26.6; 990,26.6 | 1000,233.2; 1200,233.2; 1200,300; 1150,330; 1050,330; 1000,300 | 1400,233.2; 1700,233.2; 1680,330; 1420,330

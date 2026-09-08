@@ -130,20 +130,20 @@ for (i, m) in enumerate(METHODS), (j, pct) in enumerate(PCTS)
         annotate!(p, (XL[1] + XL[2]) / 2, 0.0, text("not run", 8, :gray40))
     else
         c.ctrls === nothing || draw_paths!(p, c.ctrls; alpha = c.ok ? 1.0 : 0.4)
-        # Status line in the top-left corner: the rows above the wall A block are open
-        # there (start is on row 0, the walls begin at x = 200), so nothing is hidden.
-        if c.ok && c.len !== nothing && c.unc !== nothing
-            annotate!(p, XL[1] + 15, YL[2] - 30, text(@sprintf("%.0f m,  σ = %.2f m", c.len, c.unc), 7, :black, :left))
-        elseif !c.ok
-            annotate!(p, XL[1] + 15, YL[2] - 30, text("✗ " * replace(c.why, "_" => " "), 7, :firebrick, :left))
-        end
     end
-    i == 1 && plot!(p, title = @sprintf("%d %%  (σ ≤ %.2f m)", pct, c === nothing ? NaN : c.thr), titlefontsize = 9)
+    # Status goes in the panel TITLE (the field fills the whole frame, so any in-plot
+    # label sits on an obstacle); the first row prepends the column header.
+    status = c === nothing ? "not run" :
+             c.ok && c.len !== nothing && c.unc !== nothing ? @sprintf("%.0f m,  σ = %.2f m", c.len, c.unc) :
+             c.ok ? "ok" : "✗ " * replace(c.why, "_" => " ")
+    hdr = i == 1 ? @sprintf("%d %%  (σ ≤ %.2f m)\n", pct, c === nothing ? NaN : c.thr) : ""
+    plot!(p, title = hdr * status, titlefontsize = i == 1 ? 8 : 7,
+          titlefontcolor = (c !== nothing && !c.ok) ? :firebrick : :black)
     j == 1 && plot!(p, ylabel = get(LABEL, m, m), guidefontsize = 9)
     push!(panels, p)
 end
 nr, nc = length(METHODS), length(PCTS)
-fig = plot(panels..., layout = (nr, nc), size = (nc * 400, nr * 175 + 30),
+fig = plot(panels..., layout = (nr, nc), size = (nc * 400, nr * 190 + 40),
            left_margin = 2Plots.mm, bottom_margin = 1Plots.mm, top_margin = 1Plots.mm)
 
 function save_all(p, stem::String)

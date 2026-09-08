@@ -79,6 +79,51 @@ lanes, 13 obstacles) — the same collapse; v7 (v6 with L3 on row −3 only) —
 1800 m plan the tight rungs need is not found in 10⁶ expansions (the 1700 m
 layer of joint states is too big). v5 = v8 without the plugs.
 
+## Candidate 2 — `ladder_shapes` (v14): varied shapes, four rungs
+
+Same skeleton (walls A/B/C with two gaps each, plugs, blind north lane, informative
+south lane) drawn with houses, hexagons and trapezoids, corridor 1700 m, goal on
+row +2 at (1700, 173.2), 13 obstacles. The landmarks are graded so each extra 100 m
+of primary length buys the support exactly one more option (`v11`–`v14`, ladder
+runs `results/fig2/v14_p*`; U_ref 13.75):
+
+| pct | σ bound | lattice | spline | σ at goal | plan |
+|---|---|---|---|---|---|
+| 100–80 | 13.75–11.0 | 1800 | 1738 | 9.72 | primary north, blind; support climbs into the row-+3 pocket of chamber A–B for the weak L1 and rejoins |
+| 70 | 9.63 | 1800 | 1761 | 8.89 | support takes the south lane to L2 (wall C's row −3 gap) and relays at half weight from ~300 m |
+| 60–50 | 8.25–6.88 | 1900 | 1795 | 7.34–6.70 | primary wiggles once before the goal; support relays L2 (and a w≈0.09 glimpse of L3) from (1600, 0) |
+| 40–30 | 5.50–4.13 | 2000 | 1890 | 3.90–3.87 | primary detours down to row 0 before the goal; support sees L3 from (1700, −173.2) and relays from (1750, −86.6) |
+
+Tuning that made it four plans (all landmark covariances, nothing else):
+* `v11` (L3 cov 1): the N=19 support already saw L3 and relayed it at comm weight
+  0.09 from 346 m — enough for σ 3.5, so 60–30 % were one plan. The comm taper is
+  soft (width 20 m around 300 m), so "out of range" is never a wall; a strong
+  landmark leaks through a 9 % relay. L3 cov 4 fixes it (`v12`).
+* `v12`/`v13` (L1 cov 3–3.5): the pocket plan's σ landed at 9.605–9.611 against a
+  70 % bound of 9.606–9.611 — exactly on the rung. L1 cov 6 moves it to 9.72 and
+  the 70 % rung falls to the south half-relay plan (`v14`).
+* `v9`/`v10` (goal at 1400/1500): with the goal one cell earlier the N=16 south
+  climb after wall C breached the gate and L2/L3 arrived together.
+
+The 2000 m rungs cost ~440k A* expansions (~2 min); every other rung < 32k.
+
+### Candidate 2 sweep (`fig2_ladder/shapes_v14`, all five planners)
+
+| | 100 % (13.75) | 90 % | 80 % | 70 % (9.62) | 60 % | 50 % (6.87) | 40 % | 30 % (4.12) |
+|---|---|---|---|---|---|---|---|---|
+| ours | 1738 / 9.72 | 1737 / 9.72 | 1738 / 9.72 | 1761 / 8.89 | 1766 / 7.34 | 1770 / 6.49 | 1907 / 3.90 | 1909 / 3.53 |
+| greedy | 1748 / 12.22 | 1748 / 12.22 | ✗ recovery | ✗ | ✗ | ✗ | ✗ | ✗ |
+| formation | ✗ recovery (south-lane attempt, spline hits an obstacle) | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
+| sequential | ✗ no solution (leg 1 finds no primary route) | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
+| CL-GBT | 1739 / 10.91 | ✗ no solution | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
+
+The 100/70/50/30 columns are four different plans for ours (pocket relay → south
+half-relay → wiggle + L2 → row-0 detour + L3); CL-GBT passes the loosest rung here
+(its 200k-iteration tree reaches the goal in this wider corridor). The 2000 m rungs
+needed 978k expansions in this run against config/mc's 1e6 budget — `sweep_fig2.yaml`
+now gives hexspline_cl 1.5e6. Figure: `fig2_ladder_grid_shapes_v14.*` (the v8
+candidate's grid is kept as `fig2_ladder_grid_maze_v8.png`).
+
 ## Files
 
 ```
@@ -88,14 +133,16 @@ tools/ladder.sh        reference + hexspline_cl at 100…30 % (4 at a time), pri
 tools/baselines.sh     the four baselines at chosen levels, prints the table
 tools/gate_probe.jl    hand-typed lattice polyline → per-segment seed-gate slacks
 v1.txt … v8.txt        the candidate fields (v8 == the ladder_maze preset)
-plot_ladder_grid.jl    the figure, from a sweep_fig2 run
+plot_ladder_grid.jl    the figure, from a sweep_fig2 run (status in each panel's title)
+fig2_ladder_grid_shapes_v14.{png,svg,pdf,eps}   candidate 2 grid (the current pick)
+fig2_ladder_grid_maze_v8.png                    candidate 1 grid
 ```
 
 ## Regenerating
 
 ```
-~/.juliaup/bin/julia run_constraint_sweep.jl --sweep config/mc/sweep_fig2.yaml --tag v8     # → fig2_ladder/v8
-~/.juliaup/bin/julia paper/new_draft/figures/figure2/plot_ladder_grid.jl fig2_ladder/v8 100,70,50,30
+~/.juliaup/bin/julia run_constraint_sweep.jl --sweep config/mc/sweep_fig2.yaml --tag shapes_v14   # → fig2_ladder/shapes_v14 (scenario_name in the yaml)
+~/.juliaup/bin/julia paper/new_draft/figures/figure2/plot_ladder_grid.jl fig2_ladder/shapes_v14 100,70,50,30
 ```
 
 ## The sweep (`fig2_ladder/v8`, harness run, all five planners)
