@@ -99,6 +99,13 @@ PLANNED_COLOR = "#404040"
 LW_OBSTACLE, LW_PLANNED, LW_PRIMARY, LW_SUPPORT = 0.6, 0.7, 1.1, 0.8
 MS_LANDMARK, MS_START, MS_GOAL = 2.6, 4.2, 6.5
 DEV_PANEL_IN = 0.62      # height of the cross-track panel, inches
+# A trial that fails to capture a waypoint orbits it until the stall guard
+# fires, and keeps flying: the tell is arc flown against arc planned. Measured
+# at ~25-40 % of seeds across three different plans (notes/LOGS.md 2026-09-08),
+# and the two populations answer different questions -- pooled, the collision
+# rate and the terminal sigma describe neither. 1.15 separates them cleanly:
+# trials that fly the plan land at 1.02-1.05x, orbiting ones at 1.4-2.3x.
+ORBIT_ARC_RATIO = 1.15
 
 
 def over_white(color, alpha):
@@ -203,7 +210,7 @@ def aggregate(trials):
 # Table
 # ---------------------------------------------------------------------------
 
-def summarize(trials, out_csv):
+def summarize(trials, out_csv, case="case"):
     """Per-trial rows for `tab:mc`, plus the aggregate the table prints."""
     rows = []
     for t in trials:
@@ -220,6 +227,7 @@ def summarize(trials, out_csv):
             "rms_cross_track_m": tk["rms_cross_track_m"],
             "max_cross_track_m": tk["max_cross_track_m"],
             "arc_length_m": tk["arc_length_m"],
+            "planned_length_m": tk["planned_length_m"],
             "ticks": tk["ticks"],
             "terminal_est_error_m": e["terminal_est_error_m"],
             "terminal_unc_m": e["terminal_unc_m"],
@@ -276,6 +284,11 @@ def summarize(trials, out_csv):
         "skipped_waypoints": sum(r["n_skipped_waypoints"] for r in rows),
     }
 
+    planned = rows[0]["planned_length_m"]
+    flew = [r for r in rows if r["arc_length_m"] < ORBIT_ARC_RATIO * planned]
+    orbited = [r for r in rows if r["arc_length_m"] >= ORBIT_ARC_RATIO * planned]
+    stats["n_flew_plan"], stats["n_orbited"] = len(flew), len(orbited)
+
     print("\n  trials                 %d" % n)
     print("  reached goal           %d/%d" % (reached, n))
     print("  obstacle-clear         %d/%d  (max penetration %.3f m)" % (clear, n, stats["max_penetration_m"]))
@@ -290,9 +303,24 @@ def summarize(trials, out_csv):
     stats["support_skipped_waypoints"] = sup_skips
     print("  skipped waypoints      %d primary, %d support" % (
         stats["skipped_waypoints"], sup_skips))
+    # Split, because the two populations answer different questions: one says
+    # whether the plan is right, the other whether the closed loop can fly it.
+    for label, g in (("flew the plan", flew), ("orbited a waypoint", orbited)):
+        if not g:
+            continue
+        gs = sorted(r["terminal_unc_m"] for r in g)
+        med = gs[len(gs) // 2] if len(gs) % 2 else 0.5 * (gs[len(gs) // 2 - 1] + gs[len(gs) // 2])
+        print("  %-22s n=%2d  goal %2d/%-2d  clear %2d/%-2d  bound %2d/%-2d  "
+              "median sigma_T %6.3f  mean arc %5.0f m" % (
+                  label, len(g),
+                  sum(bool(r["reached_goal"]) for r in g), len(g),
+                  sum(r["max_penetration_m"] <= 0.0 and r["collision_sensor_hits"] == 0 for r in g), len(g),
+                  sum(r["terminal_unc_m"] <= thr for r in g), len(g),
+                  med, np.mean([r["arc_length_m"] for r in g])))
+
     print("\n  tab:mc row:")
-    print("    ladder\\_shapes @ 30\\%% & %d & %d/%d & %d/%d & %.2f\\,/\\,%.2f \\\\" % (
-        n, n - clear, n, bound_met, n, pred, emp_sigma))
+    print("    %s & %d & %d/%d & %d/%d & %.2f\\,/\\,%.2f \\\\" % (
+        case.replace("_", "\\_"), n, n - clear, n, bound_met, n, pred, emp_sigma))
     return stats
 
 
@@ -424,7 +452,7 @@ def main(argv):
     args = [a for a in argv[1:] if not a.startswith("--")]
     if not args:
         sys.exit(__doc__)
-    opts = dict(prefix="mc", out=HERE, stem="fig8_montecarlo",
+    opts = dict(prefix="mc", out=HERE, stem="fig8_montecarlo", case="",
                 nstd=str(DEFAULT_NSTD), width=str(COLUMN_IN))
     for a in argv[1:]:
         if a.startswith("--") and "=" in a:
@@ -442,7 +470,8 @@ def main(argv):
     print(f"{len(trials)} trials: {', '.join(t.tag for t in trials)}")
 
     os.makedirs(opts["out"], exist_ok=True)
-    summarize(trials, os.path.join(opts["out"], f"{opts['stem']}_summary.csv"))
+    summarize(trials, os.path.join(opts["out"], f"{opts['stem']}_summary.csv"),
+              case=opts["case"] or opts["stem"])
 
     agg, n_used = aggregate(trials)
     for name, k in n_used.items():
