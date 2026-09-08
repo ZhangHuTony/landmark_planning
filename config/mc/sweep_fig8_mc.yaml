@@ -1,0 +1,84 @@
+# ==========================================================================
+# Fig. 8 / Table tab:mc re-plan — read ONLY by run_constraint_sweep.jl
+# ==========================================================================
+# The same `ladder_shapes` ladder as sweep_fig2.yaml, ours only, re-planned so
+# that the plan it hands the HoloOcean tester is actually FLYABLE and its
+# certificate is scored on the curve the vehicle flies. Three reasons, all
+# measured on the first 20-trial Monte Carlo set (results/mc_fig2_shapes_v14_p030,
+# notes/LOGS.md 2026-09-08):
+#
+#   1. min_turn_radius_m 40 -> 82. config/mc admits 40 m corners; the shipped
+#      p030 plan's tightest is 73.6 m, and the CougUV's turn radius at
+#      SPEED_RPM 1300 is ~82 m (multiagent_base/controller.py: TURN_RADIUS_M,
+#      and arrival_radius is calibrated against it). 5 of 20 seeds overshot that
+#      corner, never captured the waypoint, and orbited — 3624 m flown against
+#      1909 m planned, 4 of the 5 into obstacles. The 15 that made the corner
+#      were 15/15 obstacle-clear, so the constraint is the fix, not the vehicle.
+#   2. cont_unc_use_waypoints true -> false. The bound was being certified on
+#      the control polygon; the sim flies the spline, so
+#      unc_ratio_planner_over_sim was 0.84-0.90 (the model optimistic) and the
+#      median terminal sigma landed on the bound at 4.122 vs 4.125.
+# NOT changed, after trying: the calibrated noise ruler (dir 0.05 -> 0.01,
+# landmark 0.038 -> 0.33, comm 0.038 -> 0.5, bearing ratio 2.2 -> 0.44) — the
+# ruler multiagent_base's FactorGraph.calibrate_to_planner was fitted to, which
+# config/mc was never re-synced to. `ladder_shapes` is INFEASIBLE under it: the
+# reference run (1 agent, threshold 1e9) discards every goal pop with "its
+# B-spline breaches an obstacle" and gives up after 29834 expansions, against 32
+# expansions and a clean solve without it. Bisected one override at a time; the
+# turn radius and the spline certification below are innocent.
+#   Why: seed_spline_clear gates on obstacles_clear(plan, ctrls, covs) — a
+#   CHANCE constraint at obstacle_delta 0.05, so the clearance a route needs
+#   scales with the agent's covariance. The reference is a single agent with no
+#   comms, so landmarks are its only correction; at 0.33 they are ~9x weaker
+#   than the 0.038 this scenario's 120 m gaps were laid out around, while dead
+#   reckoning only drops 5x. The uncertainty ellipse closes the gaps.
+#   Re-tuning ladder_shapes' geometry for the calibrated ruler is a scenario
+#   redesign, not a config change, and would cost the Fig. 2 grid its scenario.
+#   The mismatch stays a stated limitation (main.tex tab:noise already flags it).
+#
+# Because the ruler is unchanged, so is the reference's discrete seed:
+# U_ref = 13.749503082929923, exactly fig2_ladder/shapes_v14's, so the 30 % rung
+# lands on the same 4.124851 m bound as the plan already flown in
+# results/mc_fig2_shapes_v14_p030. The two Monte Carlo sets are therefore
+# directly comparable, and the turn radius is the single variable between them.
+#
+# The full ladder runs, not just the 30 % rung the Monte Carlo needs: an 82 m
+# curvature bound may make some rungs infeasible, and the neighbouring rungs are
+# what say so.
+# ==========================================================================
+
+scenario_name: ladder_shapes
+scenario_seed_base: 1
+
+# The first three are sweep_fig2.yaml's, unchanged — ladder_shapes is pinned to
+# the 100 m lattice. The last two are items 1 and 2 above. Every one reaches the
+# reference run too, which is what keeps U_ref on the same ruler as the ladder.
+overrides: hex_width_m=100.0,corridor_halfwidth_m=260.0,corridor_y_max_m=300.0,min_turn_radius_m=82.0,cont_unc_use_waypoints=false
+
+# One scenario, built on purpose — the screen would either pass it or throw the
+# whole sweep away.
+reject_trivial_straight: false
+
+pct_start: 100
+pct_step: 10
+pct_floor: 30
+pct_patience: 0
+method_patience: 0
+
+# Ours only. The baselines are not re-flown in simulation at all (they share the
+# belief model — see main.tex Sec. VII), so re-planning them here would be
+# compute spent on plans nothing consumes.
+methods: hexspline_cl@algorithms=hexspline_cl,num_agents=2,astar_iteration_limit=1500000,track_comm_events=true,track_landmark_events=true
+
+# main_ctrls.csv IS the deliverable: it is what plan_io.load_run reads.
+save_csv: true
+save_figures: true
+
+# 3 x heap_hint 6 GB against 31 GB of RAM. sweep_fig2 runs 4 x 4 GB, but that
+# was budgeted for five planners sharing the pool; here one planner may need the
+# headroom on a single rung.
+workers: 3
+heap_hint_gb: 6
+run_timeout_s: 1800
+
+outroot: mc_replan
