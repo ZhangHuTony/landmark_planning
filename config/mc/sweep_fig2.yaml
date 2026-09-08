@@ -13,7 +13,9 @@
 # lattice (see `overrides`).
 # ==========================================================================
 
-scenario_name: ladder_maze
+# Two registered candidates: `ladder_maze` (rectangles, 1400 m, two distinct plans —
+# fig2_ladder/v8) and `ladder_shapes` (varied shapes, 1700 m, four distinct plans).
+scenario_name: ladder_shapes
 scenario_seed_base: 1
 
 # The ladder_maze geometry is pinned to a 100 m hex lattice (rows at multiples of
@@ -46,7 +48,8 @@ save_csv: true
 save_figures: true
 
 # Measured on ladder_maze: hexspline_cl finds every rung in < 7k expansions
-# (seconds); CL-GBT runs its full 200k-iteration tree (~10 min) at every rung.
+# (seconds); on ladder_shapes the 2000 m rungs take ~440k expansions (~2 min).
+# CL-GBT runs its full 200k-iteration tree (~1–10 min) at every rung.
 workers: 4
 heap_hint_gb: 4
 run_timeout_s: 1800

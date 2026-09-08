@@ -328,6 +328,54 @@ const SCENARIOS = Dict{Symbol, Function}(
                               build_obstacle([(800.0, 233.2), (900.0, 233.2), (900.0, 330.0), (800.0, 330.0)]),
                               build_obstacle([(1200.0, 233.2), (1400.0, 233.2), (1400.0, 330.0), (1200.0, 330.0)])],
                           start = (0.0, 0.0), goal = (1400.0, 173.20508075688772)),
+
+    # ── Ladder shapes: Fig. 2 candidate 2 — varied convex shapes, FOUR rungs ──────
+    # Same skeleton as :ladder_maze (three gapped walls, plugs, blind north lane,
+    # informative south lane) drawn with houses, hexagons and trapezoids instead of
+    # rectangles, on a 1700 m corridor, and with the landmarks graded so that each
+    # extra 100 m of primary length unlocks exactly one more option for the support:
+    #   N=18 (1800, blind north lane)  support visits the NORTH POCKET landmark L1
+    #        from (550, 259.8) and rejoins — a weak, early relay (σ ≈ 9.7)
+    #   N=18, tighter                  support takes the south lane to L2 at wall C's
+    #        row −3 gap and can only relay at half weight from ~300 m (σ ≈ 8.9)
+    #   N=19 (1900)                    primary wiggles once; support relays L2 (and a
+    #        w≈0.09 glimpse of the weak L3) from (1600, 0) (σ ≈ 6.7–7.3)
+    #   N=20 (2000)                    primary detours down to row 0 before the goal;
+    #        support sees L3 from (1700, −173.2) and relays from (1750, −86.6) (σ ≈ 3.9)
+    # Measured 2026-09-07 (paper/new_draft/figures/figure2/README.md, v14): the
+    # 100/70/50/30 % columns are four different plans. L3 is deliberately WEAK
+    # (cov 4): with cov 1 the N=19 glimpse at comm weight 0.09 already gave σ 3.5
+    # and the fourth rung vanished. L1 is weak (cov 6) so the pocket plan lands above
+    # the 70 % rung instead of exactly on it (cov 3–3.5 put it at 9.605 vs 9.606).
+    #
+    # Lattice: hex_width_m 100 (see :ladder_maze for the seed-gate rules every block
+    # obeys; the slanted faces are extra clearance, never less). Row +3 pocket in
+    # chamber A–B is deliberately left OPEN (no plug) — that is where L1 sits.
+    # LANDMARK ORDER IS LOAD-BEARING: lms[1].cov is Σ₀ — L3 first, so Σ₀ is 4.0/3.2.
+    :ladder_shapes => () -> (landmarks = Landmark[
+                                Landmark(1750.0, -233.0, [4.0 0.0; 0.0 3.2]),   # L3: weak, seen from (1700,−173.2) / (1750,−259.8); also Σ₀
+                                Landmark(1250.0, -320.0, [1.0 0.0; 0.0 0.8]),   # L2: wall C's row −3 gap
+                                Landmark( 550.0,  300.0, [6.0 0.0; 0.0 4.8])],  # L1: north pocket, seen from (550, 259.8) only
+                            obstacles = Obstacle[
+                                # Wall A, x ∈ [200,350] — gaps at rows +1 and −1: house / stretched hexagon / inverted house
+                                build_obstacle([(200.0, 146.6), (350.0, 146.6), (350.0, 300.0), (275.0, 330.0), (200.0, 300.0)]),
+                                build_obstacle([(185.0, 0.0), (215.0, -26.6), (335.0, -26.6), (365.0, 0.0), (335.0, 26.6), (215.0, 26.6)]),
+                                build_obstacle([(200.0,-300.0), (275.0,-330.0), (350.0,-300.0), (350.0,-146.6), (200.0,-146.6)]),
+                                # Wall B, x ∈ [800,950] — gaps at rows +1 and −2: trapezoid / pointed hexagon / trapezoid
+                                build_obstacle([(800.0, 146.6), (950.0, 146.6), (915.0, 330.0), (835.0, 330.0)]),
+                                build_obstacle([(800.0,-113.2), (950.0,-113.2), (975.0, -43.3), (950.0, 26.6), (800.0, 26.6), (775.0, -43.3)]),
+                                build_obstacle([(800.0,-330.0), (950.0,-330.0), (925.0,-233.2), (825.0,-233.2)]),
+                                # Wall C, x ∈ [1200,1350] — gaps at rows +2 and −3: trapezoid / big hexagon
+                                build_obstacle([(1225.0, 233.2), (1325.0, 233.2), (1350.0, 330.0), (1200.0, 330.0)]),
+                                build_obstacle([(1200.0, 113.2), (1350.0, 113.2), (1380.0, -43.3), (1350.0,-199.8), (1200.0,-199.8), (1170.0, -43.3)]),
+                                # Plugs: row 0 of chamber A–B (hexagon), its row −3 pocket (inverted house),
+                                # row 0 of chamber B–C (hexagon), its row +3 pocket (house), row +3 before the goal (trapezoid)
+                                build_obstacle([(360.0, 0.0), (390.0, -26.6), (710.0, -26.6), (740.0, 0.0), (710.0, 26.6), (390.0, 26.6)]),
+                                build_obstacle([(425.0,-330.0), (775.0,-330.0), (775.0,-300.0), (740.0,-233.2), (460.0,-233.2), (425.0,-300.0)]),
+                                build_obstacle([(960.0, 0.0), (990.0, -26.6), (1110.0, -26.6), (1140.0, 0.0), (1110.0, 26.6), (990.0, 26.6)]),
+                                build_obstacle([(1000.0, 233.2), (1200.0, 233.2), (1200.0, 300.0), (1150.0, 330.0), (1050.0, 330.0), (1000.0, 300.0)]),
+                                build_obstacle([(1400.0, 233.2), (1700.0, 233.2), (1680.0, 330.0), (1420.0, 330.0)])],
+                            start = (0.0, 0.0), goal = (1700.0, 173.20508075688772)),
 )
 
 # ── Manual scenario: geometry read straight from config/main.yaml ──
