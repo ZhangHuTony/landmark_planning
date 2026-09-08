@@ -124,6 +124,39 @@ needed 978k expansions in this run against config/mc's 1e6 budget — `sweep_fig
 now gives hexspline_cl 1.5e6. Figure: `fig2_ladder_grid_shapes_v14.*` (the v8
 candidate's grid is kept as `fig2_ladder_grid_maze_v8.png`).
 
+## Candidate 3 — `ladder_long` (v15, run at ε = 0.25): 2350 m, four walls, four rungs
+
+`v15`–`v19` stretch the shapes skeleton to four walls (A/B/C/D at x 200/800/1300/1800,
+gaps +1/−1, +1/−2, +2/−3, +2/−2), goal on row +1 at (2350, 86.6), 18 obstacles
+(houses, hexagons, trapezoids, seven plugs). Blind north lane 2500 m (U_ref 16.2);
+south lane past L2 (C's row −3 gap) with an optional dip to L3 behind D; one weak
+north-pocket landmark L1 above chamber A–B.
+
+**At ε = 0 the ladder has three plans** (`v15`: pocket / south + L3 leak / 2600 m
+dip at 30 %; the +100 m rung took 850k expansions, +200 m is out of reach) and
+every attempt to add a fourth family at fixed length failed: plans that share an
+early history resolve to the best one in the family (v17: two north pockets
+merge; v18: the "no-dip" south plan is beaten by the dip plan whose fresh L2 fix
+relays at weight 0.09; v19: a pocket in chamber C–D is seen by the primary from
+its row-+2 lane even at detection probability 0.006 and U_ref drops 20 %). Two
+lessons: a landmark within ~250 m of the primary's lane is not hidden, and a
+relay at comm weight 0.05–0.09 of a fresh fix still halves σ.
+
+**At ε = 0.25** (`sweep_fig2_long.yaml`, as `sweep_showcase.yaml` did) every rung
+is found in < 100k expansions and the plan changes shape four times
+(`fig2_ladder/long_v15e`, ours only):
+
+| pct | σ bound | lattice | spline | σ at goal | plan |
+|---|---|---|---|---|---|
+| 100–70 | 16.2–11.3 | 2500 | 2389 | 10.2 | primary north; support sweeps the south lane (L2) and relays from row −2 behind D |
+| 60 | 9.72 | 2500 | 2421 | 8.79 | same length; primary wiggles once early, support climbs to relay closer |
+| 50–40 | 8.10–6.48 | 2600 | 2413–2417 | 8.06–6.48 | primary dips toward row 0 before the goal |
+| 30 | 4.86 | 2700 | 2591 | 3.22 | primary dips to row −2 beside L3 and climbs back; support relays at the goal |
+
+Seeds are up to 25 % suboptimal by construction (qualitative ladder, not a length
+benchmark). Single-rung figures: `singles_long_v15e/fig2_hexspline_cl_p{100,060,050,030}.*`;
+the shapes candidate's are in `singles_shapes_v14/` (100/70/50/30).
+
 ## Files
 
 ```
@@ -133,7 +166,10 @@ tools/ladder.sh        reference + hexspline_cl at 100…30 % (4 at a time), pri
 tools/baselines.sh     the four baselines at chosen levels, prints the table
 tools/gate_probe.jl    hand-typed lattice polyline → per-segment seed-gate slacks
 v1.txt … v8.txt        the candidate fields (v8 == the ladder_maze preset)
-plot_ladder_grid.jl    the figure, from a sweep_fig2 run (status in each panel's title)
+plot_ladder_grid.jl    the grid figure, from a sweep_fig2 run (status in each panel's title)
+plot_ladder_singles.jl one figure per rung of one planner: <sweep_root> [pcts] [method] [out_dir]
+singles_shapes_v14/    ours at 100/70/50/30 on ladder_shapes
+singles_long_v15e/     ours at 100/60/50/30 on ladder_long (ε = 0.25)
 fig2_ladder_grid_shapes_v14.{png,svg,pdf,eps}   candidate 2 grid (the current pick)
 fig2_ladder_grid_maze_v8.png                    candidate 1 grid
 ```

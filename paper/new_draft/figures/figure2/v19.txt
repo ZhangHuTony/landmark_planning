@@ -1,0 +1,21 @@
+start: 0,0
+goal: 2350,86.60254
+# Long field (2350 m, four walls). Blind north lane: +1 (A,B) → +2 (C,D) → +1 at the goal, 3 diagonals, N=25 (2500 m).
+# v19: two north pockets that are EXCLUSIVE by budget — the support's base route already spends 3 diagonals,
+# each pocket costs 4 more; one pocket ends the support 350 m short of the goal (in comm), two pockets 550 m
+# short (out of comm). Pocket 1 (550,300) drops the primary's σ first → pops first → 100–80 %; pocket 3
+# (1650,345), chamber C–D, drops it at 1650 → 70–50 %; the south lane's L3 leak (cov 2, w≈0.05) → 40 %;
+# N=26 (primary +100 m, support climbs one step after L3 for a full relay) → 30 %.
+# Rungs by the support's last fix:
+#   pocket L1 (550,300) from (550,259.8)                  — weak, early relay
+#   L2 (1250,-320) at wall C's row -3 gap, relay from (2300,-173.2)
+#   L3 (2250,-320) from (2250,-259.8) at N=25: leak at w≈0.05 from 360 m (needs 5 diagonals, ends there)
+#   L3 at N=26: (2300,-173.2) one step later, w≈0.85 — the real relay
+# L3 first (= Σ₀); cov 2 so the leak alone does not clear the 40 % rung.
+landmarks: 2250,-320 @ 2.0,0,0,1.6 | 1250,-320 @ 1.0,0,0,0.8 | 550,300 @ 3.0,0,0,2.4 | 1650,345 @ 2.0,0,0,1.6
+# wall A [200,350] gaps +1/-1: house / stretched hexagon / inverted house
+# wall B [800,950] gaps +1/-2: trapezoid / pointed hexagon / trapezoid
+# wall C [1300,1450] gaps +2/-3: trapezoid / big hexagon
+# wall D [1800,1950] gaps +2/-2: trapezoid / pointed hexagon (rows +1,0,-1) / trapezoid (row -3)
+# plugs: row 0 A-B hexagon, row -3 A-B inverted house, row 0 B-C hexagon, row +3 B-C house, rows 0/-1 C-D hexagon, row +3 after D trapezoid
+obstacles: 200,146.6; 350,146.6; 350,300; 275,330; 200,300 | 185,0; 215,-26.6; 335,-26.6; 365,0; 335,26.6; 215,26.6 | 200,-300; 275,-330; 350,-300; 350,-146.6; 200,-146.6 | 800,146.6; 950,146.6; 915,330; 835,330 | 800,-113.2; 950,-113.2; 975,-43.3; 950,26.6; 800,26.6; 775,-43.3 | 800,-330; 950,-330; 925,-233.2; 825,-233.2 | 1325,233.2; 1425,233.2; 1450,330; 1300,330 | 1300,113.2; 1450,113.2; 1480,-43.3; 1450,-199.8; 1300,-199.8; 1270,-43.3 | 1825,233.2; 1925,233.2; 1950,330; 1800,330 | 1800,-113.2; 1950,-113.2; 1980,0; 1950,113.2; 1800,113.2; 1770,0 | 1800,-330; 1950,-330; 1925,-233.2; 1825,-233.2 | 360,0; 390,-26.6; 710,-26.6; 740,0; 710,26.6; 390,26.6 | 425,-330; 775,-330; 775,-300; 740,-233.2; 460,-233.2; 425,-300 | 960,0; 990,-26.6; 1210,-26.6; 1240,0; 1210,26.6; 990,26.6 | 1000,233.2; 1300,233.2; 1300,300; 1250,330; 1050,330; 1000,300 | 1460,-43.3; 1490,-113.2; 1710,-113.2; 1740,-43.3; 1710,26.6; 1490,26.6 | 2000,233.2; 2350,233.2; 2330,330; 2020,330
