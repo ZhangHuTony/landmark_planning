@@ -1,0 +1,54 @@
+# ==========================================================================
+# Fig. 2 constraint ladder — read ONLY by run_constraint_sweep.jl
+# ==========================================================================
+# ONE hand-built scenario (`ladder_maze`, src/scenario_generation.jl: three
+# gapped walls + six plugs, 14 obstacles, a blind north lane and an informative
+# south lane), EVERY planner, walked down the same 100 → 30 % ladder the
+# population sweeps use. The deliverable is the SHAPE of each planner's plan at
+# each rung — the rows × columns of the paper's Fig. 2 — not a mean over draws.
+# paper/new_draft/figures/figure2/plot_ladder_grid.jl draws it from the per-rung
+# main_ctrls.csv files this sweep saves.
+#
+# Nothing here pools with constraint_sweep/ — one fixed scenario, and a 100 m
+# lattice (see `overrides`).
+# ==========================================================================
+
+scenario_name: ladder_maze
+scenario_seed_base: 1
+
+# The ladder_maze geometry is pinned to a 100 m hex lattice (rows at multiples of
+# 86.6 m; walls 150 m wide; see the preset's comment block). config/mc is the 150 m
+# lattice, so the lattice and the corridor row count are overridden for EVERY run
+# of this sweep — the reference that anchors U_ref included. corridor_halfwidth_m /
+# corridor_y_max_m are config/main.yaml's values for hex_width_m: 100 (7 rows).
+# The sensor / dead-reckoning model is config/mc's, unchanged.
+overrides: hex_width_m=100.0,corridor_halfwidth_m=260.0,corridor_y_max_m=300.0
+
+# One scenario, built on purpose — the trivial-straight screen would either pass
+# it or throw the whole sweep away.
+reject_trivial_straight: false
+
+# Full ladder, 10 % steps, no early stop: a rung where every planner fails is a
+# row of grey cells in the figure, which is information, not wasted compute.
+pct_start: 100
+pct_step: 10
+pct_floor: 30
+pct_patience: 0
+method_patience: 0
+
+# The same five planners Fig. 3/4 compare, same specs as sweep.yaml, plus the comm /
+# landmark event tracking the figure's overlays need.
+methods: hexspline_cl@algorithms=hexspline_cl,num_agents=2,track_comm_events=true,track_landmark_events=true | greedy@algorithms=greedy,num_agents=2,track_comm_events=true | formation@algorithms=formation,num_agents=2,track_comm_events=true | sequential@algorithms=sequential,num_agents=2,track_comm_events=true | clgbt@algorithms=clgbt,num_agents=2,track_comm_events=true
+
+# The per-rung main_ctrls.csv IS the deliverable; each rung's own figures are kept
+# for inspection (40 rungs of PNGs is nothing).
+save_csv: true
+save_figures: true
+
+# Measured on ladder_maze: hexspline_cl finds every rung in < 7k expansions
+# (seconds); CL-GBT runs its full 200k-iteration tree (~10 min) at every rung.
+workers: 4
+heap_hint_gb: 4
+run_timeout_s: 1800
+
+outroot: fig2_ladder

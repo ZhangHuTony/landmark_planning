@@ -95,6 +95,23 @@ const ROOT  = joinpath(_ROOT, String(SWEEP["outroot"]), TAG)
 # random population, byte-for-byte as before.
 const SCENARIO_NAME = String(get(SWEEP, "scenario_name", ""))
 
+# Sweep-wide config overrides, applied to EVERY run of this sweep — the reference,
+# the trivial-scenario screen and each method alike — before the per-method
+# `methods:` overrides. Same `key=value,key=value` grammar as a method spec. This is
+# how a sweep runs on a lattice other than config/mc's (sweep_fig2.yaml puts the
+# ladder_maze preset on its 100 m grid); per-method overrides could not do that,
+# because the reference run that anchors U_ref would still be planned on the 150 m
+# grid. Empty (the default) changes nothing.
+const SWEEP_OVERRIDES = let spec = strip(String(get(SWEEP, "overrides", "")))
+    ov = Dict{String,String}()
+    for kv in split(spec, ',')
+        kv = strip(kv); isempty(kv) && continue
+        occursin('=', kv) || error("sweep `overrides`: expected key=value, got `$kv`")
+        k, v = split(kv, '='; limit=2); ov[String(strip(k))] = String(strip(v))
+    end
+    ov
+end
+
 # Bounds concurrent planner subprocesses. Levels are sequential (the early stop
 # depends on their outcome), so this only ever throttles methods within a level.
 const SLOTS = Base.Semaphore(max(1, Int(SWEEP["workers"])))
@@ -556,7 +573,7 @@ function main()
         sid  = @sprintf("s%03d", i)
         seed = Int(SWEEP["scenario_seed_base"]) + i
         p    = sample_scenario_params(seed)
-        base = scenario_keys(seed, p)
+        base = merge(scenario_keys(seed, p), SWEEP_OVERRIDES)
 
         # ── Reference: 1 agent, no uncertainty constraint ⇒ the shortest path ──
         if haskey(scen_done, sid)
