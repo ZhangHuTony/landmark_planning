@@ -144,7 +144,7 @@ for (i, m) in enumerate(METHODS), (j, pct) in enumerate(PCTS)
 end
 nr, nc = length(METHODS), length(PCTS)
 fig = plot(panels..., layout = (nr, nc), size = (nc * 400, nr * 190 + 40),
-           left_margin = 2Plots.mm, bottom_margin = 1Plots.mm, top_margin = 1Plots.mm)
+           left_margin = 9Plots.mm, bottom_margin = 1Plots.mm, top_margin = 1Plots.mm)
 
 function save_all(p, stem::String)
     for ext in ("png", "svg", "pdf"); savefig(p, "$(stem).$(ext)"); end
