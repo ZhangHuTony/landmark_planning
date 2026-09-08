@@ -1,0 +1,11 @@
+Landmark scenario: ladder_maze — 3 landmarks, 14 obstacles, start (0.0, 0.0) → goal (1400.0, 173.20508075688772)
+  → Saved 3 landmarks to /home/tony-zhang/Research/landmark_planning/fig2_ladder/v8/sequential/s001_p090/scenario_landmarks.csv
+  → Saved 14 obstacles to /home/tony-zhang/Research/landmark_planning/fig2_ladder/v8/sequential/s001_p090/scenario_obstacles.csv
+Hex graph: 718 nodes (714 heading-states + 3 sensors + goal), radius=57.73502691896258m, directed_edges=1866, grid=19x15, start_cell=(2, 7), goal_cell=(16, 9), start_heading=0
+
+── SEQUENTIAL PLANNING (2 agent(s), one at a time) ──
+  Leg 1 — primary, 1 helper(s) parked at start (bound 22.7692 = 2.0x the 11.3846179 threshold the shipped route is held to):
+  [A*] iter 1000/1000000 (0.1%)  left=999000  elapsed=0.1s   
+  ✗ No route to the goal for the primary.
+
+[sequential] produced 0 solution(s) -> /home/tony-zhang/Research/landmark_planning/fig2_ladder/v8/sequential/s001_p090/sequential

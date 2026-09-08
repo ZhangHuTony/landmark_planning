@@ -1,0 +1,9 @@
+scenario_id,pct,threshold,method,algorithm,num_agents,success,fail_reason,primary_length,primary_unc,length_ratio,wall_s,wall_ratio,clgbt_iterations,clgbt_tree_size,continuous_primary_length,continuous_uncertainties,discrete_uncertainties,primary_disc_unc,refinement_min_slack,refinement_status
+s001,100,12.6496,clgbt,clgbt,2,false,recovery_failed,2153.9764715832634,4.9381898327438,,70.8,4.3438,103650,29969,2153.976,"[4.8912, 4.9382]","[6.0884, 6.5166]",6.516640281288133,-0.000876658942400136,recovery_failed
+s001,90,11.3846,clgbt,clgbt,2,false,recovery_failed,2153.8585057358932,4.940824747541702,,72.9,4.4733,103650,29969,2153.859,"[4.8937, 4.9408]","[6.0884, 6.5166]",6.516640281288133,-0.000890724263141008,recovery_failed
+s001,80,10.1197,clgbt,clgbt,2,false,recovery_failed,2153.782652865365,4.940377646262257,,70.3,4.3174,103650,29969,2153.783,"[4.8937, 4.9404]","[6.0884, 6.5166]",6.516640281288133,-0.0009030099788511804,recovery_failed
+s001,70,8.8547,clgbt,clgbt,2,false,recovery_failed,2153.593797872753,4.942081418198257,,66.9,4.1078,103650,29969,2153.594,"[4.8955, 4.9421]","[6.0884, 6.5166]",6.516640281288133,-0.0009229929676748509,recovery_failed
+s001,60,7.5897,clgbt,clgbt,2,false,recovery_failed,2148.9927779101963,5.968766742994403,,68.9,4.2270,103650,29969,2148.993,"[5.6676, 5.9688]","[6.0884, 6.5166]",6.516640281288133,-0.000979128287498663,recovery_failed
+s001,50,6.3248,clgbt,clgbt,2,false,no_solution,null,null,,192.7,11.8284,200000,57415,null,[],[],null,,
+s001,40,5.0598,clgbt,clgbt,2,false,no_solution,null,null,,190.8,11.7121,200000,57415,null,[],[],null,,
+s001,30,3.7949,clgbt,clgbt,2,false,no_solution,null,null,,191.3,11.7438,200000,57415,null,[],[],null,,

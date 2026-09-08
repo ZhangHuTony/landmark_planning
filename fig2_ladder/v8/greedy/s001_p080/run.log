@@ -1,0 +1,57 @@
+┌ Warning: Seed is infeasible (min_slack=-0.8346889581677122, ε=0.001); the barrier will try to recover it before shortening. Expected for the straight_cont ablation, and for a discrete seed that A* returned as its best incumbent after exhausting its budget.
+└ @ Main ~/Research/landmark_planning/planners/hexspline_cl.jl:1207
+Landmark scenario: ladder_maze — 3 landmarks, 14 obstacles, start (0.0, 0.0) → goal (1400.0, 173.20508075688772)
+  → Saved 3 landmarks to /home/tony-zhang/Research/landmark_planning/fig2_ladder/v8/greedy/s001_p080/scenario_landmarks.csv
+  → Saved 14 obstacles to /home/tony-zhang/Research/landmark_planning/fig2_ladder/v8/greedy/s001_p080/scenario_obstacles.csv
+Hex graph: 718 nodes (714 heading-states + 3 sensors + goal), radius=57.73502691896258m, directed_edges=1866, grid=19x15, start_cell=(2, 7), goal_cell=(16, 9), start_heading=0
+
+── GREEDY PLANNING ──
+  Primary: shortest obstacle-clear route (single-agent A*, no uncertainty bound)
+
+  ✓ FEASIBLE SOLUTION at iter 23: dist=1500.0, unc=12.6496
+  [Constraint A*] Single-agent complete: 23 iterations, final_dist=1500.0
+  Helpers: greedy placement, minimising the primary's uncertainty per step
+  Greedy roster breaches the obstacle/support gate; falling back to parked helpers.
+  Support 1: dist=0.0m, goal_unc=0.9457m
+  Primary  : dist=1500.0m, goal_unc=10.9544m (threshold 10.11966035 ✗)
+
+=== Continuous Spline Optimization (threshold=10.1197) ===
+  Initial (discrete→spline): prim_len=1448.629, unc=10.9544
+  Barrier stage 1/15: μ=20.0
+  [Spline barrier] line search stalled; stopping at stage 1
+  Barrier stage 2/15: μ=20.0
+  [Spline barrier] line search stalled; stopping at stage 2
+  Barrier stage 3/15: μ=20.0
+  [Spline barrier] line search stalled; stopping at stage 3
+  Barrier stage 4/15: μ=20.0
+  [Spline barrier] line search stalled; stopping at stage 4
+  Barrier stage 5/15: μ=20.0
+  [Spline barrier] line search stalled; stopping at stage 5
+  Barrier stage 6/15: μ=20.0
+  [Spline barrier] line search stalled; stopping at stage 6
+  Barrier stage 7/15: μ=20.0
+  [Spline barrier] line search stalled; stopping at stage 7
+  Barrier stage 8/15: μ=20.0
+  [Spline barrier] line search stalled; stopping at stage 8
+  Barrier stage 9/15: μ=20.0
+  [Spline barrier] line search stalled; stopping at stage 9
+  Barrier stage 10/15: μ=20.0
+  [Spline barrier] line search stalled; stopping at stage 10
+  Barrier stage 11/15: μ=20.0
+  [Spline barrier] line search stalled; stopping at stage 11
+  Barrier stage 12/15: μ=20.0
+  [Spline barrier] line search stalled; stopping at stage 12
+  Barrier stage 13/15: μ=20.0
+  [Spline barrier] line search stalled; stopping at stage 13
+  Barrier stage 14/15: μ=20.0
+  [Spline barrier] line search stalled; stopping at stage 14
+  Barrier stage 15/15: μ=20.0
+  [Spline barrier] line search stalled; stopping at stage 15
+  Final: prim_len=1448.629, unc=10.9544, threshold=10.1197, status=recovery_failed, min_slack=-0.834689
+  Obstacle re-verification: mean path clears all obstacles ✓
+Fig combined (main) saved: Discrete Len=1448.63 → Continuous Len=1448.63
+Fig uncertainty profile (main) saved: /home/tony-zhang/Research/landmark_planning/fig2_ladder/v8/greedy/s001_p080/greedy/figures/main_unc_profile.png
+  → Saved control points to /home/tony-zhang/Research/landmark_planning/fig2_ladder/v8/greedy/s001_p080/greedy/csv/main_ctrls.csv (32 points)
+  → Saved 6 comm events to /home/tony-zhang/Research/landmark_planning/fig2_ladder/v8/greedy/s001_p080/greedy/csv/comm_events.csv
+
+[greedy] produced 1 solution(s) -> /home/tony-zhang/Research/landmark_planning/fig2_ladder/v8/greedy/s001_p080/greedy
