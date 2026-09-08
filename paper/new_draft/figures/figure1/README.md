@@ -75,6 +75,7 @@ to the landmark itself, two rows deeper, which is the +200 m on the lattice.
 ```
 <cand>/tight/           shipped variant: config/, scenario_*.csv, hexspline_cl/{results.yaml,csv,figures}
                         + fig1_continuous_ellipses{,_comm}.{png,svg,pdf,eps}   ← the deliverable
+                        + fig1_scene*.json, fig1_continuous_ellipses_gr*.{png,svg,pdf}  ← input/reference
 <cand>/plain/           strict-bound variant (A 2.2, B 2.3, C 2.5), PNG only
 D_island/flat/          rectangular-island variant of D (same bound), full run
 D_island/*/fig1_continuous_ellipses_every100m{,_comm}.*   ellipse every 100 m of arc (D only)
@@ -128,6 +129,13 @@ OUTPUT_DIR=results/fig1_X ~/.juliaup/bin/julia generate_plan.jl paper/new_draft/
 ~/.juliaup/bin/julia paper/new_draft/figures/fig1_overview.jl results/fig1_X          # writes the ellipse figures into the run
 ~/.juliaup/bin/julia paper/new_draft/figures/fig1_overview.jl results/fig1_X results/fig1_X 100   # ellipse every 100 m of arc instead
 ```
+`fig1_overview.jl` calls `fig1_overview_mpl.py` at the end (see Formats); set
+`FIG1_PYTHON` if the interpreter with matplotlib is neither
+`~/Research/multiagent_base/.venv/bin/python` nor `python3`. To restyle without
+re-running Julia, edit the renderer and re-run it on the dumped scene:
+```
+<python> paper/new_draft/figures/fig1_overview_mpl.py <run>/fig1_scene.json <run> [--width=3.5]
+```
 The optional third argument is the ellipse spacing in metres of each agent's
 own arc (start and goal included; the comm checkpoints lie on the same grid).
 0 or omitted = comm points only. Spaced output gets an `_every<N>m` suffix.
@@ -137,7 +145,20 @@ own arc (start and goal included; the comm checkpoints lie on the same grid).
 It prints the per-event table (arc, weight, distance, σ before → after) the
 numbers above come from.
 
-Formats: PNG preview; SVG/PDF straight from GR; EPS via Ghostscript
-`eps2write` of the PDF (GR has no EPS writer). GR outlines text in **every**
-vector format (the SVG has no `<text>` nodes) — geometry and fills are
-editable, labels must be retyped if changed.
+Formats: the shipped `{png,svg,pdf,eps}` are drawn by
+`fig1_overview_mpl.py` (matplotlib), in the same style as Figs. 3–4 (serif,
+8/7/6.5 pt, 0.6 pt axes, 3.5 in column). Every hex tile, ellipse, track and
+label is its own object in Illustrator, and the SVG keeps live `<text>`.
+`fig1_overview.jl` dumps the scene it drew to `fig1_scene*.json` and invokes
+the renderer on it; the GR figures it still draws are kept as the reference the
+render is checked against, under the `_gr` stem, PNG/SVG/PDF only.
+
+Why a second renderer: GR has no EPS writer, so the GR route went through
+Ghostscript `eps2write`, and PostScript has no transparency — the alpha'd hex,
+obstacle and ellipse fills made Ghostscript flatten the **whole page** into one
+10000×5600 bitmap, a single unselectable object in Illustrator. The matplotlib
+route pre-blends every alpha onto its background instead (`over()`, the trick
+`make_figs_baseline.py` uses for Figs. 3–4), so PDF, SVG, EPS and PNG all agree
+and the EPS is real vector. Two consequences of pre-blending: the obstacle is
+opaque (the GR one showed the hex grid through it), and the covariance ellipses
+sit *under* the tracks rather than over them, so the tracks stay visible.

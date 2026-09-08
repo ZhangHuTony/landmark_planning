@@ -22,12 +22,25 @@
 # draw_covariance_ellipse!, overlay_comm_events!); nothing in src/ changes.
 #
 # Output (<out_dir> defaults to <run_dir>):
-#   fig1_continuous_ellipses.{png,svg,pdf,eps}        paths + ellipses
-#   fig1_continuous_ellipses_comm.{png,svg,pdf,eps}   + the run's comm overlay
-# GR has no EPS writer, so the EPS is Ghostscript's eps2write of the PDF. Note
-# that GR outlines text in EVERY vector format (the SVG has no <text> nodes,
-# only paths — verified), so labels come out as shapes; paths, fills and
-# colours are all editable, labels have to be retyped if changed.
+#   fig1_continuous_ellipses_gr.{png,svg,pdf}         GR preview, paths + ellipses
+#   fig1_continuous_ellipses_gr_comm.{png,svg,pdf}    + the run's comm overlay
+#   fig1_scene.json                                   the scene, for the renderer
+#   fig1_continuous_ellipses.{png,svg,pdf,eps}        ← the deliverable
+#   fig1_continuous_ellipses_comm.{png,svg,pdf,eps}   ← the deliverable
+#
+# The deliverable files are drawn a SECOND time, by fig1_overview_mpl.py, in
+# the same matplotlib style as Figs. 3–4 (see make_figs_baseline.py). Reason:
+# GR has no EPS writer, so the GR route had to go through Ghostscript
+# eps2write, and PostScript has no transparency — every alpha'd fill in this
+# figure (ellipses, obstacles, hex tiles) made Ghostscript flatten the whole
+# page to one 10000×5600 bitmap, so nothing was selectable in Illustrator. The
+# matplotlib route pre-blends alpha onto the background instead (over(), as in
+# make_figs_baseline.py), so its EPS is real vector: one path per hex, per
+# ellipse, per track. GR also outlines text in every vector format; matplotlib
+# keeps live <text> in the SVG.
+#
+# The GR figures are kept as the visual reference the scene is checked against;
+# they are no longer what the paper includes, hence the _gr stem and no EPS.
 # ==========================================================================
 
 ENV["GKSwstype"] = "100"
@@ -144,9 +157,15 @@ for a in 1:na
     plot!(plt, xs, ys, color = agent_color(a), linewidth = (a == na ? 2.2 : 1.3),
           label = agent_name(a))
 end
-ellipse!(ag, pos, idx) = draw_covariance_ellipse!(plt, pos[1], pos[2] + y_offset(ag), covs[ag][idx];
-                                                  nstd = 2, color = agent_color(ag), alpha = 0.22,
-                                                  display_scale = SIGMA_SCALE^2)
+# Each ellipse is recorded as it is drawn so the matplotlib renderer redraws
+# exactly the ones GR did — same centre, same Σ, same colour.
+const ELLIPSE_RECORDS = Any[]
+function ellipse!(ag, pos, idx)
+    x, y, cov = pos[1], pos[2] + y_offset(ag), covs[ag][idx]
+    push!(ELLIPSE_RECORDS, (x = x, y = y, cov = cov, color = String(Symbol(agent_color(ag)))))
+    draw_covariance_ellipse!(plt, x, y, cov; nstd = 2, color = agent_color(ag), alpha = 0.22,
+                             display_scale = SIGMA_SCALE^2)
+end
 if ELLIPSE_SPACING_M > 0
     # Every <spacing> m of each agent's own arc, at the first sample at/after
     # that arc (same rule as the comm-point ellipses), start and goal included.
@@ -173,22 +192,82 @@ scatter!(plt, [NaN], [NaN], marker = :circle, markersize = 9, color = :blue, alp
          markerstrokewidth = 0, label = ell_label)
 plot!(plt, xlabel = "x (m)", ylabel = "y (m)", size = (1000, 560))
 
+# ── GR figures: the visual reference the matplotlib render is checked against.
+# No EPS — Ghostscript's eps2write flattens this figure's alpha to a bitmap.
 function save_all(p, stem::String)
     for ext in ("png", "svg", "pdf")
         savefig(p, "$(stem).$(ext)")
     end
-    gs = Sys.which("gs")
-    if gs === nothing
-        @warn "ghostscript (gs) not found — no EPS written for $(stem)"
-    else
-        run(`$(gs) -q -dNOPAUSE -dBATCH -sDEVICE=eps2write -o $(stem).eps $(stem).pdf`)
-    end
-    println("  → $(stem).{png,svg,pdf" * (gs === nothing ? "" : ",eps") * "}")
+    println("  → $(stem).{png,svg,pdf}")
 end
 
 mkpath(OUT_DIR)
 suffix = ELLIPSE_SPACING_M > 0 ? @sprintf("_every%dm", Int(ELLIPSE_SPACING_M)) : ""
-save_all(plt, joinpath(OUT_DIR, "fig1_continuous_ellipses" * suffix))
+save_all(plt, joinpath(OUT_DIR, "fig1_continuous_ellipses_gr" * suffix))
 plt_comm = deepcopy(plt)
 overlay_comm_events!(plt_comm, comm)
-save_all(plt_comm, joinpath(OUT_DIR, "fig1_continuous_ellipses" * suffix * "_comm"))
+save_all(plt_comm, joinpath(OUT_DIR, "fig1_continuous_ellipses_gr" * suffix * "_comm"))
+
+# ── Scene dump ───────────────────────────────────────────────────────────
+# Everything the figure draws, in world coordinates, so fig1_overview_mpl.py
+# can redraw it without re-running the planner. Hand-rolled JSON: the depot
+# carries no JSON package (same reason config parsing is hand-rolled).
+jnum(x::Real) = @sprintf("%.6g", x)
+jstr(s) = '"' * replace(String(s), "\\" => "\\\\", "\"" => "\\\"") * '"'
+jlist(xs) = "[" * join(xs, ",") * "]"
+jpt(p) = jlist((jnum(p[1]), jnum(p[2])))
+jmat(m) = jlist(jlist(jnum(m[i, j]) for j in 1:size(m, 2)) for i in 1:size(m, 1))
+jobj(kvs) = "{" * join((jstr(k) * ":" * v for (k, v) in kvs), ",") * "}"
+
+let sensor_idx = findall(last(node_role_masks(graph)))
+    scene = jobj([
+        "stem"      => jstr("fig1_continuous_ellipses" * suffix),
+        "xlabel"    => jstr("x (m)"),
+        "ylabel"    => jstr("y (m)"),
+        # sorted: route_tile_centers collects a Set, whose order is not stable
+        "hex_radius"   => jnum(HEX_RADIUS_M),
+        "hex_centers"  => jlist(jpt(c) for c in sort(route_tile_centers(graph))),
+        "obstacles"    => jlist(jlist(jpt(v) for v in o.verts) for o in OBSTACLES),
+        "sensor_landmarks" => jlist(jobj(["x" => jnum(graph.landmarks[i].x),
+                                          "y" => jnum(graph.landmarks[i].y),
+                                          "cov" => jmat(graph.landmarks[i].cov)])
+                                    for i in sensor_idx),
+        "landmark_display_scale" => jnum(400.0),   # make_base_plot's
+        "start" => jpt((graph.landmarks[1].x, graph.landmarks[1].y)),
+        "goal"  => jpt((graph.landmarks[graph.n].x, graph.landmarks[graph.n].y)),
+        "agents" => jlist(jobj(["label"   => jstr(agent_name(a)),
+                                "color"   => jstr(String(Symbol(agent_color(a)))),
+                                "primary" => (a == na ? "true" : "false"),
+                                "xs" => jlist(jnum(w[1]) for w in wpts[a]),
+                                "ys" => jlist(jnum(w[2] + y_offset(a)) for w in wpts[a])])
+                          for a in 1:na),
+        "ellipses" => jlist(jobj(["x" => jnum(e.x), "y" => jnum(e.y),
+                                  "cov" => jmat(e.cov), "color" => jstr(e.color)])
+                            for e in ELLIPSE_RECORDS),
+        "ellipse_nstd"          => "2",
+        "ellipse_display_scale" => jnum(SIGMA_SCALE^2),
+        "ellipse_label"         => jstr(ell_label),
+        "comm" => jlist(jobj(["t" => jnum(t), "w" => jnum(w),
+                              "pa" => jpt(pa), "pb" => jpt(pb)])
+                        for (t, _, _, w, pa, pb) in comm),
+    ])
+    global SCENE_PATH = joinpath(OUT_DIR, "fig1_scene" * suffix * ".json")
+    open(io -> println(io, scene), SCENE_PATH, "w")
+    println("  → $(SCENE_PATH)")
+end
+
+# ── The paper's files: matplotlib, in the Figs. 3–4 style ────────────────
+let script = joinpath(@__DIR__, "fig1_overview_mpl.py"),
+    cands  = String[]
+    haskey(ENV, "FIG1_PYTHON") && push!(cands, ENV["FIG1_PYTHON"])
+    push!(cands, joinpath(homedir(), "Research", "multiagent_base", ".venv", "bin", "python"))
+    for name in ("python3", "python")
+        w = Sys.which(name); w === nothing || push!(cands, w)
+    end
+    py = findfirst(c -> isfile(c) && success(`$(c) -c "import matplotlib, numpy"`), cands)
+    if py === nothing
+        @warn "no python with matplotlib+numpy found; run it yourself:\n  <python> $(script) $(SCENE_PATH) $(OUT_DIR)"
+    else
+        run(`$(cands[py]) $(script) $(SCENE_PATH) $(OUT_DIR)`)
+    end
+end
