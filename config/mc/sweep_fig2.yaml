@@ -40,7 +40,10 @@ method_patience: 0
 
 # The same five planners Fig. 3/4 compare, same specs as sweep.yaml, plus the comm /
 # landmark event tracking the figure's overlays need.
-methods: hexspline_cl@algorithms=hexspline_cl,num_agents=2,track_comm_events=true,track_landmark_events=true | greedy@algorithms=greedy,num_agents=2,track_comm_events=true | formation@algorithms=formation,num_agents=2,track_comm_events=true | sequential@algorithms=sequential,num_agents=2,track_comm_events=true | clgbt@algorithms=clgbt,num_agents=2,track_comm_events=true
+# hexspline_cl gets a 1.5e6 expansion budget: the 2000 m rungs of ladder_shapes took
+# 978k in the shipped run (fig2_ladder/shapes_v14), too close to config/mc's 1e6.
+# ~1.8 GB per 300k expansions ⇒ ~9 GB worst case; it runs alone by the time it matters.
+methods: hexspline_cl@algorithms=hexspline_cl,num_agents=2,astar_iteration_limit=1500000,track_comm_events=true,track_landmark_events=true | greedy@algorithms=greedy,num_agents=2,track_comm_events=true | formation@algorithms=formation,num_agents=2,track_comm_events=true | sequential@algorithms=sequential,num_agents=2,track_comm_events=true | clgbt@algorithms=clgbt,num_agents=2,track_comm_events=true
 
 # The per-rung main_ctrls.csv IS the deliverable; each rung's own figures are kept
 # for inspection (40 rungs of PNGs is nothing).
