@@ -1,0 +1,11 @@
+Landmark scenario: ladder_shapes — 3 landmarks, 13 obstacles, start (0.0, 0.0) → goal (1700.0, 173.20508075688772)
+  → Saved 3 landmarks to /home/tony-zhang/Research/landmark_planning/fig2_ladder/shapes_v14/sequential/s001_p090/scenario_landmarks.csv
+  → Saved 13 obstacles to /home/tony-zhang/Research/landmark_planning/fig2_ladder/shapes_v14/sequential/s001_p090/scenario_obstacles.csv
+Hex graph: 844 nodes (840 heading-states + 3 sensors + goal), radius=57.73502691896258m, directed_edges=2208, grid=22x15, start_cell=(2, 7), goal_cell=(19, 9), start_heading=0
+
+── SEQUENTIAL PLANNING (2 agent(s), one at a time) ──
+  Leg 1 — primary, 1 helper(s) parked at start (bound 24.7491 = 2.0x the 12.37455277 threshold the shipped route is held to):
+  [A*] iter 1000/1000000 (0.1%)  left=999000  elapsed=0.1s     [A*] iter 2000/1000000 (0.2%)  left=998000  elapsed=0.2s     [A*] iter 3000/1000000 (0.3%)  left=997000  elapsed=0.3s     [A*] iter 4000/1000000 (0.4%)  left=996000  elapsed=0.5s   
+  ✗ No route to the goal for the primary.
+
+[sequential] produced 0 solution(s) -> /home/tony-zhang/Research/landmark_planning/fig2_ladder/shapes_v14/sequential/s001_p090/sequential

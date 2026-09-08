@@ -1,0 +1,9 @@
+scenario_id,pct,threshold,method,algorithm,num_agents,success,fail_reason,primary_length,primary_unc,length_ratio,wall_s,wall_ratio,clgbt_iterations,clgbt_tree_size,continuous_primary_length,continuous_uncertainties,discrete_uncertainties,primary_disc_unc,refinement_min_slack,refinement_status
+s001,100,13.7495,clgbt,clgbt,2,true,,1739.1281834427896,10.913241689784456,1.0140,29.3,1.8587,37645,11569,1739.128,"[10.6883, 10.9132]","[12.4619, 12.7592]",12.759152211273015,5.569381161445562e-6,optimized
+s001,90,12.3746,clgbt,clgbt,2,false,no_solution,null,null,,195.8,12.4164,200000,57849,null,[],[],null,,
+s001,80,10.9996,clgbt,clgbt,2,false,no_solution,null,null,,195.2,12.3795,200000,57849,null,[],[],null,,
+s001,70,9.6247,clgbt,clgbt,2,false,no_solution,null,null,,194.5,12.3355,200000,57849,null,[],[],null,,
+s001,60,8.2497,clgbt,clgbt,2,false,no_solution,null,null,,193.9,12.2954,200000,57849,null,[],[],null,,
+s001,50,6.8748,clgbt,clgbt,2,false,no_solution,null,null,,193.8,12.2925,200000,57849,null,[],[],null,,
+s001,40,5.4998,clgbt,clgbt,2,false,no_solution,null,null,,194.0,12.3011,200000,57849,null,[],[],null,,
+s001,30,4.1249,clgbt,clgbt,2,false,no_solution,null,null,,193.7,12.2814,200000,57849,null,[],[],null,,

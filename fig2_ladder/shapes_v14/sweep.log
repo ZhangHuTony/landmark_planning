@@ -1,0 +1,47 @@
+── constraint sweep shapes_v14 ──
+  methods: hexspline_cl, greedy, formation, sequential, clgbt
+  ladder:  100, 90, 80, 70, 60, 50, 40, 30%   patience=0   method_patience=0   timeout=1800s
+  scenarios: the fixed preset `ladder_shapes` (n_scenarios and the geometry ranges are ignored)
+  output:  /home/tony-zhang/Research/landmark_planning/fig2_ladder/shapes_v14
+  s001: scenario=ladder_shapes  L_ref=1715.1 U_ref=13.75  (15.8s)  [1/1]
+    s001 p100  sequential        FAIL no_solution   11.2s
+    s001 p100  formation         FAIL recovery_failed   14.3s
+    s001 p100  greedy            ok   ratio=1.0192   14.8s
+    s001 p100  hexspline_cl      ok   ratio=1.0132   21.9s
+    s001 p100  clgbt             ok   ratio=1.0140   29.3s
+    s001 p90  sequential        FAIL no_solution   11.4s
+    s001 p90  greedy            ok   ratio=1.0192   14.3s
+    s001 p90  formation         FAIL recovery_failed   14.3s
+    s001 p90  hexspline_cl      ok   ratio=1.0131   21.7s
+    s001 p90  clgbt             FAIL no_solution   195.8s
+    s001 p80  sequential        FAIL no_solution   11.3s
+    s001 p80  formation         FAIL recovery_failed   14.3s
+    s001 p80  greedy            FAIL recovery_failed   14.7s
+    s001 p80  hexspline_cl      ok   ratio=1.0133   21.8s
+    s001 p80  clgbt             FAIL no_solution   195.2s
+    s001 p70  sequential        FAIL no_solution   11.4s
+    s001 p70  formation         FAIL recovery_failed   14.1s
+    s001 p70  greedy            FAIL recovery_failed   14.7s
+    s001 p70  hexspline_cl      ok   ratio=1.0267   18.3s
+    s001 p70  clgbt             FAIL no_solution   194.5s
+    s001 p60  sequential        FAIL no_solution   11.4s
+    s001 p60  formation         FAIL recovery_failed   14.1s
+    s001 p60  greedy            FAIL recovery_failed   14.7s
+    s001 p60  hexspline_cl      ok   ratio=1.0299   21.6s
+    s001 p60  clgbt             FAIL no_solution   193.9s
+    s001 p50  sequential        FAIL no_solution   11.4s
+    s001 p50  formation         FAIL recovery_failed   14.1s
+    s001 p50  greedy            FAIL recovery_failed   14.9s
+    s001 p50  hexspline_cl      ok   ratio=1.0320   24.0s
+    s001 p50  clgbt             FAIL no_solution   193.8s
+    s001 p40  sequential        FAIL no_solution   11.3s
+    s001 p40  formation         FAIL recovery_failed   14.0s
+    s001 p40  greedy            FAIL recovery_failed   14.9s
+    s001 p40  hexspline_cl      ok   ratio=1.1120   70.2s
+    s001 p40  clgbt             FAIL no_solution   194.0s
+    s001 p30  sequential        FAIL no_solution   11.4s
+    s001 p30  formation         FAIL recovery_failed   14.2s
+    s001 p30  greedy            FAIL recovery_failed   14.7s
+    s001 p30  hexspline_cl      ok   ratio=1.1131   69.1s
+    s001 p30  clgbt             FAIL no_solution   193.7s
+── done: /home/tony-zhang/Research/landmark_planning/fig2_ladder/shapes_v14 ──
