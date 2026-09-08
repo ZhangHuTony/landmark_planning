@@ -1,0 +1,36 @@
+# ==========================================================================
+# Fig. 2, candidate 3 — `ladder_long`, OUR PLANNER ONLY — read by run_constraint_sweep.jl
+# ==========================================================================
+# One hand-built 2350 m scenario (`ladder_long`, src/scenario_generation.jl: four
+# gapped walls + seven plugs, blind north lane, informative south lane), hexspline_cl
+# alone, walked down the 100 → 30 % ladder. Deliverable: one figure per rung
+# (paper/new_draft/figures/figure2/plot_ladder_singles.jl). The baselines are not
+# part of this one — run sweep_fig2.yaml with scenario_name: ladder_long for them.
+#
+# primary_epsilon 0.25 is what makes the deep rungs reachable, exactly as in
+# sweep_showcase.yaml: at ε = 0 the +100 m rung took ~850k expansions and the
+# +200 m rung was never found, so the ladder had three plans; at 0.25 every rung
+# is found in < 100k and the plan changes shape at four levels. The seeds are up
+# to 25 % suboptimal in length by construction — this is the qualitative ladder,
+# not a length benchmark, and its lengths must not be pooled with constraint_sweep/.
+# ==========================================================================
+
+scenario_name: ladder_long
+scenario_seed_base: 1
+overrides: hex_width_m=100.0,corridor_halfwidth_m=260.0,corridor_y_max_m=300.0
+reject_trivial_straight: false
+
+pct_start: 100
+pct_step: 10
+pct_floor: 30
+pct_patience: 0
+method_patience: 0
+
+methods: hexspline_cl@algorithms=hexspline_cl,num_agents=2,primary_epsilon=0.25,astar_iteration_limit=1500000,track_comm_events=true,track_landmark_events=true
+
+save_csv: true
+save_figures: true
+workers: 4
+heap_hint_gb: 4
+run_timeout_s: 1800
+outroot: fig2_ladder

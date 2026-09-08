@@ -376,6 +376,64 @@ const SCENARIOS = Dict{Symbol, Function}(
                                 build_obstacle([(1000.0, 233.2), (1200.0, 233.2), (1200.0, 300.0), (1150.0, 330.0), (1050.0, 330.0), (1000.0, 300.0)]),
                                 build_obstacle([(1400.0, 233.2), (1700.0, 233.2), (1680.0, 330.0), (1420.0, 330.0)])],
                             start = (0.0, 0.0), goal = (1700.0, 173.20508075688772)),
+
+    # ── Ladder long: Fig. 2 candidate 3 — 2350 m, four walls, varied shapes ─────────
+    # The :ladder_shapes skeleton stretched to four walls (A [200,350] gaps +1/−1,
+    # B [800,950] +1/−2, C [1300,1450] +2/−3, D [1800,1950] +2/−2), goal on row +1 at
+    # (2350, 86.6), 18 obstacles. Blind north lane: rows +1 → +2 → +1, 3 diagonals,
+    # 2500 m on the lattice (U_ref 16.2). South lane: −1 → −2 → −3 (L2 at wall C's
+    # row −3 gap) → −2 through D → optional dip back to row −3 for L3 behind D.
+    # A weak north-pocket landmark L1 sits above chamber A–B.
+    #
+    # Run with primary_epsilon 0.25 (config/mc/sweep_fig2_long.yaml), as the
+    # showcase ladder was: at ε = 0 the +100 m rung needs ~850k expansions and the
+    # +200 m rung is out of reach, so the ladder collapses to three plans; at 0.25
+    # every rung is found in < 100k and the plan changes SHAPE at four levels
+    # (measured 2026-09-07, paper/new_draft/figures/figure2/README.md, v15e):
+    #   100–70 %  2500 lattice / 2388 spline, σ 10.2 — primary north, support sweeps
+    #             the south lane and relays from row −2 behind D
+    #    60 %     2500 / 2421, σ 8.8  — same length, different support timing
+    #    50–40 %  2600 / 2414, σ 8.1–6.5 — primary dips toward row 0 before the goal
+    #    30 %     2700 / 2570, σ 3.7  — primary dips to row −2 next to L3 and climbs back
+    # The seeds are up to 25 % suboptimal in length by construction; this preset is
+    # for the qualitative ladder figure, not a length benchmark.
+    #
+    # Rules as :ladder_maze (100 m lattice, seed-gate geometry). Two extra lessons:
+    # a landmark within ~250 m of the primary's lane is NOT hidden — even at detection
+    # probability 0.01 the up-weighted observation still shrinks U_ref by 20 % (that
+    # is why the only pocket landmark sits off a row-+1 stretch, 213 m away); and a
+    # support relaying a fresh fix at comm weight 0.05–0.09 (350 m) still halves the
+    # primary's σ, so "out of comm range" is never a hard wall. lms[1] is Σ₀.
+    :ladder_long => () -> (landmarks = Landmark[
+                              Landmark(2250.0, -320.0, [2.0 0.0; 0.0 1.6]),   # L3: behind D, seen from (2250,−259.8); also Σ₀
+                              Landmark(1250.0, -320.0, [1.0 0.0; 0.0 0.8]),   # L2: wall C's row −3 gap
+                              Landmark( 550.0,  300.0, [3.0 0.0; 0.0 2.4])],  # L1: north pocket above chamber A–B
+                          obstacles = Obstacle[
+                              # Wall A, x ∈ [200,350] — gaps +1/−1: house / stretched hexagon / inverted house
+                              build_obstacle([(200.0, 146.6), (350.0, 146.6), (350.0, 300.0), (275.0, 330.0), (200.0, 300.0)]),
+                              build_obstacle([(185.0, 0.0), (215.0, -26.6), (335.0, -26.6), (365.0, 0.0), (335.0, 26.6), (215.0, 26.6)]),
+                              build_obstacle([(200.0,-300.0), (275.0,-330.0), (350.0,-300.0), (350.0,-146.6), (200.0,-146.6)]),
+                              # Wall B, x ∈ [800,950] — gaps +1/−2: trapezoid / pointed hexagon / trapezoid
+                              build_obstacle([(800.0, 146.6), (950.0, 146.6), (915.0, 330.0), (835.0, 330.0)]),
+                              build_obstacle([(800.0,-113.2), (950.0,-113.2), (975.0, -43.3), (950.0, 26.6), (800.0, 26.6), (775.0, -43.3)]),
+                              build_obstacle([(800.0,-330.0), (950.0,-330.0), (925.0,-233.2), (825.0,-233.2)]),
+                              # Wall C, x ∈ [1300,1450] — gaps +2/−3: trapezoid / big hexagon
+                              build_obstacle([(1325.0, 233.2), (1425.0, 233.2), (1450.0, 330.0), (1300.0, 330.0)]),
+                              build_obstacle([(1300.0, 113.2), (1450.0, 113.2), (1480.0, -43.3), (1450.0,-199.8), (1300.0,-199.8), (1270.0, -43.3)]),
+                              # Wall D, x ∈ [1800,1950] — gaps +2/−2: trapezoid / pointed hexagon (rows +1,0,−1) / trapezoid (row −3)
+                              build_obstacle([(1825.0, 233.2), (1925.0, 233.2), (1950.0, 330.0), (1800.0, 330.0)]),
+                              build_obstacle([(1800.0,-113.2), (1950.0,-113.2), (1980.0, 0.0), (1950.0, 113.2), (1800.0, 113.2), (1770.0, 0.0)]),
+                              build_obstacle([(1800.0,-330.0), (1950.0,-330.0), (1925.0,-233.2), (1825.0,-233.2)]),
+                              # Plugs: row 0 A–B (hexagon), row −3 A–B (inverted house), row 0 B–C (hexagon),
+                              # row +3 B–C (house), rows 0/−1 C–D (hexagon), row +3 C–D (house), row +3 after D (trapezoid)
+                              build_obstacle([(360.0, 0.0), (390.0, -26.6), (710.0, -26.6), (740.0, 0.0), (710.0, 26.6), (390.0, 26.6)]),
+                              build_obstacle([(425.0,-330.0), (775.0,-330.0), (775.0,-300.0), (740.0,-233.2), (460.0,-233.2), (425.0,-300.0)]),
+                              build_obstacle([(960.0, 0.0), (990.0, -26.6), (1210.0, -26.6), (1240.0, 0.0), (1210.0, 26.6), (990.0, 26.6)]),
+                              build_obstacle([(1000.0, 233.2), (1300.0, 233.2), (1300.0, 300.0), (1250.0, 330.0), (1050.0, 330.0), (1000.0, 300.0)]),
+                              build_obstacle([(1460.0, -43.3), (1490.0,-113.2), (1710.0,-113.2), (1740.0, -43.3), (1710.0, 26.6), (1490.0, 26.6)]),
+                              build_obstacle([(1500.0, 233.2), (1800.0, 233.2), (1800.0, 300.0), (1750.0, 330.0), (1550.0, 330.0), (1500.0, 300.0)]),
+                              build_obstacle([(2000.0, 233.2), (2350.0, 233.2), (2330.0, 330.0), (2020.0, 330.0)])],
+                          start = (0.0, 0.0), goal = (2350.0, 86.60254037844386)),
 )
 
 # ── Manual scenario: geometry read straight from config/main.yaml ──
