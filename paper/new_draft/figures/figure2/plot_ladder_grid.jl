@@ -1,13 +1,17 @@
 # ==========================================================================
 # plot_ladder_grid.jl — Fig. 2: the constraint ladder as a planners × bounds grid
 # ==========================================================================
-#   julia paper/new_draft/figures/figure2/plot_ladder_grid.jl <sweep_root> [pcts] [out_dir]
+#   julia paper/new_draft/figures/figure2/plot_ladder_grid.jl <sweep_root> [pcts] [out_dir] [methods]
 #
 # <sweep_root> is a run_constraint_sweep.jl output in `scenario_name` mode
 # (config/mc/sweep_fig2.yaml → fig2_ladder/<tag>). <pcts> is the comma list of
 # ladder levels to show as columns (default 100,70,50,30); rows are the methods
-# in the order of the sweep's method folders that hold a trials.csv. <out_dir>
-# defaults to <sweep_root>/figures.
+# in the order of the sweep's method folders that hold a trials.csv, or the
+# comma list <methods> if given (then the stem gains `_<method>` per row and a
+# single row drops its label). <out_dir> defaults to <sweep_root>/figures.
+# FIG2_FONT_SCALE (env, default 1) multiplies every font size: a one-row strip
+# goes in at \textwidth (7.16 in) from a 16 in canvas, where 8 pt prints as
+# 3.6 pt, so it is rendered with FIG2_FONT_SCALE=2.2.
 #
 # Each cell draws the plan that rung SHIPPED (csv/main_ctrls.csv, sampled with
 # the planner's own bspline_sample_path) over the scenario's obstacles and
@@ -19,7 +23,12 @@
 #
 # Config comes from a rung's `_cfg` snapshot, so the hex lattice (100 m here,
 # via the sweep's `overrides`), the preset geometry and the sensor model are
-# exactly what ran. Only viz.jl helpers draw the scenery; nothing in src/ moves.
+# exactly what ran. Nothing in src/ moves. Obstacles and landmark ellipses are
+# drawn here rather than by viz.jl's helpers because those use alpha, and
+# PostScript has no transparency: Ghostscript's eps2write flattens every
+# alpha'd panel into a bitmap (5 image operators, nothing selectable in
+# Illustrator -- the same failure Fig. 1 had). The fills are pre-blended onto
+# white instead, so the EPS is pure vector.
 # Output: fig2_ladder_grid.{png,svg,pdf,eps} (EPS via Ghostscript, as fig1).
 # ==========================================================================
 
@@ -27,11 +36,14 @@ ENV["GKSwstype"] = "100"
 using Printf
 
 const _ROOT = normpath(joinpath(@__DIR__, "..", "..", "..", ".."))
-length(ARGS) >= 1 || error("usage: julia plot_ladder_grid.jl <sweep_root> [pcts] [out_dir]")
+length(ARGS) >= 1 || error("usage: julia plot_ladder_grid.jl <sweep_root> [pcts] [out_dir] [methods]")
 abspath_or(p) = isabspath(p) ? p : joinpath(_ROOT, p)
 const RUN_ROOT = abspath_or(ARGS[1])
 const PCTS     = length(ARGS) >= 2 ? parse.(Int, split(ARGS[2], ',')) : [100, 70, 50, 30]
 const OUT_DIR  = length(ARGS) >= 3 ? abspath_or(ARGS[3]) : joinpath(RUN_ROOT, "figures")
+const ONLY     = length(ARGS) >= 4 ? String.(split(ARGS[4], ',')) : String[]
+const FONT_SCALE = parse(Float64, get(ENV, "FIG2_FONT_SCALE", "1"))
+fs(pt) = round(Int, pt * FONT_SCALE)
 isdir(RUN_ROOT) || error("no such sweep root: $(RUN_ROOT)")
 
 # Method folders, in the order the sweep's methods.yaml listed them if that order
@@ -40,7 +52,9 @@ const METHOD_DIRS = filter(d -> isfile(joinpath(RUN_ROOT, d, "trials.csv")),
                            filter(d -> isdir(joinpath(RUN_ROOT, d)), readdir(RUN_ROOT)))
 isempty(METHOD_DIRS) && error("no method folder with a trials.csv under $(RUN_ROOT)")
 const PREFERRED = ["hexspline_cl", "greedy", "formation", "sequential", "clgbt"]
-const METHODS = vcat(filter(m -> m in METHOD_DIRS, PREFERRED), sort(filter(m -> !(m in PREFERRED), METHOD_DIRS)))
+const METHODS = isempty(ONLY) ?
+    vcat(filter(m -> m in METHOD_DIRS, PREFERRED), sort(filter(m -> !(m in PREFERRED), METHOD_DIRS))) :
+    (all(m -> m in METHOD_DIRS, ONLY) ? ONLY : error("no trials.csv for some of $(ONLY) under $(RUN_ROOT)"))
 const LABEL = Dict("hexspline_cl" => "ours", "greedy" => "greedy", "formation" => "formation",
                    "sequential" => "sequential", "clgbt" => "CL-GBT")
 
@@ -93,13 +107,25 @@ sample(ctrl) = first(bspline_sample_path(ctrl; length_samples_per_seg = 12))
 const XL = (-60.0, SCEN.goal[1] + 60.0)
 const YL = (-CORRIDOR_Y_MAX_M - 45.0, CORRIDOR_Y_MAX_M + 45.0)
 
+# `color` at `alpha` flattened onto white -- what the alpha'd fill would look
+# like over the white ground, minus the transparency the EPS cannot carry.
+over_white(color, alpha) = (c = Plots.RGB(Plots.Colors.parse(Plots.Colors.Colorant, string(color)));
+                            Plots.RGB(1 - alpha * (1 - c.r), 1 - alpha * (1 - c.g), 1 - alpha * (1 - c.b)))
+
 function scenery(; ground = :white)
     p = plot(legend = false, aspect_ratio = :equal, xlims = XL, ylims = YL,
              background_color_inside = ground, framestyle = :box, grid = false,
-             xticks = 0:500:SCEN.goal[1], yticks = -200:200:200, tickfontsize = 6)
-    overlay_obstacles!(p)
+             xticks = 0:500:SCEN.goal[1], yticks = -200:200:200, tickfontsize = fs(6))
+    # ellipses first, then obstacles, so an obstacle still covers an ellipse
     for lm in SCEN.landmarks
-        draw_covariance_ellipse!(p, lm.x, lm.y, lm.cov, color = :red, alpha = 0.18, display_scale = 400.0)
+        draw_covariance_ellipse!(p, lm.x, lm.y, lm.cov, color = over_white(:red, 0.18),
+                                 alpha = 1.0, display_scale = 400.0)
+    end
+    for obs in OBSTACLES   # viz.jl's overlay_obstacles!, opaque (gray35 at 0.55 on white)
+        xs = [v[1] for v in obs.verts]; ys = [v[2] for v in obs.verts]
+        push!(xs, xs[1]); push!(ys, ys[1])
+        plot!(p, xs, ys, seriestype = :shape, color = over_white(:gray35, 0.55),
+              linecolor = :black, linewidth = 1.5, label = false)
     end
     scatter!(p, [lm.x for lm in SCEN.landmarks], [lm.y for lm in SCEN.landmarks],
              color = :black, markersize = 3, markerstrokewidth = 0)
@@ -116,8 +142,8 @@ function draw_paths!(p, ctrls; alpha = 1.0)
         pts = sample(ctrl)
         primary = a == na
         plot!(p, [q[1] for q in pts], [q[2] + (primary ? 0.0 : SUPPORT_PLOT_OFFSET_M * a) for q in pts];
-              color = agent_color(a, na), linewidth = primary ? 2.0 : 1.2,
-              linestyle = primary ? :solid : :dash, alpha = alpha)
+              color = over_white(agent_color(a, na), alpha), linewidth = primary ? 2.0 : 1.2,
+              linestyle = primary ? :solid : :dash)
     end
 end
 
@@ -127,7 +153,7 @@ for (i, m) in enumerate(METHODS), (j, pct) in enumerate(PCTS)
     c = get(cells, (m, pct), nothing)
     p = scenery(ground = (c === nothing || !c.ok) ? RGB(0.90, 0.90, 0.90) : :white)
     if c === nothing
-        annotate!(p, (XL[1] + XL[2]) / 2, 0.0, text("not run", 8, :gray40))
+        annotate!(p, (XL[1] + XL[2]) / 2, 0.0, text("not run", fs(8), :gray40))
     else
         c.ctrls === nothing || draw_paths!(p, c.ctrls; alpha = c.ok ? 1.0 : 0.4)
     end
@@ -137,14 +163,14 @@ for (i, m) in enumerate(METHODS), (j, pct) in enumerate(PCTS)
              c.ok && c.len !== nothing && c.unc !== nothing ? @sprintf("%.0f m,  σ = %.2f m", c.len, c.unc) :
              c.ok ? "ok" : "✗ " * replace(c.why, "_" => " ")
     hdr = i == 1 ? @sprintf("%d %%  (σ ≤ %.2f m)\n", pct, c === nothing ? NaN : c.thr) : ""
-    plot!(p, title = hdr * status, titlefontsize = i == 1 ? 8 : 7,
+    plot!(p, title = hdr * status, titlefontsize = fs(i == 1 ? 8 : 7),
           titlefontcolor = (c !== nothing && !c.ok) ? :firebrick : :black)
-    j == 1 && plot!(p, ylabel = get(LABEL, m, m), guidefontsize = 9)
+    j == 1 && length(METHODS) > 1 && plot!(p, ylabel = get(LABEL, m, m), guidefontsize = fs(9))
     push!(panels, p)
 end
 nr, nc = length(METHODS), length(PCTS)
-fig = plot(panels..., layout = (nr, nc), size = (nc * 400, nr * 190 + 40),
-           left_margin = 9Plots.mm, bottom_margin = 1Plots.mm, top_margin = 1Plots.mm)
+fig = plot(panels..., layout = (nr, nc), size = (nc * 400, nr * 190 + round(Int, 40 * FONT_SCALE)),
+           left_margin = (nr > 1 ? 9 : 3) * Plots.mm, bottom_margin = 1Plots.mm, top_margin = 1Plots.mm)
 
 function save_all(p, stem::String)
     for ext in ("png", "svg", "pdf"); savefig(p, "$(stem).$(ext)"); end
@@ -154,7 +180,7 @@ function save_all(p, stem::String)
     println("  → $(stem).{png,svg,pdf" * (gs === nothing ? "" : ",eps") * "}")
 end
 mkpath(OUT_DIR)
-save_all(fig, joinpath(OUT_DIR, "fig2_ladder_grid"))
+save_all(fig, joinpath(OUT_DIR, "fig2_ladder_grid" * (isempty(ONLY) ? "" : "_" * join(ONLY, "_"))))
 
 # ── Console summary ──────────────────────────────────────────────────────
 println("\n── $(basename(RUN_ROOT)): $(nr) planners × $(nc) levels ──")

@@ -170,15 +170,37 @@ plot_ladder_grid.jl    the grid figure, from a sweep_fig2 run (status in each pa
 plot_ladder_singles.jl one figure per rung of one planner: <sweep_root> [pcts] [method] [out_dir]
 singles_shapes_v14/    ours at 100/70/50/30 on ladder_shapes
 singles_long_v15e/     ours at 100/60/50/30 on ladder_long (ε = 0.25)
-fig2_ladder_grid_shapes_v14.{png,svg,pdf,eps}   candidate 2 grid (the current pick)
+fig2_ladder_grid_shapes_v14.{png,svg,pdf,eps}   candidate 2 grid, all five planners
 fig2_ladder_grid_maze_v8.png                    candidate 1 grid
+fig2_ladder_ours_long_v15e.{png,svg,pdf,eps}    candidate 3 as an ours-only 1x4 strip (spare)
+../fig2_ladder_ours_shapes_v14.{png,svg,pdf,eps}  candidate 2 as an ours-only 1x4 strip -- IN THE PAPER
 ```
+
+## The shipped figure: ours only (2026-09-10)
+
+User call: the paper's Fig. 2 shows the hexspline ladder alone, no baseline
+rows. `plot_ladder_grid.jl` gained an optional 4th argument (comma list of
+methods; the stem gains `_<method>` and a single row drops its label) and an
+env font scale, because a one-row strip goes in at `\textwidth` = 7.16 in from
+a 16 in canvas (×0.45): at the script's 8/7/6 pt the titles would print at
+3.6 pt, so the strip is rendered with `FIG2_FONT_SCALE=2.2` (≈7 pt on paper).
+
+The EPS is now real vector. `overlay_obstacles!` (fillalpha 0.55) and the
+landmark ellipses (alpha 0.18) made Ghostscript's `eps2write` flatten every
+panel into a bitmap -- the same failure Fig. 1 had -- so the plot script draws
+both itself with the alpha pre-blended onto white (`over_white`), and a failed
+rung's faded path the same way. Round-trip check: `gs -sDEVICE=pdfwrite` on the
+EPS, then `pdfimages -list` shows no images. (Counting `image` in the EPS text
+is a false positive: the prolog defines the operator whether or not it is used.)
 
 ## Regenerating
 
 ```
 ~/.juliaup/bin/julia run_constraint_sweep.jl --sweep config/mc/sweep_fig2.yaml --tag shapes_v14   # → fig2_ladder/shapes_v14 (scenario_name in the yaml)
 ~/.juliaup/bin/julia paper/new_draft/figures/figure2/plot_ladder_grid.jl fig2_ladder/shapes_v14 100,70,50,30
+# the paper's ours-only strip (then renamed fig2_ladder_grid_hexspline_cl -> fig2_ladder_ours_shapes_v14):
+FIG2_FONT_SCALE=2.2 ~/.juliaup/bin/julia paper/new_draft/figures/figure2/plot_ladder_grid.jl fig2_ladder/shapes_v14 100,70,50,30 paper/new_draft/figures hexspline_cl
+FIG2_FONT_SCALE=2.2 ~/.juliaup/bin/julia paper/new_draft/figures/figure2/plot_ladder_grid.jl fig2_ladder/long_v15e 100,60,50,30 paper/new_draft/figures/figure2 hexspline_cl
 ```
 
 ## The sweep (`fig2_ladder/v8`, harness run, all five planners)
