@@ -1,8 +1,8 @@
 # Fig. 3 — iteration history
 
-Every version of `fig3_length_vs_constraint` we rendered, in order. Numbered
+Every version of Fig. 3 we rendered, in order. Numbered
 files are the ones that shipped (commit given); `x*` are explorations that never
-did. `14_` is what is currently in the paper.
+did. `15a_`/`15b_` are what is currently in the paper.
 
 All are 300 dpi previews of a 3.5 in column figure — judge them at that size,
 not zoomed.
@@ -25,7 +25,8 @@ not zoomed.
 | `11_transposed_accent-on-line.png` | `39bcf195` | **Axes transposed** — success rate on y, length ratio on x, so the best corner is top left. Length takes x because that is where the data needs the room. The coral accent comes off the marker rings and goes on Ours' line alone, so every glyph keeps the same dark ring and nothing competes with the fills. Line gray darkened 0.55 → 0.35. |
 | `12_ylgnbu_dotted-baselines_success-on-y.png` | `ea1fd30d` | Scale switched to **YlGnBu**, dark = the higher constraint number. All four baselines collapse to one **dotted gray**, so they read as a single background population and identity falls entirely to marker shape; Ours becomes **solid black**. Also fixes the reversed key, below. `12b_` is the same figure with the axes swapped — both are generated. |
 | `13_gold-diamond_side-key_row-legend.png` | `2159e951` | **Back to the `08_` layout** — constraint level on x, success rate on y, median length ratio painted along the line. Ours' fill goes coral → gold `#c68a00`, the ramp is trimmed a little greener (0.74 → 0.80), the length key stands vertically at the right, and the planner key is one horizontal row under the plot. `12_`/`12b_` stay generated as spares. |
-| `14_yellow-diamond_keys-stacked-below.png` | current | Undoes `13_`'s squish. The side key cost the plot 0.4 in of width, so the length key goes back under the x label and the plot returns to `08_`'s exact 3.073 × 1.696 in; the figure grows to 2.75 in tall instead. Ours' fill goes gold → plain yellow `#ffdd00`. |
+| `14_yellow-diamond_keys-stacked-below.png` | `d5e904d1` | Undoes `13_`'s squish. The side key cost the plot 0.4 in of width, so the length key goes back under the x label and the plot returns to `08_`'s exact 3.073 × 1.696 in; the figure grows to 2.75 in tall instead. Ours' fill goes gold → plain yellow `#ffdd00`. |
+| `15a_split_success-rate.png`, `15b_split_length_mean-sd.png` | current | **Split into two plots** (user call, 2026-09-10): constraint level on x for both, success rate on y in (a), **mean ± SD of length / $L_\mathrm{ref}$ over the solved scenarios** on y in (b), planners dodged along x so the bars stay apart. No ramp, no colorbar: identity is back to the paper palette + marker shape, Ours the heavier line drawn on top. (a) carries no error bar on purpose (success rate is a proportion; the user declined a binomial SE). (b)'s y stops at 3.2 so the 1.1–1.5 band where most of the data lives keeps its room; Sequential's 2.49±1.37 / 2.76±1.51 at 40/30% run off the top, and the caption says so. Stems `fig3a_success_vs_constraint`, `fig3b_length_vs_constraint`; `fig3_length_vs_constraint` and `fig3_success_on_*` are deleted (recover from `d5e904d1`). |
 
 ## Alternates worth keeping
 
@@ -223,13 +224,13 @@ separate at all.
 includes, **SVG** and **EPS** both open in Illustrator, **PNG** is a preview.
 Prefer the SVG for editing — it is the one that keeps live text.
 
-Two things about the SVG, both deliberate:
+One thing about the SVG, deliberate:
 
 - Text is text, not outlines (`svg.fonttype: none`), so labels stay editable.
   Illustrator substitutes only if Nimbus Roman is missing there; the
   font-family falls back through Times New Roman and Liberation Serif.
-- The colorbar is a `pcolormesh`, not an `imshow`. `imshow` embeds the bar as a
-  raster block, which arrives in Illustrator resolution-locked and uneditable.
+  (If a colorbar ever comes back, draw it with `pcolormesh`, not `imshow` —
+  `imshow` embeds a raster block that arrives resolution-locked.)
 
 And two about the EPS:
 
@@ -242,9 +243,9 @@ And two about the EPS:
   white** (`over_white`) rather than given an alpha. Do not reintroduce
   `set_alpha` there; it comes out opaque in the EPS and stops matching the PDF.
 
-The one rough edge: Fig. 3's gradient lines arrive as a run of short stroked
-segments (32 per data interval), not one path each. That is what a per-vertex
-color ramp has to be. Group a line's segments before moving it.
+Since `15_` every line is a single path again (the gradient lines of
+`05_`–`14_` were 32 stroked segments per data interval and had to be grouped
+before moving).
 
 Regenerate everything with:
 

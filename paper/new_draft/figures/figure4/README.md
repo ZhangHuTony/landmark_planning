@@ -1,17 +1,19 @@
 # Fig. 4 — iteration history
 
-Every version of the wall-clock figure we rendered, in order. `01_` is what is
-currently in the paper. All are 300 dpi previews — judge them at print size, not
+Every version of the wall-clock figure we rendered, in order. `05_` is what is
+currently in the paper (Fig. 4); `06_` is its ablation twin (Fig. 6). All are 300 dpi previews — judge them at print size, not
 zoomed: `01_` and `03_` are 3.5 in (one column), `02_` and `04_` are 7.16 in
 (full text width, so they would need `figure*`).
 
 | file | what it is |
 |---|---|
 | `00_pooled_box.png` | The original. One box per planner, **all eight constraint levels pooled**. |
-| `01_5level_box.png` | Split by level, five levels (100/80/60/40/30), boxes. Column width. **In the paper.** |
+| `01_5level_box.png` | Split by level, five levels (100/80/60/40/30), boxes. Column width. Was in the paper until `05_`. |
 | `02_alllevel_box.png` | All eight levels, boxes. Full text width. |
 | `03_5level_violin.png` | Five levels, violins. Column width. |
 | `04_alllevel_violin.png` | All eight levels, violins. Full text width. |
+| `05_5level_box_no-fliers.png` | `01_` with the **fliers hidden** and the log axis fitted to the whiskers (≈12–140 s instead of 11–900 s). Column width. **In the paper.** |
+| `06_abl_5level_box_linear.png` | The same cut for the ablation arms (Fig. 6), on a **linear** axis: everything sits in 16–21 s. Column width. **In the paper.** |
 
 ## What the split is for
 
@@ -20,6 +22,21 @@ planners cost essentially the same however tight the bound gets — their boxes
 barely move across the levels — while CL-GBT's median roughly triples and its
 tail runs to 730 s. In `00_` that shows up only as one planner having a longer
 whisker, which reads as noise rather than as a trend.
+
+## Why the fliers are gone (`05_`)
+
+With the axis running to 900 s to hold CL-GBT's 730 s tail, the four cheap
+planners were a flat band at the bottom and could not be compared. `05_` hides
+the fliers beyond 1.5×IQR (`showfliers=False`) and fits the axis to what is
+still drawn — whisker caps and the small-n tick strips — so the 13–22 s band
+gets roughly twice the vertical room. Nothing else changes: the whiskers still
+end at 1.5×IQR, so CL-GBT's box at 60% still reaches 124 s. That is not an
+outlier; its IQR at that level is 14–61 s.
+
+The baseline keeps the log axis for exactly that box. The ablation arms have
+no such tail (whiskers 16–21 s), so Fig. 6 takes a linear axis and the median
+gap between the full pipeline and the discrete stage (~1.4 s) is legible.
+Violins are untouched spares and keep the old fixed limits.
 
 ## Three things to know before editing
 
