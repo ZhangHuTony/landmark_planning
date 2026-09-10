@@ -36,6 +36,18 @@ line.
 
 Run it with the simulator's interpreter, which has matplotlib and numpy:
     ~/Research/multiagent_base/.venv/bin/python fig8_montecarlo.py <mc_run_dir>
+
+The shipped set (2026-09-10) is `results/2026-09-02_thr1.8b` (behind_wall, 2
+agents, bound 1.8 m), rendered as `fig8_mc_behind_wall` with `--case=behind_wall`:
+    python fig8_montecarlo.py ~/Research/landmark_planning/results/2026-09-02_thr1.8b \
+        --stem=fig8_mc_behind_wall --case=behind_wall
+All 30 `mc*` trials there were re-flown on 2026-09-09 with the sim's fixed
+estimator (support backlog seeded from its own solved pose, see
+multiagent_base/CLAUDE.md), and 30/30 fly the plan -- the earlier 20-trial
+version of this figure, with 5 orbiting runs, is superseded. The `fix<seed>/`
+re-runs in that directory do not match the `<prefix><i>` pattern and are
+ignored. The two ladder_shapes sets (`results/mc_*_p030`) are still
+old-estimator runs and are not shipped.
 `plan_io` is imported from that same checkout because it owns the planner's and
 the recorder's file schemas; re-implementing its YAML reader here is how the two
 would drift.
