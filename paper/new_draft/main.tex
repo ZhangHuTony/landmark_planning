@@ -17,6 +17,7 @@
 
 \newtheorem{theorem}{Theorem}
 \newtheorem{proposition}{Proposition}
+\newtheorem{lemma}{Lemma}
 
 \crefname{figure}{Fig.}{Fig.}
 \Crefname{figure}{Figure}{Figures}
@@ -131,7 +132,7 @@ In the following sections, we formalize the problem, describe the discrete and c
 % ===========================================================================
 \budget{$\approx$300 words, 0.3 page}
 
-\lipsum[8-11]
+\lipsum[8-10]
 
 % ===========================================================================
 \section{PROBLEM FORMULATION}
@@ -219,55 +220,53 @@ with $\omega \in [0,1]$ chosen to minimize $\det\Sigma_i^{+}$, and symmetrically
 for agent $j$. As $w_{ij} \to 0$ the transferred information
 vanishes, so distant agents do not fuse.
 
-\subsection{Constraints}
+\subsection{Optimization Problem}
 
-\textbf{Terminal uncertainty.} The primary must arrive with bounded
-localization uncertainty,
-\begin{equation}
-  \det\big(\Sigma_1(S_1)\big)^{1/4} \le \bar{u},
-  \label{eq:term}
-\end{equation}
-where $\det(\Sigma)^{1/4}$ equals the standard deviation $\sigma$ for an
-isotropic covariance $\sigma^2 I$ and is therefore expressed in metres.
+The planning problem gathers the objective and all constraints in one place:
+\begin{subequations}
+\label{eq:opt}
+\begin{align}
+  & \min_{\{\theta_i(\cdot)\},\, S_1}\;\; S_1 \nonumber \\
+  & \mathrm{s.t.}\;\;
+    \det\big(\Sigma_1(S_1)\big)^{1/4} \le \bar{u}, \label{eq:term} \\
+  & a_j^{\top} x_i(s) \ge b_j + r_a
+      + z_\delta \sqrt{a_j^{\top}\big(\Sigma_i(s) + \Sigma_o\big)a_j},
+      \label{eq:cc} \\
+  & |\kappa_i(s)| \le 1/r_{\min}, \label{eq:kin} \\
+  & x_i(0) = x_i^0,\;\; \Sigma_i(0) = \Sigma^0,\;\; x_1(S_1) = G.
+      \label{eq:bc}
+\end{align}
+\end{subequations}
 
-\textbf{Obstacle avoidance.} Every agent must clear every obstacle with
-probability at least $1-\delta$ at every instant. A sufficient condition is
-that the mean lies outside at least one face of the obstacle with a margin that
-accounts for the vehicle radius $r_a$ and for both the agent's and the
-obstacle's positional uncertainty \todo{cite Blackmore / Ono--Williams}: for
-some face $j$ of $\mathcal{O}_o$,
-\begin{equation}
-  a_j^{\top} x_i(s) \;\ge\; b_j + r_a
-  + z_\delta \sqrt{a_j^{\top}\big(\Sigma_i(s) + \Sigma_o\big)a_j},
-  \label{eq:cc}
-\end{equation}
-for all $i \in \mathcal{I}$, $o \in \{1,\dots,M\}$ and $s$, where
-$z_\delta = \Phi^{-1}(1-\delta)$ and $\Phi$ is the standard normal distribution
-function. A union bound over the $PM$
+\textbf{Terminal uncertainty \eqref{eq:term}.} The primary must arrive with
+bounded localization uncertainty; $\det(\Sigma)^{1/4}$ equals the standard
+deviation $\sigma$ for an isotropic covariance $\sigma^2 I$ and is therefore
+expressed in metres.
+
+\textbf{Obstacle avoidance \eqref{eq:cc}.} Every agent must clear every
+obstacle with probability at least $1-\delta$ at every instant: the constraint
+must hold for \emph{some} face $j$ of each obstacle $\mathcal{O}_o$, for every
+agent $i$, obstacle $o$, and arc position $s$. The mean then lies outside one
+face with a margin covering the vehicle radius $r_a$ and both the agent's and
+the obstacle's positional uncertainty, where $z_\delta = \Phi^{-1}(1-\delta)$
+and $\Phi$ is the standard normal distribution function
+\todo{cite Blackmore / Ono--Williams}. A union bound over the $PM$
 agent--obstacle pairs bounds the instantaneous probability of any collision by
 $\Delta = PM\delta$.
 
-\textbf{Kinematics.} Each trajectory respects the vehicles' minimum turn radius
-$r_{\min}$ through the curvature bound $|\kappa_i(s)| \le 1/r_{\min}$, where
-$\kappa_i = \mathrm{d}\theta_i/\mathrm{d}s$.
+\textbf{Kinematics \eqref{eq:kin}.} Each trajectory respects the vehicles'
+minimum turn radius $r_{\min}$, where $\kappa_i = \mathrm{d}\theta_i/\mathrm{d}s$
+is the path curvature.
 
-\textbf{Boundary conditions.} $x_i(0) = x_i^0$ and $\Sigma_i(0) = \Sigma^0$ for
-all $i \in \mathcal{I}$, and $x_1(S_1) = G$.
+\textbf{Boundary conditions \eqref{eq:bc}.} All agents start from known
+positions with a common prior covariance, and the primary must end at the goal.
 
-\subsection{Optimization Problem}
-
-\begin{equation}
-\begin{aligned}
-  \min_{\{\theta_i(\cdot)\},\,S_1}\;\; & S_1 \\
-  \text{s.t.}\;\; & \eqref{eq:dyn}\text{--}\eqref{eq:ci},\;\; \eqref{eq:term},\;\; \eqref{eq:cc},\;\;
-    |\kappa_i(s)| \le 1/r_{\min}, \\
-  & x_i(0) = x_i^0,\;\; \Sigma_i(0) = \Sigma^0,\;\; x_1(S_1) = G .
-\end{aligned}
-\label{eq:opt}
-\end{equation}
-The agents are coupled only through \eqref{eq:ci}: the supports' trajectories
-affect the objective solely by shaping the primary's covariance, which is what
-makes the problem a joint one.
+The belief dynamics do not appear as constraints: $\Sigma_i(s)$ is a
+deterministic functional of the decision variables through
+\eqref{eq:dyn}--\eqref{eq:ci}, and this dependence is left implicit in
+\eqref{eq:opt}. The agents are coupled only through the fusion step
+\eqref{eq:ci}: the supports' trajectories affect the problem solely by shaping
+the primary's covariance, which is what makes the problem a joint one.
 
 % ===========================================================================
 \section{METHOD}
@@ -275,52 +274,198 @@ makes the problem a joint one.
 \budget{$\approx$1000 words + Alg.~1, 1.2 pages}
 
 \subsection{Heading-Aware Hexagonal Graph}
-\lipsum[19-20]
+
+We discretize the workspace with a pointy-top hexagonal lattice of cell width
+$w_{\mathrm{hex}}$ covering a padded corridor around the start--goal segment;
+hexagonal grids reduce directional bias and provide uniform neighbor spacing
+\cite{duszak2021hexgrid}. A graph node pairs a cell with one of six headings
+spaced $60^\circ$ apart, and exactly three moves leave each node: continue
+straight, or turn $\pm 60^\circ$ and step into the cell faced by the new
+heading. Heading changes are therefore bounded by $60^\circ$ per cell
+traversed, a graph-level surrogate of the curvature bound \eqref{eq:kin}.
+Landmarks are appended as non-traversable sensor nodes: they carry no edges
+and enter the search only through the measurement update \eqref{eq:lm}. A
+goal super-node absorbs all six headings of the goal cell, leaving the
+arrival heading unconstrained. Obstacles do not remove cells from the graph;
+they act on beliefs during the search below. Finally, all-pairs shortest-path
+distances are precomputed on the graph and serve as the search heuristic.
 
 \subsection{Joint Discrete Search}
-\lipsum[22-24]
+
+The planner first seeks a resolution-constrained solution of \eqref{eq:opt}
+by an A*-style search over the joint state of the team. A search state
+stacks, for every agent, its graph node, its covariance, and its arc distance
+travelled; each expansion advances every agent by one edge, so successors are
+the Cartesian product of the agents' three moves. The accumulated cost $g$ is
+the primary's arc distance alone, and states are popped by
+$f = g + (1+\varepsilon)\,h$, where $h$ is the precomputed shortest-path
+distance from the primary's node to the goal and support agents contribute
+zero heuristic cost, making $h$ an admissible lower bound. With
+$\varepsilon = 0$ the key is admissible; $\varepsilon > 0$ yields a weighted
+search that trades a $(1+\varepsilon)$ factor on the seed length for fewer
+expansions. Ties are broken toward lower primary uncertainty and busier
+supports.
+
+During expansion each agent's covariance is propagated along its edge by
+\eqref{eq:prop}--\eqref{eq:lm}, and covariance intersection \eqref{eq:ci} is
+applied whenever two agents' arc distances align within a communication
+checkpoint. A successor is discarded outright if any agent violates the
+chance constraint \eqref{eq:cc} along its edge or if a support outruns the
+primary. The joint space is tamed by Pareto pruning: at each joint node
+signature we keep a frontier of $(g, \Sigma_1)$ labels and discard a new
+label only if an existing one has no larger $g$ and a covariance no larger in
+the positive-semidefinite order. Such pruning is sound because the heuristic
+is shared at the same node tuple, the primary path cost of the dominated
+state cannot be lower, and the covariance used for feasibility assessment
+cannot improve under future propagation.
+
+The search is anytime with respect to the terminal constraint
+\eqref{eq:term}. When a popped state places the primary at the goal and its
+induced spline seed (Sec.~\ref{sec:cont}) clears all obstacles, the state is
+returned immediately if \eqref{eq:term} holds; otherwise it is recorded as
+the incumbent whenever its terminal uncertainty is the smallest seen so far.
+If the expansion budget is exhausted, the incumbent---the least-violating
+obstacle-clear candidate---is handed to the continuous stage, which attempts
+to recover feasibility. Only the terminal bound is ever relaxed in this way;
+obstacle clearance is not.
+
+\begin{lemma}[Seed feasibility and near-optimality]
+Suppose \eqref{eq:opt} admits a solution of length $S_1^\star$ whose
+constraint slacks are strictly positive. Then for sufficiently small
+$w_{\mathrm{hex}}$, the search with $\varepsilon = 0$ returns a feasible seed
+of length at most $\tfrac{2}{\sqrt{3}}\big(1 + O(w_{\mathrm{hex}})\big)\,
+S_1^\star$.
+\end{lemma}
+\begin{proof}[Proof sketch]
+Any continuous trajectory can be traced by a lattice path within Hausdorff
+distance $O(w_{\mathrm{hex}})$ whose length exceeds the trajectory's by at
+most the direction-quantization factor $2/\sqrt{3}$, attained when a segment
+bisects two of the six headings. The covariance maps
+\eqref{eq:prop}--\eqref{eq:ci} are continuous in the path, so for small
+enough $w_{\mathrm{hex}}$ the traced path inherits strictly positive slacks,
+and dominance pruning never discards every feasible label at a signature. An
+admissible search therefore pops a feasible goal state no longer than the
+traced path.
+\end{proof}
+The $2/\sqrt{3}$ overhead is a property of the six-heading move set, not of
+the resolution; removing it is precisely the role of the continuous
+refinement.
 
 \begin{algorithm}[t]
-  \caption{Joint discrete search \todo{name}}
+  \caption{Discrete-to-continuous escort planning}
   \label{alg:joint}
   \begin{algorithmic}[1]
-    \Require graph $G$, start/goal, landmarks, bound $\bar{u}$
-    \State \todo{init open set with joint start state, $\Sigma_0$}
-    \While{open set non-empty and budget remains}
-      \State \todo{pop by $f = g + h_{\mathrm{FW}}$}
-      \If{primary on goal cell \textbf{and} spline-clear gate passes}
-        \State \Return joint path
+    \Require hex graph, start states $\Sigma^0$, goal $G$, bound $\bar{u}$,
+      budget $N$
+    \State precompute all-pairs graph distances $h(\cdot)$
+    \State $\mathit{open} \gets \{\text{joint start}\}$;\quad
+      $\mathit{inc} \gets \varnothing$
+    \While{$\mathit{open} \neq \varnothing$ and expansions $< N$}
+      \State pop state minimizing $f = g + (1+\varepsilon)h$
+      \If{primary at goal \textbf{and} seed spline clears obstacles}
+        \If{$\det(\Sigma_1)^{1/4} \le \bar{u}$}
+          seed $\gets$ state; \textbf{break}
+        \ElsIf{lowest terminal uncertainty so far}
+          $\mathit{inc} \gets$ state
+        \EndIf
       \EndIf
-      \ForAll{joint successors}
-        \State \todo{propagate $\Sigma$ per agent; CI fusion at checkpoints}
-        \State \todo{reject if chance constraint violated}
-        \State \todo{dominance test against frontier; push if survives}
+      \ForAll{joint successors (every agent one edge)}
+        \State propagate $\Sigma_i$ by \eqref{eq:prop}--\eqref{eq:lm};
+          fuse by \eqref{eq:ci}
+        \State discard if \eqref{eq:cc} violated or a support outruns
+          the primary
+        \State insert unless dominated in $(g,\Sigma_1)$ at its signature
       \EndFor
     \EndWhile
-    \State \Return best incumbent
+    \State \textbf{if} no seed \textbf{then} seed $\gets \mathit{inc}$
+      \Comment{least-violating}
+    \State $x \gets$ control points of seed splines;\quad
+      $\mathit{feas} \gets \min s(x) \ge 0$
+    \For{each barrier stage; Adam iterations on $\nabla_x J(x;\mu)$}
+      \State accept step iff $J$ decreases and
+        ($\neg\mathit{feas}$ \textbf{or} trial feasible)
+      \State $\mathit{feas} \gets \mathit{feas} \lor \text{trial feasible}$
+        \Comment{latch}
+      \State track least-violating / shortest-feasible incumbents
+      \State decay $\mu$ only once $\mathit{feas}$
+    \EndFor
+    \State \Return best incumbent trajectory
   \end{algorithmic}
 \end{algorithm}
-
-\lipsum[26-27]
 
 % Fig.~2 is a two-column float; LaTeX places figure* at the top of the NEXT
 % page after its source position, so it is issued here to land on the page
 % where Results begins. Move the source if it drifts.
 \begin{figure*}[t]
   \centering
-  \figbox{6.5cm}{Fig.~2 --- constraint ladder: one scenario, columns = constraint
-    level (100/70/50/30\%), rows = ours vs.\ baselines; shows how the plan
-    adapts as the bound tightens and where each baseline fails}
-  \caption{Constraint ladder on a single scenario. Each column tightens the
-    terminal uncertainty bound; each row is a planner. Our planner reroutes the
-    support agent toward the landmarks as the bound tightens while the
-    baselines \todo{describe failure modes}. Grey cells: no feasible plan found.
-    \todo{write real caption}}
+  \includegraphics[width=\textwidth]{fig2_ladder_ours_shapes_v14}
+  \caption{Constraint ladder on one scenario (1700\,m corridor, 13 obstacles,
+    three landmarks, $\varepsilon = 0$, 100\,m lattice). Each panel is our
+    planner's solution as the terminal bound tightens from 100\% to 30\% of the
+    lone-agent reference $U_\mathrm{ref}$; the primary is the solid curve, the
+    support the dashed one, landmarks are dots with their map covariance, and
+    each title gives the primary's length and terminal $\sigma$. At 100\% the
+    support climbs into the upper pocket to sight the weak landmark there and
+    rejoins (1738\,m); at 70\% it takes the southern lane to a stronger
+    landmark and relays it at half weight (1761\,m); at 50\% the primary adds
+    one wiggle before the goal so the support can reach that landmark in time
+    (1770\,m, $\sigma = 6.5$\,m); at 30\% the primary itself detours through
+    the obstacle row toward the third landmark (1909\,m, $\sigma = 3.5$\,m).
+    Each 100\,m of primary length buys the support one more option.}
   \label{fig:ladder}
 \end{figure*}
 
 \subsection{Continuous B-Spline Refinement}
-\lipsum[29-30]
+\label{sec:cont}
+
+The discrete seed is lifted into continuous space as clamped cubic B-splines,
+one per agent, whose control points are the seed's cell centres; support
+paths are padded to the primary's node count and the primary's final control
+point is pinned to $G$. The decision vector $x$ stacks the free control
+points: all interior points of the primary, whose endpoints are fixed, and
+all but the first point of each support, whose terminal position is free.
+
+The constraints of \eqref{eq:opt} are collected in a slack vector
+$s(x)$, feasible when $s(x) \ge 0$: the terminal bound \eqref{eq:term},
+evaluated by propagating \eqref{eq:prop}--\eqref{eq:ci} along the sampled
+splines; the curvature bound, sampled analytically from the spline
+derivatives; the requirement that no support spline exceed the primary's
+length; and obstacle clearance. For the latter, each spline segment is
+enclosed in the convex hull of its MINVO control points
+\todo{cite MINVO (Tordesillas--How)}, and each segment--obstacle pair is
+committed to the single face of \eqref{eq:cc} most cleared by the seed,
+fixing the homotopy class and replacing the disjunction with conservative
+per-vertex rows. Refinement then minimizes the primary length under the
+log-barrier merit function
+\begin{equation}
+  J(x;\mu) = S_1(x) + \sum\nolimits_k B\big(s_k(x);\mu\big),
+  \label{eq:merit}
+\end{equation}
+\begin{equation}
+  B(s;\mu) =
+  \begin{cases}
+    -\mu \log s, & s > \delta_b, \\[2pt]
+    -\mu \big( \log\delta_b + \tfrac{s-\delta_b}{\delta_b} \big), & s \le \delta_b,
+  \end{cases}
+  \label{eq:barrier}
+\end{equation}
+where the tangent extension below the knee $\delta_b$ keeps $J$ finite for
+violated constraints and supplies a constant restoring gradient, so a single
+objective serves feasible and infeasible iterates alike.
+
+We minimize $J$ with Adam on forward-difference gradients and a backtracking
+line search over a schedule of barrier stages. A feasibility latch splits the
+run into two regimes. While no feasible iterate has been accepted---the case
+when the search handed over its incumbent---any step that decreases $J$ is
+accepted and $\mu$ is held large, so the barrier dominates and drives the
+violation down (\emph{recovery}). The first feasible iterate arms the latch
+permanently: thereafter only feasible $J$-decreasing steps are accepted and
+$\mu$ decays between stages, shifting effort from constraint satisfaction to
+shortening (\emph{refinement}). Throughout, the least-violating and the
+shortest feasible iterates are tracked as incumbents and the best is
+returned, so the output is never longer than a feasible seed nor more
+violating than an infeasible one. Algorithm~\ref{alg:joint} summarizes the
+full pipeline.
 
 % ===========================================================================
 \section{RESULTS}
@@ -328,7 +473,7 @@ makes the problem a joint one.
 \budget{$\approx$800 words, 0.85 page of prose (planner-only; simulation is Sec.~VI); the floats add $\approx$0.8 page}
 
 \subsection{Experimental Setup}
-\lipsum[33-34]
+\lipsum[33]
 
 \subsection{Baselines}
 \budget{$\approx$400 words for the four descriptions}
@@ -367,15 +512,19 @@ makes the problem a joint one.
 
 \begin{figure}[t]
   \centering
-  \includegraphics[width=\linewidth]{fig3_length_vs_constraint}
-  \caption{Fraction of the 50 randomized scenarios each planner solved as the
-    terminal uncertainty bound tightens. Marker shape identifies the planner,
-    keyed along the bottom; the color along each line encodes what that success
-    cost --- the median primary path length at that level, normalized by the
-    lone-agent reference length $L_\mathrm{ref}$, on the shared scale below the
-    axis. One ramp serves every planner, so the same color means the same
-    detour on every line. Ours (yellow) is still solving 80\% of the scenarios at
-    half the reference bound, and pays under $1.31 L_\mathrm{ref}$ to do it.}
+  \includegraphics[width=\linewidth]{fig3a_success_vs_constraint}\\[-2pt]
+  {\footnotesize (a)}\\[3pt]
+  \includegraphics[width=\linewidth]{fig3b_length_vs_constraint}\\[-2pt]
+  {\footnotesize (b)}
+  \caption{Baseline comparison over the 50 randomized scenarios as the terminal
+    uncertainty bound tightens from 100\% to 30\% of the lone-agent reference
+    $U_\mathrm{ref}$. (a)~Fraction of scenarios solved. (b)~Primary path length
+    over the solved scenarios, normalized by the lone-agent reference length
+    $L_\mathrm{ref}$: mean $\pm$ one standard deviation, planners offset
+    slightly along $x$ for legibility. Sequential's bars at 40\% and 30\%
+    ($2.5 \pm 1.4$ and $2.8 \pm 1.5$) run off the top of the axis. Ours still
+    solves 80\% of the scenarios at half the reference bound, at a mean cost
+    of $1.34\,L_\mathrm{ref}$.}
   \label{fig:length_success}
 \end{figure}
 
@@ -384,62 +533,83 @@ makes the problem a joint one.
   \includegraphics[width=\linewidth]{fig4_wall_5level_box}
   \caption{Wall-clock time per planner over successful runs, split by
     constraint level (log scale; five of the eight levels shown). Boxes span
-    the interquartile range, whiskers extend to $1.5\times$ IQR, and dots are
-    individual runs beyond them. Four of the five planners cost the same
-    whatever the bound; only CL-GBT's search grows with it, its median tripling
-    and its tail reaching $730$\,s. Where a planner solved fewer than five
-    scenarios at a level there is nothing to summarize, so those runs are drawn
-    individually, one tick each.}
+    the interquartile range and whiskers extend to $1.5\times$ IQR; runs
+    beyond the whiskers are omitted and the axis spans what remains, so the
+    four planners that sit in 13--22\,s can be told apart. Only CL-GBT's
+    search grows with the bound: at 60\% its upper quartile reaches 61\,s and
+    its whisker 124\,s (its longest run took 730\,s). Where a planner solved
+    fewer than five scenarios at a level there is nothing to summarize, so
+    those runs are drawn individually, one tick each.}
   \label{fig:wall}
 \end{figure}
 
-\lipsum[39-40]
+\lipsum[39]
 
 \subsection{Ablation}
 
 \begin{figure}[t]
   \centering
-  \figbox{5cm}{Fig.~5 --- same axes as Fig.~3 for the ablation:
-    full pipeline vs.\ discrete-only vs.\ straight-line seed + continuous}
-  \caption{Ablation: path length versus constraint level for the full pipeline,
-    the discrete stage alone, and continuous refinement seeded from a straight
-    line. \todo{write real caption}}
+  \includegraphics[width=\linewidth]{fig5a_abl_success_vs_constraint}\\[-2pt]
+  {\footnotesize (a)}\\[3pt]
+  \includegraphics[width=\linewidth]{fig5b_abl_length_vs_constraint}\\[-2pt]
+  {\footnotesize (b)}
+  \caption{Ablation on a separate set of 30 randomized scenarios, drawn without
+    the trivial-straight screen of Fig.~\ref{fig:length_success}, so the full
+    pipeline is re-run on this set. Same axes as Fig.~\ref{fig:length_success}:
+    (a)~success rate, (b)~mean $\pm$ SD path length over the solved scenarios.
+    The discrete stage alone solves the same scenarios as the full pipeline
+    down to 70\% (the curves coincide) and slightly fewer at 60--50\%, with
+    paths 2--7\% longer at every level down to 50\%, which is what the
+    continuous refinement buys. Seeding the refinement from a straight line
+    instead of the lattice solution solves only the scenarios where the
+    straight run already meets the bound: half at 100\% and none below 60\%.}
   \label{fig:abl_length_success}
 \end{figure}
 
 \begin{figure}[t]
   \centering
-  \figbox{4cm}{Fig.~6 --- box plot of wall-clock time for the ablation arms}
-  \caption{Ablation: wall-clock time per arm. \todo{write real caption}}
+  \includegraphics[width=\linewidth]{fig6_abl_wall_5level_box}
+  \caption{Wall-clock time of the ablation arms over successful runs, split by
+    constraint level and drawn as in Fig.~\ref{fig:wall} but on a linear axis:
+    all three arms sit between 16 and 21\,s. The continuous refinement adds
+    about 1.5\,s to the discrete stage. The straight-line seed skips the search
+    yet costs the same as the full pipeline where it succeeds at all (its
+    single run at 60\% is drawn as a tick).}
   \label{fig:abl_wall}
 \end{figure}
 
 \begin{table}[t]
-  \caption{Success rate / median path-length ratio at selected constraint
-    levels, 50 scenarios. \todo{pick levels; fill from trials\_all.csv}}
+  \caption{Success rate (\%) / mean $\pm$ SD of the primary path length over
+    the solved scenarios, normalized by $L_\mathrm{ref}$, at four constraint
+    levels. Top block: the 50 screened scenarios of
+    Figs.~\ref{fig:length_success}--\ref{fig:wall}. Bottom block: the
+    30-scenario ablation set of Figs.~\ref{fig:abl_length_success}--\ref{fig:abl_wall},
+    on which the full pipeline is listed again; ``straight seed'' is the
+    continuous stage seeded from a straight line. ``--'': no scenario solved.}
   \label{tab:sweep}
   \centering
-  \footnotesize
-  \setlength{\tabcolsep}{4pt}
+  \scriptsize
+  \setlength{\tabcolsep}{2pt}
   \begin{tabular}{@{}lcccc@{}}
     \toprule
-    & \multicolumn{4}{c}{Constraint level (\% of reference)} \\
+    & \multicolumn{4}{c}{Constraint level (\% of $U_\mathrm{ref}$)} \\
     \cmidrule(l){2-5}
     Method & 100 & 70 & 50 & 30 \\
     \midrule
-    Ours          & --\,/\,-- & --\,/\,-- & --\,/\,-- & --\,/\,-- \\
-    Formation     & --\,/\,-- & --\,/\,-- & --\,/\,-- & --\,/\,-- \\
-    Sequential    & --\,/\,-- & --\,/\,-- & --\,/\,-- & --\,/\,-- \\
-    CL-GBT        & --\,/\,-- & --\,/\,-- & --\,/\,-- & --\,/\,-- \\
-    Greedy        & --\,/\,-- & --\,/\,-- & --\,/\,-- & --\,/\,-- \\
+    Ours          & 100 / 1.14$\pm$0.09 & 100 / 1.22$\pm$0.23 & 80 / 1.34$\pm$0.26 & 40 / 1.41$\pm$0.21 \\
+    Formation     & 98 / 1.22$\pm$0.12 & 72 / 1.34$\pm$0.25 & 54 / 1.33$\pm$0.16 & 22 / 1.48$\pm$0.45 \\
+    Sequential    & 100 / 1.18$\pm$0.14 & 94 / 1.41$\pm$0.92 & 52 / 1.36$\pm$0.50 & 16 / 2.76$\pm$1.51 \\
+    CL-GBT        & 100 / 1.47$\pm$0.33 & 70 / 1.78$\pm$0.43 & 32 / 2.01$\pm$0.41 & 6 / 2.07$\pm$0.26 \\
+    Greedy        & 90 / 1.24$\pm$0.10 & 14 / 1.21$\pm$0.06 & 4 / 1.13$\pm$0.01 & 4 / 1.13$\pm$0.01 \\
     \midrule
-    Discrete only          & --\,/\,-- & --\,/\,-- & --\,/\,-- & --\,/\,-- \\
-    Straight seed + cont.\ & --\,/\,-- & --\,/\,-- & --\,/\,-- & --\,/\,-- \\
+    Full pipeline & 100 / 1.12$\pm$0.14 & 100 / 1.17$\pm$0.23 & 87 / 1.22$\pm$0.22 & 43 / 1.29$\pm$0.22 \\
+    Discrete only & 100 / 1.20$\pm$0.15 & 100 / 1.23$\pm$0.23 & 80 / 1.25$\pm$0.22 & 43 / 1.29$\pm$0.22 \\
+    Straight seed & 53 / 0.99$\pm$0.04 & 7 / 1.00$\pm$0.00 & -- & -- \\
     \bottomrule
   \end{tabular}
 \end{table}
 
-\lipsum[42]
+
 
 % ===========================================================================
 \section{SIMULATION VALIDATION}
@@ -508,28 +678,33 @@ makes the problem a joint one.
 \end{equation}
 
 \begin{table}[t]
-  \caption{Simulated sensor and factor noise. \todo{values are the current
-    \texttt{factor\_graph.py} constants --- replace after calibration to the
-    planner's dead-reckoning rates (A2--A4); note the depth factor $\sigma$
-    (0.5\,m) differs from the injected noise (0.01\,m)}}
+  \caption{Factor noise of the simulated estimator, derived from the planner's
+    noise model so that both codebases share one ruler: along-track odometry
+    from $q_\parallel$, the compass from $q_\perp$, landmark noise from the
+    planner's per-pass value rescaled to one sighting per 5\,m node, and
+    communication noise $\sigma_c$ divided by $\sqrt{w}$ for link weight $w$.
+    Poses are estimated in the world frame; the prior on the known start pose
+    carries the planner's $\Sigma^0$ in $x$, $y$.
+    \todo{the depth factor $\sigma$ (0.5\,m) still differs from the injected
+    depth noise (0.01\,m); not re-verified}}
   \label{tab:noise}
   \centering
   \scriptsize
-  \setlength{\tabcolsep}{4pt}
+  \setlength{\tabcolsep}{3pt}
   \begin{tabular}{@{}llc@{}}
     \toprule
     Factor & Variables & $\sigma$ \\
     \midrule
-    Odometry (between, per 5\,m node) & $\mathbf T_{k-1},\mathbf T_k$ & 1$^\circ$/axis; 0.02, 0.02, 0.01\,m \\
-    Depth (unary) & $\mathbf T_k,\mathbf T^{a}$ & 0.5\,m \\
-    Orientation (unary) & $\mathbf T_k,\mathbf T^{a}$ & 1$^\circ$/axis \\
-    Landmark az./el./range & $\mathbf T_k,\mathbf T^{a},\ell$ & 1$^\circ$, 1$^\circ$, 2\,m; $r<100$\,m \\
-    Inter-agent bearing az./el. & $\mathbf T^{s}_k,\mathbf T^{p}_k,\mathbf T^{a}_{s,p}$ & 10$^\circ$, 15$^\circ$ \\
-    Anchor / initial pose prior & $\mathbf T^{a}$, $\mathbf T_0$ & 10$^\circ$, 1\,m \\
+    Odometry (between, per 5\,m node) & $\mathbf T_{k-1},\mathbf T_k$ & 1$^\circ$/axis; 0.22, 0.02, 0.01\,m \\
+    Depth (unary) & $\mathbf T_k$ & 0.5\,m \\
+    Compass (unary) & $\mathbf T_k$ & 0.86$^\circ$/axis \\
+    Landmark az./el./range & $\mathbf T_k,\ell$ & 1.05$^\circ$, 1.05$^\circ$, 2.09\,m; $r<100$\,m \\
+    Inter-agent relative pose & $\mathbf T^{s}_k,\mathbf T^{p}_k$ & 0.86$^\circ$/axis; $0.5/\sqrt{w}$\,m \\
+    Initial pose prior & $\mathbf T_0$ & 10$^\circ$/axis; 1.15, 0.76, 0.5\,m \\
     \bottomrule
   \end{tabular}
 \end{table}
-\lipsum[54-55]
+\lipsum[54]
 
 \subsection{Monte Carlo Results}
 \budget{$\approx$200 words; Fig.~7, Fig.~8 and \cref{tab:mc} live here}
@@ -550,17 +725,27 @@ makes the problem a joint one.
 
 \begin{figure}[t]
   \centering
-  \figbox{4.5cm}{Fig.~8 --- planned path vs.\ mean executed path $\pm$ 1 std.\
-    envelope over Monte Carlo runs, both agents}
-  \caption{Planned trajectories against the mean executed trajectory and one
-    standard-deviation envelope over \todo{N} Monte Carlo runs in HoloOcean.
-    \todo{write real caption}}
+  \includegraphics[width=\linewidth]{fig8_mc_behind_wall}
+  \caption{Closed-loop Monte Carlo of the behind-wall plan in HoloOcean, 30
+    runs with different noise seeds. Top: planned trajectories (dashed) against
+    the mean executed trajectory of each agent, with the $\pm1\sigma$
+    cross-track envelope drawn on the map; the primary passes north of the
+    obstacle while the support diverts south to the landmark and rejoins before
+    the goal. Bottom: the same envelope at true scale against arc length. It is
+    a 2--3\,m tube along the 1.1\,km route and stays within about 4\,m; every
+    run reaches the goal and clears the obstacle.}
   \label{fig:mc_paths}
 \end{figure}
 
 \begin{table}[t]
-  \caption{Monte Carlo constraint satisfaction in HoloOcean.
-    \todo{choose rows (scenarios or constraint levels) and columns}}
+  \caption{Monte Carlo constraint satisfaction in HoloOcean: the behind-wall
+    plan of Fig.~\ref{fig:mc_paths} (two agents, one obstacle, one landmark,
+    $\bar u = 1.8$\,m) flown 30 times with different noise seeds. Collision
+    rate counts runs with any obstacle penetration, against the allocated
+    $\Delta = PM\delta = 0.10$; the terminal bound is met when the estimator's
+    marginal at the goal is under $\bar u$; $\sigma_T$ is the planner's
+    prediction against the sample covariance of the true terminal error over
+    the runs.}
   \label{tab:mc}
   \centering
   \footnotesize
@@ -569,9 +754,7 @@ makes the problem a joint one.
     \toprule
     Case & Runs & \makecell{Collision\\rate ($\le\Delta$)} & \makecell{Terminal\\bound met} & \makecell{Pred.\,/\,emp.\\$\sigma_T$} \\
     \midrule
-    \todo{A} & -- & -- & -- & --\,/\,-- \\
-    \todo{B} & -- & -- & -- & --\,/\,-- \\
-    \todo{C} & -- & -- & -- & --\,/\,-- \\
+    Behind wall & 30 & 0/30 & 28/30 & 1.80\,/\,1.70 \\
     \bottomrule
   \end{tabular}
 \end{table}
@@ -598,7 +781,7 @@ makes the problem a joint one.
   (vii) simulated measurements are ground truth plus Gaussian noise ---
       the simulation tests belief-model consistency, not sensor realism.}
 
-\lipsum[47-48]
+\lipsum[47]
 
 % ===========================================================================
 \section{CONCLUSION}
