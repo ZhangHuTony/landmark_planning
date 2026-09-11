@@ -163,7 +163,7 @@ def despine(ax):
 # bound tightens left to right) and the same frame, so they stack in one
 # column float. Identity is the paper-wide color plus marker shape; Ours is
 # the heavier line and draws over the others.
-FIG_W, FIG_H = 3.5, 2.05
+FIG_W, FIG_H = 3.5, 1.8   # 2.05 until 2026-09-10; shortened to fit the ICRA page limit
 AX_RECT = (0.145, 0.235, 0.845, 0.745)
 
 
@@ -284,7 +284,7 @@ def fig4(stats, methods, levels, kind, stem, width, yscale="log"):
     or "linear". Violins are the old log10-space spares and keep WALL_LIM.
     """
     wide = width > 4
-    fig = plt.figure(figsize=(width, 2.15 if wide else 2.05))
+    fig = plt.figure(figsize=(width, 2.15 if wide else 1.8))  # column version shortened 2026-09-10
     ax = fig.add_axes((0.075 if wide else 0.145, 0.245 if wide else 0.235,
                        0.915 if wide else 0.845, 0.735 if wide else 0.745))
 
