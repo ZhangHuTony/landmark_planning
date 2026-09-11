@@ -94,7 +94,7 @@ the generated paths satisfy the collision constraint in 100\% and the terminal u
 
 \begin{figure}[t]
   \centering
-  \includegraphics[width=\figw]{fig1}
+  \includegraphics[width=\columnwidth]{fig1}
   \caption{The escort problem. The primary must reach the goal with its
     localization uncertainty under a terminal bound, and the support is routed
     to hold it there. Both trajectories are searched on the heading-aware
@@ -416,23 +416,11 @@ $x \leftarrow$ control points of the seed splines;
 % where Results begins. Move the source if it drifts.
 \begin{figure*}[t]
   \centering
-  \includegraphics[width=\figwide]{fig2}\\[4pt]
-  {\footnotesize
-  \setlength{\tabcolsep}{6pt}
-  \begin{tabular}{@{}lcccc@{}}
-    \toprule
-    Panel & (a) & (b) & (c) & (d) \\
-    \midrule
-    Constraint level (\% of $U_\mathrm{ref}$) & 100 & 70 & 50 & 30 \\
-    Terminal bound $\bar{u}$ (m)              & 13.75 & 9.62 & 6.87 & 4.12 \\
-    Primary length (m)                        & 1741 & 1761 & 1822 & 1890 \\
-    Terminal $\sigma$ (m)                     & 9.73 & 8.89 & 6.66 & 3.91 \\
-    \bottomrule
-  \end{tabular}}
+  \includegraphics[width=\figwide]{fig2}
   \caption{Constraint ladder on one scenario: a 1700\,m corridor of staggered
-    walls, 14 obstacles and three landmarks, against a single-agent reference
-    of 1712\,m at $U_\mathrm{ref} = 13.75$\,m. The bound tightens from (a) to
-    (d), and every tightening is paid for in primary length. In (a) the
+    walls, 14 obstacles and three landmarks. The terminal bound tightens from
+    (a) to (d), and every tightening is paid for in primary length; the levels
+    and the solutions they produce are in Table~\ref{tab:ladder}. In (a) the
     support climbs into the north pocket for the weak landmark there and
     rejoins; in (b) it takes the southern lane to a stronger landmark and
     relays it from behind the last wall; in (c) the primary adds a turn before
@@ -440,6 +428,30 @@ $x \leftarrow$ control points of the seed splines;
     centre line so that the support can reach the last landmark in time.}
   \label{fig:ladder}
 \end{figure*}
+
+\begin{table}[t]
+  \centering
+  \footnotesize
+  \setlength{\tabcolsep}{5pt}
+  \begin{tabular}{@{}lcccc@{}}
+    \toprule
+    Panel & \makecell{Constraint level\\(\% of $U_\mathrm{ref}$)}
+          & \makecell{Terminal\\bound $\bar{u}$ (m)}
+          & \makecell{Primary\\length (m)}
+          & \makecell{Terminal\\$\sigma$ (m)} \\
+    \midrule
+    (a) & 100 & 13.75 & 1741 & 9.73 \\
+    (b) &  70 &  9.62 & 1761 & 8.89 \\
+    (c) &  50 &  6.87 & 1822 & 6.66 \\
+    (d) &  30 &  4.12 & 1890 & 3.91 \\
+    \bottomrule
+  \end{tabular}
+  \caption{The four panels of Fig.~\ref{fig:ladder}. The constraint level is
+    the terminal bound as a fraction of the uncertainty an unconstrained
+    single agent reaches on the same scenario, which is 13.75\,m over a
+    reference path of 1712\,m.}
+  \label{tab:ladder}
+\end{table}
 
 \subsection{Continuous B-Spline Refinement}
 \label{sec:cont}
