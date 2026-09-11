@@ -177,8 +177,8 @@ the control points.
 
 % ===========================================================================
 \section{PROBLEM FORMULATION}
+\label{sec:pf}
 % ===========================================================================
-%\budget{$\approx$500 words + 6--8 display equations, 0.65 page}
 Let $\mathcal{I} = \{1,2,\dots,P\}$ denote a team of $P$ agents, where agent $i=1$
 is the primary agent tasked with reaching a goal location $G\in\mathbb{R}^2$.
 All other agents $2,\dots,P$ are support agents whose sole task is to assist the
@@ -193,10 +193,10 @@ positions $\ell\in\mathbb{R}^2$ and positional uncertainty $\Sigma_\ell$.
 
 \subsection{Decision Variables}
 
-The optimization is performed over mean-state trajectories. Specifically, the
-decision variables are the heading profiles $\theta_i(s)$ of all agents and the
-primary's path length $S_1$. Positions are deterministically induced by the
-headings at arc samples $s_k = k\,\Delta s$:
+We optimize over mean-state trajectories only. The decision variables are the
+heading profile $\theta_i(s)$ of every agent and the primary's path length
+$S_1$. Positions follow from the headings at the arc samples
+$s_k = k\,\Delta s$ through
 \begin{equation}
   x_i(s_{k+1}) = x_i(s_k) + \Delta s
   \begin{bmatrix} \cos\theta_i(s_k) \\ \sin\theta_i(s_k) \end{bmatrix}.
@@ -206,64 +206,65 @@ headings at arc samples $s_k = k\,\Delta s$:
 \subsection{Covariance Propagation}
 
 Let $\Sigma_i(s)$ denote the $2\times2$ position covariance of agent $i$.
-Covariance is not a decision variable and is propagated deterministically along
-the mean trajectories for constraint evaluation. Between measurements the
-agents dead-reckon, and we model the resulting drift as anisotropic process
-noise whose variance grows linearly with distance travelled, larger along the
+Covariance is not a decision variable. It is propagated along the mean
+trajectories and used only to evaluate constraints. Between measurements the
+agents dead-reckon, and we model the resulting drift as process noise whose
+variance grows linearly with the distance travelled and is larger along the
 direction of travel than across it:
 \begin{equation}
   \Sigma_i^{-}(s_{k+1}) = \Sigma_i(s_k) + Q\big(\theta_i(s_k)\big)\,\Delta s,
   \label{eq:prop}
 \end{equation}
 where $Q(\theta) = R(\theta)\,\mathrm{diag}(q_\parallel, q_\perp)\,R(\theta)^{\!\top}$,
-$R(\theta)$ is the planar rotation, and $q_\parallel \ge q_\perp$ are the
-along- and cross-track noise intensities.
+$R(\theta)$ is the planar rotation matrix, and $q_\parallel \ge q_\perp$ are
+the along-track and cross-track noise intensities.
 
 \subsection{Landmark Measurements}
 
-A landmark $\ell$ provides a range--bearing fix whose quality decays smoothly
-with the distance $d_{i\ell} = \lVert x_i - \ell \rVert$ through the logistic
-taper
+A landmark $\ell$ provides a range-bearing measurement whose quality decays
+smoothly with the distance $d_{i\ell} = \lVert x_i - \ell \rVert$ through the
+logistic taper
 \begin{equation}
   q_{i\ell} = \frac{1}{1 + \exp\!\big((d_{i\ell} - r_v)/w_v\big)},
   \label{eq:taper}
 \end{equation}
-which is near one inside the visibility range $r_v$ and rolls off over a width
-$w_v$; there is no hard sensing cutoff. Every landmark contributes information
-weighted by its quality, and the posterior covariance follows the information
-form of the Kalman update for a direct position measurement (for $H = I$ this
-is identical to the Joseph form):
+which is close to one inside the visibility range $r_v$ and rolls off over a
+width $w_v$. There is no hard sensing cutoff. Every landmark contributes
+information weighted by its quality, and the posterior covariance follows the
+information form of the Kalman update for a direct position measurement,
+which for $H = I$ is identical to the Joseph form:
 \begin{equation}
   \Sigma_i(s_k) = \Big( \Sigma_i^{-}(s_k)^{-1}
   + \sum_{\ell \in \mathcal{L}} q_{i\ell}\,\big(S_{i\ell} + \Sigma_\ell\big)^{-1} \Big)^{-1},
   \label{eq:lm}
 \end{equation}
 where $S_{i\ell} = R(\beta_{i\ell})\,\mathrm{diag}(\sigma_r^2, \sigma_b^2)\,R(\beta_{i\ell})^{\!\top}$
-is the range--bearing sensor noise rotated to the line-of-sight bearing
+is the range-bearing sensor noise rotated to the line-of-sight bearing
 $\beta_{i\ell}$.
 
 \subsection{Inter-Agent Fusion}
 
 Agents exchange position estimates at fixed arc-length intervals $\Lambda$.
-Because the estimates of cooperating agents share history, adding their
-information would double count it; we therefore fuse with covariance
-intersection \cite{julier1997cov}, which is consistent for unknown
-cross-correlation. When agents $i$ and $j$ communicate at separation $d_{ij}$,
-agent $i$ receives the transferred estimate $P_{j \to i} = (\Sigma_j + R_c)/w_{ij}$,
-where $R_c = \sigma_c^2 I$ is the communication noise and $w_{ij}$ is a
-logistic taper of the form \eqref{eq:taper} with half-weight at the
-communication range $r_c$, and updates
+The estimates of cooperating agents share history, so adding their
+information directly would double count it. We therefore fuse with covariance
+intersection \cite{julier1997cov}, which remains consistent under unknown
+cross-correlation. When agents $i$ and $j$ communicate at separation
+$d_{ij}$, agent $i$ receives the transferred estimate
+$P_{j \to i} = (\Sigma_j + R_c)/w_{ij}$, where $R_c = \sigma_c^2 I$ is the
+communication noise and $w_{ij}$ is a logistic taper of the form
+\eqref{eq:taper} with half weight at the communication range $r_c$. The
+update is
 \begin{equation}
   \Sigma_i^{+} = \Big( \omega\,\Sigma_i^{-1} + (1-\omega)\,P_{j \to i}^{-1} \Big)^{-1},
   \label{eq:ci}
 \end{equation}
-with $\omega \in [0,1]$ chosen to minimize $\det\Sigma_i^{+}$, and symmetrically
-for agent $j$. As $w_{ij} \to 0$ the transferred information
-vanishes, so distant agents do not fuse.
+with $\omega \in [0,1]$ chosen to minimize $\det\Sigma_i^{+}$, and agent $j$
+is updated in the same way. As $w_{ij} \to 0$ the transferred information
+vanishes, so agents that are far apart do not fuse.
 
 \subsection{Optimization Problem}
 
-The planning problem gathers the objective and all constraints in one place:
+The planning problem collects the objective and all constraints as
 \begin{subequations}
 \label{eq:opt}
 \begin{align}
@@ -280,34 +281,36 @@ The planning problem gathers the objective and all constraints in one place:
 \end{subequations}
 
 \textbf{Terminal uncertainty \eqref{eq:term}.} The primary must arrive with
-bounded localization uncertainty; $\det(\Sigma)^{1/4}$ equals the standard
-deviation $\sigma$ for an isotropic covariance $\sigma^2 I$ and is therefore
-expressed in metres.
+bounded localization uncertainty. The quantity $\det(\Sigma)^{1/4}$ equals
+the standard deviation $\sigma$ for an isotropic covariance $\sigma^2 I$, so
+the bound $\bar{u}$ is expressed in metres.
 
 \textbf{Obstacle avoidance \eqref{eq:cc}.} Every agent must clear every
-obstacle with probability at least $1-\delta$ at every instant: the constraint
-must hold for \emph{some} face $j$ of each obstacle $\mathcal{O}_o$, for every
-agent $i$, obstacle $o$, and arc position $s$. The mean then lies outside one
-face with a margin covering the vehicle radius $r_a$ and both the agent's and
-the obstacle's positional uncertainty, where $z_\delta = \Phi^{-1}(1-\delta)$
-and $\Phi$ is the standard normal distribution function
-\todo{cite Blackmore / Ono--Williams}. A union bound over the $PM$
-agent--obstacle pairs bounds the instantaneous probability of any collision by
-$\Delta = PM\delta$.
+obstacle with probability at least $1-\delta$ at every instant. For each
+agent $i$, obstacle $o$, and arc position $s$, the constraint must hold for
+at least one face $j$ of $\mathcal{O}_o$. The mean position then lies outside
+that face with a margin that covers the vehicle radius $r_a$ and both the
+agent's and the obstacle's positional uncertainty, where
+$z_\delta = \Phi^{-1}(1-\delta)$ and $\Phi$ is the standard normal
+distribution function \cite{blackmore2011chance}. A union bound over the
+$PM$ agent-obstacle pairs bounds the instantaneous probability of any
+collision by $\Delta = PM\delta$.
 
 \textbf{Kinematics \eqref{eq:kin}.} Each trajectory respects the vehicles'
 minimum turn radius $r_{\min}$, where $\kappa_i = \mathrm{d}\theta_i/\mathrm{d}s$
 is the path curvature.
 
 \textbf{Boundary conditions \eqref{eq:bc}.} All agents start from known
-positions with a common prior covariance, and the primary must end at the goal.
+positions with a common prior covariance, and the primary must end at the
+goal.
 
-The belief dynamics do not appear as constraints: $\Sigma_i(s)$ is a
-deterministic functional of the decision variables through
+The belief dynamics do not appear as constraints. $\Sigma_i(s)$ is a
+deterministic function of the decision variables through
 \eqref{eq:dyn}--\eqref{eq:ci}, and this dependence is left implicit in
 \eqref{eq:opt}. The agents are coupled only through the fusion step
-\eqref{eq:ci}: the supports' trajectories affect the problem solely by shaping
-the primary's covariance, which is what makes the problem a joint one.
+\eqref{eq:ci}. The supports' trajectories enter the problem only by shaping
+the primary's covariance, and this coupling is what makes the problem a
+joint one.
 
 % ===========================================================================
 \section{METHOD}
