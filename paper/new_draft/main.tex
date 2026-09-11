@@ -15,7 +15,12 @@
 \usepackage[font=footnotesize,labelsep=period,skip=5pt]{caption}
 \usepackage{cleveref}
 
-\graphicspath{{figures/final/}{figures/}}
+\graphicspath{{figures/finalfinal/}{figures/final/}{figures/}}
+% The figures in figures/finalfinal/ are hand-finished exports carrying ~7pt text on a
+% ~2.5in canvas. Stretched to a full column their text renders near 10pt, larger than the
+% 8pt captions, so every figure goes in through one of these two lengths instead.
+\newlength{\figw}\setlength{\figw}{0.80\columnwidth}      % single-column figures
+\newlength{\figwide}\setlength{\figwide}{0.75\textwidth}  % Fig. 2, the two-column float
 
 \newtheorem{theorem}{Theorem}
 \newtheorem{proposition}{Proposition}
@@ -89,13 +94,11 @@ the generated paths satisfy the collision constraint in 100\% and the terminal u
 
 \begin{figure}[t]
   \centering
-  \figbox{6.5cm}{Fig.~1 --- overview: domain (GPS-denied, escorted primary), the
-    discrete-to-continuous pipeline, and the contribution in one frame}
-  \caption{Overview. A primary agent (\todo{color}) must reach the goal under a
-    terminal localization bound while support agents act as mobile landmarks.
-    Left: the heading-aware hexagonal graph and the joint discrete search.
-    Right: the continuous B-spline refinement of the same plan.
-    \todo{write real caption}}
+  \includegraphics[width=\figw]{fig1}
+  \caption{The escort problem. The primary must reach the goal with its
+    localization uncertainty under a terminal bound, and the support is routed
+    to hold it there. Both trajectories are searched on the heading-aware
+    hexagonal lattice and then refined as B-splines.}
   \label{fig:overview}
 \end{figure}
 In environments where GPS signal is unreliable, such as underwater, or in regions subject to spoofing or jamming, agents must rely on other forms of information
@@ -413,18 +416,28 @@ $x \leftarrow$ control points of the seed splines;
 % where Results begins. Move the source if it drifts.
 \begin{figure*}[t]
   \centering
-  \includegraphics[width=\textwidth]{fig2_ladder}
-  \caption{Constraint ladder on one scenario (1700\,m corridor, 14 obstacles,
-    three landmarks, 100\,m lattice) as the terminal bound tightens from
-    100\% to 30\% of the single-agent reference. Primary solid, support
-    dashed, landmarks as dots with their map covariance; each title gives the
-    primary's length and terminal $\sigma$. At 100\% the support climbs into
-    the north pocket to sight the weak landmark there and rejoins. At 70\% it
-    takes the southern lane to a stronger landmark and relays it from the far
-    side of the last wall. At 50\% the primary adds one turn before the goal
-    so that the support can relay from closer. At 30\% the primary dips to
-    the centre line before the goal so that the support can reach the last
-    landmark and still relay it.}
+  \includegraphics[width=\figwide]{fig2}\\[4pt]
+  {\footnotesize
+  \setlength{\tabcolsep}{6pt}
+  \begin{tabular}{@{}lcccc@{}}
+    \toprule
+    Panel & (a) & (b) & (c) & (d) \\
+    \midrule
+    Constraint level (\% of $U_\mathrm{ref}$) & 100 & 70 & 50 & 30 \\
+    Terminal bound $\bar{u}$ (m)              & 13.75 & 9.62 & 6.87 & 4.12 \\
+    Primary length (m)                        & 1741 & 1761 & 1822 & 1890 \\
+    Terminal $\sigma$ (m)                     & 9.73 & 8.89 & 6.66 & 3.91 \\
+    \bottomrule
+  \end{tabular}}
+  \caption{Constraint ladder on one scenario: a 1700\,m corridor of staggered
+    walls, 14 obstacles and three landmarks, against a single-agent reference
+    of 1712\,m at $U_\mathrm{ref} = 13.75$\,m. The bound tightens from (a) to
+    (d), and every tightening is paid for in primary length. In (a) the
+    support climbs into the north pocket for the weak landmark there and
+    rejoins; in (b) it takes the southern lane to a stronger landmark and
+    relays it from behind the last wall; in (c) the primary adds a turn before
+    the goal so that the support can relay from closer; in (d) it dips to the
+    centre line so that the support can reach the last landmark in time.}
   \label{fig:ladder}
 \end{figure*}
 
@@ -550,14 +563,11 @@ This replaces exhaustive lattice search with sampling.
 
 \begin{figure}[t]
   \centering
-  \includegraphics[width=\linewidth]{fig3a_success}\\[-2pt]
-  {\footnotesize (a)}\\[3pt]
-  \includegraphics[width=\linewidth]{fig3b_length}\\[-2pt]
-  {\footnotesize (b)}
+  \includegraphics[width=\figw]{fig3}
   \caption{Baseline comparison over the 50 randomized scenarios as the terminal
     uncertainty bound tightens from 100\% to 30\% of the single-agent
-    reference $U_\mathrm{ref}$. (a)~Fraction of scenarios solved. (b)~Mean
-    primary path length over the solved scenarios, normalized by the
+    reference $U_\mathrm{ref}$. Top: fraction of scenarios solved. Bottom:
+    mean primary path length over the solved scenarios, normalized by the
     single-agent reference length $L_\mathrm{ref}$ (standard deviations in
     Table~\ref{tab:sweep}).}
   \label{fig:length_success}
@@ -565,7 +575,7 @@ This replaces exhaustive lattice search with sampling.
 
 \begin{figure}[t]
   \centering
-  \includegraphics[width=\linewidth]{fig4_wall}
+  \includegraphics[width=\figw]{fig4_wall}
   \caption{Wall-clock time per planner over successful runs at five constraint
     levels (log scale). Boxes span the interquartile range, whiskers extend
     to $1.5\times$ IQR, and runs beyond the whiskers are omitted. Levels with
@@ -596,27 +606,24 @@ among the solved scenarios at every level, from $1.14\,L_\mathrm{ref}$ at
 100\% to $1.41\,L_\mathrm{ref}$ at 30\%, with the smallest spread across
 scenarios. Fig.~\ref{fig:wall} reports wall-clock time: a median of 18\,s
 per run against 14\,s for Formation and Sequential and 16\,s for the
-single-agent reference, most of it overhead shared by every method. Only
-CL-GBT grows with the bound, and its longest run took 730\,s.
+single-agent reference, most of it shared overhead. Only CL-GBT grows with
+the bound, and its longest run took 730\,s.
 
 \subsection{Ablation}
 
 \begin{figure}[t]
   \centering
-  \includegraphics[width=\linewidth]{fig5a_abl_success}\\[-2pt]
-  {\footnotesize (a)}\\[3pt]
-  \includegraphics[width=\linewidth]{fig5b_abl_length}\\[-2pt]
-  {\footnotesize (b)}
+  \includegraphics[width=\figw]{fig5}
   \caption{Ablation on a separate set of 30 scenarios drawn without the
-    straight-line screen. Same axes as Fig.~\ref{fig:length_success}:
-    (a)~success rate, (b)~mean path length over the solved scenarios
+    straight-line screen. Same axes as Fig.~\ref{fig:length_success}: top,
+    success rate; bottom, mean path length over the solved scenarios
     (standard deviations in Table~\ref{tab:sweep}).}
   \label{fig:abl_length_success}
 \end{figure}
 
 \begin{figure}[t]
   \centering
-  \includegraphics[width=\linewidth]{fig6_abl_wall}
+  \includegraphics[width=\figw]{fig6}
   \caption{Wall-clock time of the ablation arms over successful runs, drawn as
     in Fig.~\ref{fig:wall} on a linear axis. The refinement adds about
     1.5\,s to the discrete stage. The straight seed's single run at 60\% is
@@ -666,9 +673,9 @@ recovers by cutting the lattice corners. The straight seed solves 53\% of
 the scenarios at the loosest level and none below 60\%, and every solution
 it returns has a length ratio of 1.00: the refinement never found a detour
 from a straight seed and succeeded only where the straight line was already
-feasible. The joint search finds the landmarks, and the refinement makes the
-route short. Fig.~\ref{fig:abl_wall} shows all three arms running in 16 to
-21\,s, with the refinement adding about 1.5\,s.
+feasible. The joint search finds the landmarks, and the
+refinement makes the route short, at a cost of about 1.5\,s
+(Fig.~\ref{fig:abl_wall}).
 
 % ===========================================================================
 \section{SIMULATION VALIDATION}
@@ -773,16 +780,16 @@ belief model rather than the realism of any sensor.
 
 \begin{figure}[t]
   \centering
-  \figbox{4cm}{Fig.~7 --- HoloOcean screenshot: what the simulated
-    environment looks like}
-  \caption{The HoloOcean~\cite{potokar2022holoocean} environment used for validation.
-    \todo{write real caption}}
+  \includegraphics[width=\figw]{fig7_holoocean_screenshot}
+  \caption{The two vehicles in HoloOcean~\cite{potokar2022holoocean}. Each is a
+    torpedo-shaped autonomous underwater vehicle flying its planned spline at a
+    fixed depth over the kelp seabed of the simulator's open-water world.}
   \label{fig:holoocean}
 \end{figure}
 
 \begin{figure}[t]
   \centering
-  \includegraphics[width=\linewidth]{fig8_mc}
+  \includegraphics[width=\figw]{fig8}
   \caption{Closed-loop Monte Carlo of the behind-wall plan in HoloOcean, 30 runs
     with different noise seeds: planned trajectories (dashed) against the
     mean executed trajectory of each agent, with the $\pm2\sigma$
@@ -813,11 +820,10 @@ belief model rather than the realism of any sensor.
 \end{table}
 
 We flew the behind-wall plan of Fig.~\ref{fig:mc_paths} 30 times with
-different noise seeds. The scenario has one wall, 400\,m long and 80\,m
-wide, and one landmark hidden behind it, and the plan sends the primary
-north of the wall while the support diverts south to sight the landmark and
-rejoins before the goal, under a terminal bound of 1.8\,m against which the
-planner predicts 1.80\,m. Every run reached the goal within 2\% of the
+different noise seeds. The scenario hides its one landmark behind a wall
+400\,m long, so only the support can see it, under a terminal bound of
+1.8\,m against which the planner predicts 1.80\,m. Every run reached the
+goal within 2\% of the
 planned length and none penetrated the wall, against an allocated collision
 probability of $\Delta = 0.10$ (Table~\ref{tab:mc}).
 The estimator's terminal marginal was under the bound in 28 of 30 runs, with
@@ -846,15 +852,14 @@ larger graph, and the all-pairs heuristic is cubic in the number of nodes.
 The belief model is Gaussian and assumes that the planned trajectory
 receives its expected measurements \cite{platt2010belief}. The simulation
 tests calibration against an independent estimator fed ground-truth
-measurements plus Gaussian noise, so Table~\ref{tab:mc} says that the
-planner's covariance is consistent with that estimator under the noise
-levels of Table~\ref{tab:noise}, not that either models an acoustic modem or
-a sonar. The along-track bias in the terminal error shows that a consistent
+measurements plus Gaussian noise, so Table~\ref{tab:mc} says the planner's
+covariance is consistent with that estimator under the noise of
+Table~\ref{tab:noise}, not that either models an acoustic modem or a sonar. The along-track bias in the terminal error shows that a consistent
 covariance does not rule out a biased estimate.
 
-The plan is centralized, computed offline, and executed open loop, with a
-communication schedule fixed in arc length. Replanning after a missed fix or
-communication is not addressed. The joint search grows exponentially in the
+The plan is centralized, computed offline, and executed open loop on a
+communication schedule fixed in arc length; replanning after a missed fix is
+not addressed. The joint search grows exponentially in the
 number of agents, and all experiments use one support. In the benchmark it
 cost 1.3 to 1.9 times the wall clock of the single-agent reference on
 average, most of it fixed overhead, but the exponent will bind for larger
