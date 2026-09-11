@@ -719,19 +719,10 @@ additive Gaussian noise, so the simulation tests the consistency of the
 belief model rather than the realism of any sensor.
 
 \subsection{Factor-Graph State Estimator}
-\budget{$\approx$150 words on how the graph is built, in place of the filler
-  paragraph below; the configuration paragraph and \cref{tab:noise} are written}
-% For whoever writes the filler paragraph: it should cover (a) the two layers of
-% graph --- a per-agent dead-reckoning graph carrying that agent's odometry
-% between-factors, unary depth and 3-DOF orientation factors, and
-% azimuth/elevation/range factors to landmarks inside the visibility range, each
-% landmark pinned by a prior with the planner's map covariance, so the map is
-% known and this is not SLAM; and the primary's multi-agent graph, which is what
-% the reported covariance comes off; and (b) that every measurement is ground
-% truth from the simulator plus additive Gaussian noise, with no DVL or IMU
-% sensor model, which is why this tests the belief model's consistency and not
-% sensor realism. Credit for the stack belongs in the acknowledgments once the
-% submission is de-anonymized.
+% Drafted from multiagent_base (factor_graph.py, main.py) at the state the
+% shipped Monte Carlo set was flown, and awaiting review by the author of that
+% stack. Credit for it belongs in the acknowledgments once the submission is
+% de-anonymized.
 
 The estimator is an existing GTSAM factor-graph stack
 \cite{kaess2012isam2,dellaert2017factor}, developed independently of the
@@ -746,7 +737,22 @@ residuals $r_i$ of the factors $\mathcal F$ the graph holds,
   \label{eq:fg}
 \end{equation}
 
-\lipsum[54]
+The graph is built in two layers. Each agent carries a dead-reckoning graph of
+its own, holding a between-factor for the odometry of each node, a unary depth
+factor, a unary three-axis orientation factor, and a range and bearing factor
+to every landmark inside the visibility range. Landmarks are not free
+variables: each is pinned by a prior carrying the planner's map covariance, so
+the map is known and the problem is localization rather than mapping. This
+graph is what the agent steers on, and for a support it is also the source of
+the pose and the covariance its acoustic packets carry. The primary holds a
+second graph, and the covariance compared against the planner's is read from
+that one. It takes the primary's own nodes as they are created, and a
+support's nodes in a batch when a communication succeeds, seeded with the pose
+that support solved for itself, together with one inter-agent factor per
+communication. Measurements enter both layers once rather than being drawn
+again, and every one of them is ground truth plus additive Gaussian noise:
+odometry is synthesized from the simulator's pose sensor, and there is no
+inertial or Doppler sensor model.
 
 Three configuration choices decide what the comparison in
 Sec.~\ref{sec:sim}-C measures, and all three were in force for the runs
