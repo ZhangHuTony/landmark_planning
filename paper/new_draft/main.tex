@@ -735,28 +735,38 @@ the discrete stage.
 
 % ===========================================================================
 \section{SIMULATION VALIDATION}
+\label{sec:sim}
 % ===========================================================================
-\budget{$\approx$700 words + 1 eq.\ + \cref{tab:noise}, 0.75 page of prose; floats
-  Fig.~7, Fig.~8, \cref{tab:mc} add $\approx$0.55 page}
-\todo{open with the purpose in one sentence: every planner in Sec.~V propagates
-  the same covariance model, so the simulation is not a planner comparison ---
-  it asks whether that model is \emph{calibrated} against a vehicle, controller
-  and estimator that do not share its equations. Each plan is flown $N$ times
-  with different noise seeds.}
+Every planner in Sec.~\ref{sec:results} propagates the same covariance
+model, so the benchmark cannot tell whether that model is calibrated. The
+simulation asks that question. We fly a planned trajectory in a physics
+simulator with a vehicle model, a controller, and a state estimator that
+share none of the planner's equations, and we check whether the constraints
+the planner certified hold on the executed trajectory. Each plan is flown
+repeatedly with different noise seeds.
 
 \subsection{Simulator and Vehicle}
-\budget{$\approx$150 words}
-\todo{HoloOcean \todo{cite Potokar et al.\ (verify)}: 6-DOF Fossen AUV dynamics
-  with the simulator's stock depth/heading autopilot at 30\,Hz; an outer-loop
-  waypoint follower tracks the planned B-spline resampled every 25\,m (arrival
-  radius 15\,m, set by the turn radius); the vehicle steers on the
-  \emph{estimated} position, dead-reckoned forward between fixes. Three
-  cadences, all scheduled on arc length accumulated from ground truth so that
-  events land where the planner assumed them: control every tick, an estimator
-  node every 5\,m, an acoustic comm every 100\,m (the planner's comm interval,
-  range-gated with the planner's comm weight). Landmarks, obstacles, start and
-  goal are imported from the plan; the 2-D field is lifted onto one depth plane.}
-\lipsum[52]
+
+We use HoloOcean \cite{potokar2022holoocean}, a marine robotics simulator
+built on Unreal Engine. Each agent is a torpedo-shaped autonomous underwater
+vehicle with the six-degree-of-freedom dynamics of Fossen
+\cite{fossen2021handbook}, driven by the simulator's depth and heading
+autopilot at 30\,Hz at a cruise speed of about 2.2\,m/s. An outer-loop
+waypoint follower tracks the planned B-spline, resampled every 25\,m, with an
+arrival radius of 15\,m set by the vehicle's turn radius. The vehicle steers
+on its estimated position, which is dead-reckoned forward between estimator
+updates, so estimation error feeds back into the executed path. Landmarks,
+obstacles, start, and goal are imported from the plan, and the planar field
+is placed on a single depth plane with the agents staggered in depth, so
+only agent-obstacle collisions are under test. Three cadences are scheduled
+on arc length accumulated from ground truth, so that events land where the
+planner assumed them: the controller runs every tick, the estimator adds a
+pose node every 5\,m, and an acoustic communication is attempted every
+100\,m, the planner's communication interval, and succeeds only when the
+pair is within the planner's communication range. Measurements are
+synthesized from ground truth with additive Gaussian noise, so the
+simulation tests the consistency of the belief model rather than the
+realism of any sensor.
 
 \subsection{Factor-Graph State Estimator}
 \budget{$\approx$350 words + \cref{eq:fg} + \cref{tab:noise}}
@@ -829,12 +839,6 @@ the discrete stage.
 \lipsum[54]
 
 \subsection{Monte Carlo Results}
-\budget{$\approx$200 words; Fig.~7, Fig.~8 and \cref{tab:mc} live here}
-\todo{report per trial: goal reached, obstacle penetration vs.\ the
-  allocated $\Delta$, terminal $\det(\Sigma)^{1/4}$ predicted vs.\ empirical
-  (planner model on the flown track vs.\ estimator marginal vs.\ sample
-  covariance of the true error); one sentence on why baselines are not
-  re-flown (shared belief model, see Sec.~VII)}
 
 \begin{figure}[t]
   \centering
@@ -881,40 +885,84 @@ the discrete stage.
   \end{tabular}
 \end{table}
 
-\lipsum[44]
+We flew the behind-wall plan of Fig.~\ref{fig:mc_paths} 30 times with
+different noise seeds. The scenario has one obstacle, a wall 400\,m long and
+80\,m wide, and one landmark hidden behind it. The plan routes the primary
+north of the wall while the support diverts south to sight the landmark and
+rejoins before the goal, under a terminal bound of 1.8\,m against which the
+planner predicts 1.80\,m. Table~\ref{tab:mc} summarizes the outcome. Every
+run reached the goal with an executed length within 2\% of the plan, and no
+run penetrated the obstacle, against an allocated collision probability of
+$\Delta = 0.10$. The estimator's terminal marginal was under the bound in 28
+of the 30 runs, with the two exceptions at 1.85 and 1.96\,m. The sample
+covariance of the true terminal error over the runs gives 1.70\,m, within
+6\% of the planner's prediction, while the estimator's own mean marginal of
+1.51\,m is more optimistic than both. The true terminal error also carried a
+mean offset of 2.6\,m along track and 0.8\,m across track, which a
+covariance comparison does not capture and which is a bias of the estimate
+rather than of the plan. Fig.~\ref{fig:mc_paths} shows the executed
+trajectories. The $2\sigma$ cross-track envelope has a half-width of about
+4\,m along most of the 1.1\,km route and 8\,m on the primary's final bend,
+and the median cross-track error is 2.5\,m RMS. The baselines are not
+re-flown, because they share the belief model whose calibration is the
+quantity under test, and a difference between them in simulation would say
+nothing the benchmark has not already said.
 
 % ===========================================================================
 \section{DISCUSSION AND LIMITATIONS}
 % ===========================================================================
-\budget{$\approx$400 words, 0.4 page}
-\todo{cover, roughly one paragraph each:
-  (i) discretization and completeness --- replaces the old optimality
-      guarantee: the lattice phase is exogenous to obstacle geometry, so the
-      discrete feasible set is neither a subset nor a superset of the true one,
-      and refinement cannot rescue it;
-  (ii) Gaussian belief + maximum-likelihood-observation assumption
-      (platt2010belief) --- the simulation validation is what tests whether it
-      is calibrated;
-  (iii) centralized, offline, open-loop plan; replanning not addressed;
-  (iv) cost: 1.3--1.9$\times$ the reference wall clock; Floyd--Warshall
-      $O(n^3)$ bounds the graph; joint space exponential in agents, two tested;
-  (v) 2-D, static, convex obstacles with known $\Sigma_o$;
-  (vi) why the baselines are not re-run in simulation (shared belief model);
-  (vii) simulated measurements are ground truth plus Gaussian noise ---
-      the simulation tests belief-model consistency, not sensor realism.}
+The discrete stage is complete only with respect to the lattice. The lattice
+is laid over the corridor without regard to the obstacle geometry, so the set
+of lattice paths that clear the obstacles is neither a subset nor a superset
+of the continuous feasible set, and a route that exists only between two
+lattice cells is not found. The refinement can shorten a seed and recover a
+small violation, but it cannot change the homotopy class of the seed, so
+such a route stays out of reach. A finer lattice reduces this gap at the
+cost of a larger graph, and the all-pairs shortest-path computation that
+provides the heuristic is cubic in the number of nodes.
 
-\lipsum[47]
+The belief model is Gaussian and assumes that the planned trajectory receives
+its expected measurements \cite{platt2010belief}. The simulation of
+Sec.~\ref{sec:sim} is what tests whether this model is calibrated, and it
+does so against measurements that are ground truth with Gaussian noise
+rather than against sensor models. The agreement in Table~\ref{tab:mc}
+therefore says that the planner's covariance is consistent with an
+independent estimator under the noise levels of Table~\ref{tab:noise}, not
+that either is a faithful model of an acoustic modem or a sonar. The
+along-track bias in the terminal error is a reminder that a consistent
+covariance does not rule out a biased estimate.
+
+The plan is centralized, computed offline, and executed open loop. Every
+agent follows its planned trajectory, and the communication schedule is
+fixed in arc length rather than negotiated at run time. Replanning when an
+agent misses a fix or a communication is not addressed. The joint search
+grows exponentially in the number of agents, and all experiments use one
+support. In the benchmark the search cost 1.3 to 1.9 times the wall clock of
+the single-agent reference on average, most of it fixed overhead, but the
+exponent will bind for larger teams. Finally, the environment is planar with
+static convex obstacles whose position covariance is known, and the vehicle
+is modelled by a turn-radius bound alone. The baselines are compared in the
+planner and not re-flown in simulation, because they share the belief model
+whose calibration the simulation tests.
 
 % ===========================================================================
 \section{CONCLUSION}
 % ===========================================================================
-\budget{$\approx$150 words, 0.15 page}
+We presented a centralized planner for a primary agent that must reach a
+goal in minimum time in a GPS-denied environment while support agents are
+routed to keep its localization uncertainty within a terminal bound. By
+optimizing over mean trajectories and propagating covariance only for
+constraint evaluation, the belief-space problem reduces to a joint search
+over a heading-aware hexagonal lattice followed by B-spline refinement, with
+chance-constrained obstacle avoidance and a curvature bound enforced in both
+stages. On 50 randomized scenarios the planner solved 80\% of the scenarios
+at half the reference uncertainty against 54\% for the strongest baseline,
+with the shortest paths of any method, and closed-loop Monte Carlo trials in
+HoloOcean showed that the certified constraints hold on the executed
+trajectories. Future work includes replanning online in a receding-horizon
+fashion, scaling the joint search to larger teams through decoupled or
+hierarchical search, and validating the planner on hardware.
 
-\lipsum[51]
-
-% DRAFT: \nocite{*} makes the bibliography non-empty so its height is counted.
-% Remove it once the text carries real \cite commands.
-\nocite{*}
 \bibliographystyle{IEEEtran}
 \bibliography{refs}
 
