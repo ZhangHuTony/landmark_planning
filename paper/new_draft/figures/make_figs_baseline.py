@@ -3,8 +3,9 @@
 
 Baseline  constraint_sweep/baseline_2026-08-17 -- 5 planners x 50 screened scenarios
   fig3a_success_vs_constraint.{pdf,svg,eps,png}   success rate against constraint level
-  fig3b_length_vs_constraint.{pdf,svg,eps,png}    mean +- SD of primary length / L_ref
-                                                  over the solved scenarios, same x
+  fig3b_length_vs_constraint.{pdf,svg,eps,png}    mean primary length / L_ref over
+                                                  the solved scenarios, same x (the
+                                                  SD is in Table I, not drawn)
   fig4_wall_5level_box.{pdf,svg,eps,png}          <- the one in the paper
   fig4_wall_alllevel_box.{pdf,svg,eps,png}        spare, all eight levels, text width
   fig4_wall_{5,all}level_violin.{pdf,svg,eps,png} spare
@@ -12,8 +13,9 @@ Ablation  constraint_sweep/ablation_2026-08-17 -- 3 arms x 30 UNscreened scenari
   fig5a_abl_success_vs_constraint / fig5b_abl_length_vs_constraint   same two plots
   fig6_abl_wall_5level_box.{pdf,svg,eps,png}      <- the one in the paper
   fig6_abl_wall_alllevel_box.{pdf,svg,eps,png}    spare
-Table I   the LaTeX rows (success % / mean +- SD length ratio at 100/70/50/30) are
-          printed to stdout so main.tex is pasted from here, never typed.
+Table I   the LaTeX rows (mean +- SD length ratio at 100/70/50/30; the success
+          rate is Figs. 3a/5a's) are printed to stdout so main.tex is pasted
+          from here, never typed.
 
 The two sweeps are different scenario populations (the baseline sweep rejects
 trivial-straight draws, the ablation sweep does not), so the ablation arms are
@@ -209,27 +211,20 @@ def fig_success(stats, methods, stem):
 
 
 def fig_length(stats, methods, stem, ylim, yticks):
-    """Mean +- SD of primary length / L_ref over the solved runs, same x.
+    """Mean primary length / L_ref over the solved runs, same x.
 
-    Levels a planner never solved are left out; a level solved once is drawn
-    without a bar (no spread to report). Planners are dodged a little along x
-    so their bars do not sit on top of each other. Bars that run off the top
-    are clipped on purpose: `ylim` is chosen for the 1.1-1.5 band where most
-    of the data is, and the caption names the runaway ones.
+    Levels a planner never solved are left out. The across-scenario SD is
+    reported in Table I rather than drawn: as bars it was as wide as the gaps
+    between planners (Sequential 2.8 +- 1.5 at 30%), and more scenarios would
+    not shrink it -- it measures how much the detour varies from one random
+    scenario to the next, not how well the mean is known (that is SD/sqrt(n)).
     """
     fig = plt.figure(figsize=(FIG_W, FIG_H))
     ax = fig.add_axes(AX_RECT)
     ax.axhline(1.0, color="0.6", lw=0.6, ls=(0, (1, 2)), zorder=1)
-    n = len(methods)
     for mi, (m, _, _, _) in enumerate(methods):
         pcts = [p for p in LVL_PCTS if stats[m][p]["k"] > 0]
-        dodge = (mi - (n - 1) / 2) * 0.9
-        ax.errorbar([p + dodge for p in pcts],
-                    [stats[m][p]["mean"] for p in pcts],
-                    yerr=[stats[m][p]["sd"] if stats[m][p]["k"] > 1 else np.nan
-                          for p in pcts],
-                    capsize=1.5, elinewidth=0.6, capthick=0.6,
-                    **_style(methods, mi))
+        ax.plot(pcts, [stats[m][p]["mean"] for p in pcts], **_style(methods, mi))
     _level_axes(ax)
     ax.set_ylabel(r"primary length / $L_\mathrm{ref}$")
     ax.set_ylim(*ylim)
@@ -361,13 +356,14 @@ def fig4(stats, methods, levels, kind, stem, width, yscale="log"):
 
 # ---------------------------------------------------------------- Table I --
 def table_rows(stats, methods, levels=TABLE_LEVELS):
-    """Print the LaTeX rows: success % / mean +- SD length ratio per level."""
+    """Print the LaTeX rows: mean +- SD length ratio per level (no success
+    rate -- that is what Figs. 3a/5a show)."""
     for m, label, _, _ in methods:
         cells = []
         for p in levels:
             d = stats[m][p]
             cells.append("--" if d["k"] == 0 else
-                         f"{d['rate']:.0f} / {d['mean']:.2f}$\\pm${d['sd']:.2f}")
+                         f"{d['mean']:.2f}$\\pm${d['sd']:.2f}")
         print(f"    {label:<22s} & " + " & ".join(cells) + r" \\")
 
 
@@ -375,7 +371,7 @@ if __name__ == "__main__":
     base = level_stats(read_trials(SWEEP), METHODS)
     fig_success(base, METHODS, "fig3a_success_vs_constraint")
     fig_length(base, METHODS, "fig3b_length_vs_constraint",
-               ylim=(0.9, 3.2), yticks=[1.0, 1.5, 2.0, 2.5, 3.0])
+               ylim=(0.95, 2.9), yticks=[1.0, 1.5, 2.0, 2.5])
     fig4(base, METHODS, LEVELS_5, "box", "fig4_wall_5level_box", 3.5, "log")
     fig4(base, METHODS, LVL_PCTS, "box", "fig4_wall_alllevel_box", 7.16, "log")
     fig4(base, METHODS, LEVELS_5, "violin", "fig4_wall_5level_violin", 3.5)
@@ -384,12 +380,12 @@ if __name__ == "__main__":
     abl = level_stats(read_trials(ABL_SWEEP), ARMS)
     fig_success(abl, ARMS, "fig5a_abl_success_vs_constraint")
     fig_length(abl, ARMS, "fig5b_abl_length_vs_constraint",
-               ylim=(0.9, 1.9), yticks=[1.0, 1.2, 1.4, 1.6, 1.8])
+               ylim=(0.95, 1.45), yticks=[1.0, 1.1, 1.2, 1.3, 1.4])
     fig4(abl, ARMS, LEVELS_5, "box", "fig6_abl_wall_5level_box", 3.5, "linear")
     fig4(abl, ARMS, LVL_PCTS, "box", "fig6_abl_wall_alllevel_box", 7.16, "linear")
 
     print("wrote figs 3-6 to", HERE)
-    print("Table I rows (success % / mean+-SD length ratio at",
+    print("Table I rows (mean+-SD length ratio at",
           "/".join(map(str, TABLE_LEVELS)), "%):")
     table_rows(base, METHODS)
     print(r"    \midrule")
