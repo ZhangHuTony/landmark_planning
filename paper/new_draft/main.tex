@@ -518,13 +518,11 @@ full pipeline.
   {\footnotesize (b)}
   \caption{Baseline comparison over the 50 randomized scenarios as the terminal
     uncertainty bound tightens from 100\% to 30\% of the lone-agent reference
-    $U_\mathrm{ref}$. (a)~Fraction of scenarios solved. (b)~Primary path length
-    over the solved scenarios, normalized by the lone-agent reference length
-    $L_\mathrm{ref}$: mean $\pm$ one standard deviation, planners offset
-    slightly along $x$ for legibility. Sequential's bars at 40\% and 30\%
-    ($2.5 \pm 1.4$ and $2.8 \pm 1.5$) run off the top of the axis. Ours still
-    solves 80\% of the scenarios at half the reference bound, at a mean cost
-    of $1.34\,L_\mathrm{ref}$.}
+    $U_\mathrm{ref}$. (a)~Fraction of scenarios solved. (b)~Mean primary path
+    length over the solved scenarios, normalized by the lone-agent reference
+    length $L_\mathrm{ref}$ (standard deviations in Table~\ref{tab:sweep}).
+    Ours still solves 80\% of the scenarios at half the reference bound, at a
+    mean cost of $1.34\,L_\mathrm{ref}$.}
   \label{fig:length_success}
 \end{figure}
 
@@ -556,7 +554,8 @@ full pipeline.
   \caption{Ablation on a separate set of 30 randomized scenarios, drawn without
     the trivial-straight screen of Fig.~\ref{fig:length_success}, so the full
     pipeline is re-run on this set. Same axes as Fig.~\ref{fig:length_success}:
-    (a)~success rate, (b)~mean $\pm$ SD path length over the solved scenarios.
+    (a)~success rate, (b)~mean path length over the solved scenarios (standard
+    deviations in Table~\ref{tab:sweep}).
     The discrete stage alone solves the same scenarios as the full pipeline
     down to 70\% (the curves coincide) and slightly fewer at 60--50\%, with
     paths 2--7\% longer at every level down to 50\%, which is what the
@@ -579,32 +578,32 @@ full pipeline.
 \end{figure}
 
 \begin{table}[t]
-  \caption{Success rate (\%) / mean $\pm$ SD of the primary path length over
-    the solved scenarios, normalized by $L_\mathrm{ref}$, at four constraint
-    levels. Top block: the 50 screened scenarios of
+  \caption{Mean $\pm$ SD of the primary path length over the solved scenarios,
+    normalized by $L_\mathrm{ref}$, at four constraint levels (success rates
+    are in Figs.~\ref{fig:length_success}a and~\ref{fig:abl_length_success}a).
+    Top block: the 50 screened scenarios of
     Figs.~\ref{fig:length_success}--\ref{fig:wall}. Bottom block: the
     30-scenario ablation set of Figs.~\ref{fig:abl_length_success}--\ref{fig:abl_wall},
-    on which the full pipeline is listed again; ``straight seed'' is the
-    continuous stage seeded from a straight line. ``--'': no scenario solved.}
+    on which the full pipeline is listed again. ``--'': no scenario solved.}
   \label{tab:sweep}
   \centering
-  \scriptsize
-  \setlength{\tabcolsep}{2pt}
+  \footnotesize
+  \setlength{\tabcolsep}{4pt}
   \begin{tabular}{@{}lcccc@{}}
     \toprule
     & \multicolumn{4}{c}{Constraint level (\% of $U_\mathrm{ref}$)} \\
     \cmidrule(l){2-5}
     Method & 100 & 70 & 50 & 30 \\
     \midrule
-    Ours          & 100 / 1.14$\pm$0.09 & 100 / 1.22$\pm$0.23 & 80 / 1.34$\pm$0.26 & 40 / 1.41$\pm$0.21 \\
-    Formation     & 98 / 1.22$\pm$0.12 & 72 / 1.34$\pm$0.25 & 54 / 1.33$\pm$0.16 & 22 / 1.48$\pm$0.45 \\
-    Sequential    & 100 / 1.18$\pm$0.14 & 94 / 1.41$\pm$0.92 & 52 / 1.36$\pm$0.50 & 16 / 2.76$\pm$1.51 \\
-    CL-GBT        & 100 / 1.47$\pm$0.33 & 70 / 1.78$\pm$0.43 & 32 / 2.01$\pm$0.41 & 6 / 2.07$\pm$0.26 \\
-    Greedy        & 90 / 1.24$\pm$0.10 & 14 / 1.21$\pm$0.06 & 4 / 1.13$\pm$0.01 & 4 / 1.13$\pm$0.01 \\
+    Ours          & 1.14$\pm$0.09 & 1.22$\pm$0.23 & 1.34$\pm$0.26 & 1.41$\pm$0.21 \\
+    Formation     & 1.22$\pm$0.12 & 1.34$\pm$0.25 & 1.33$\pm$0.16 & 1.48$\pm$0.45 \\
+    Sequential    & 1.18$\pm$0.14 & 1.41$\pm$0.92 & 1.36$\pm$0.50 & 2.76$\pm$1.51 \\
+    CL-GBT        & 1.47$\pm$0.33 & 1.78$\pm$0.43 & 2.01$\pm$0.41 & 2.07$\pm$0.26 \\
+    Greedy        & 1.24$\pm$0.10 & 1.21$\pm$0.06 & 1.13$\pm$0.01 & 1.13$\pm$0.01 \\
     \midrule
-    Full pipeline & 100 / 1.12$\pm$0.14 & 100 / 1.17$\pm$0.23 & 87 / 1.22$\pm$0.22 & 43 / 1.29$\pm$0.22 \\
-    Discrete only & 100 / 1.20$\pm$0.15 & 100 / 1.23$\pm$0.23 & 80 / 1.25$\pm$0.22 & 43 / 1.29$\pm$0.22 \\
-    Straight seed & 53 / 0.99$\pm$0.04 & 7 / 1.00$\pm$0.00 & -- & -- \\
+    Full pipeline          & 1.12$\pm$0.14 & 1.17$\pm$0.23 & 1.22$\pm$0.22 & 1.29$\pm$0.22 \\
+    Discrete only          & 1.20$\pm$0.15 & 1.23$\pm$0.23 & 1.25$\pm$0.22 & 1.29$\pm$0.22 \\
+    Straight seed + cont.\ & 0.99$\pm$0.04 & 1.00$\pm$0.00 & -- & -- \\
     \bottomrule
   \end{tabular}
 \end{table}
@@ -727,13 +726,13 @@ full pipeline.
   \centering
   \includegraphics[width=\linewidth]{fig8_mc_behind_wall}
   \caption{Closed-loop Monte Carlo of the behind-wall plan in HoloOcean, 30
-    runs with different noise seeds. Top: planned trajectories (dashed) against
-    the mean executed trajectory of each agent, with the $\pm1\sigma$
-    cross-track envelope drawn on the map; the primary passes north of the
+    runs with different noise seeds: planned trajectories (dashed) against the
+    mean executed trajectory of each agent, with the $\pm2\sigma$ cross-track
+    envelope of the runs drawn on the map. The primary passes north of the
     obstacle while the support diverts south to the landmark and rejoins before
-    the goal. Bottom: the same envelope at true scale against arc length. It is
-    a 2--3\,m tube along the 1.1\,km route and stays within about 4\,m; every
-    run reaches the goal and clears the obstacle.}
+    the goal. The $2\sigma$ half-width is about 4\,m along the 1.1\,km route
+    and peaks at 8\,m on the primary's final bend; every run reaches the goal
+    and clears the obstacle.}
   \label{fig:mc_paths}
 \end{figure}
 
