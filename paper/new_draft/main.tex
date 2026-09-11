@@ -509,44 +509,81 @@ seed and never more violating than an infeasible one.
 
 % ===========================================================================
 \section{RESULTS}
+\label{sec:results}
 % ===========================================================================
-\budget{$\approx$800 words, 0.85 page of prose (planner-only; simulation is Sec.~VI); the floats add $\approx$0.8 page}
 
 \subsection{Experimental Setup}
-\lipsum[33]
+
+We evaluate the planner on randomized corridor scenarios with one primary and
+one support agent. Each scenario places the start at the origin and the goal
+between 600 and 900\,m away along the $x$ axis, draws two to four landmarks
+whose map covariances have standard deviations between 0.6 and 1.35\,m, and
+draws one to three convex obstacles with three to six sides and up to
+220\,m across. Landmarks are placed between 280 and 430\,m to the side of
+the direct line, on alternating sides, so that every fix costs a detour and
+no single formation side is favoured. Obstacle centres follow a triangular
+distribution across the corridor, so most scenarios have an obstacle on the
+direct line. The lattice width is 150\,m, the minimum turn radius 40\,m, the
+visibility range 100\,m with a 15\,m taper width, the communication interval
+100\,m, and the communication range 300\,m with a 20\,m taper width.
+Dead-reckoning variance grows at $q_\parallel = 0.25$\,m$^2$ per metre
+travelled along track, a standard deviation of 5\,m after 100\,m, and at one
+ninth of that rate across track. The obstacle risk is $\delta = 0.05$ per
+agent-obstacle pair with a vehicle radius of 5\,m. The search runs with
+$\varepsilon = 0$ and a budget of $10^6$ expansions, and the refinement runs
+15 barrier stages that share a budget of 1000 Adam iterations.
+
+For every scenario we first plan a single unconstrained agent, which gives a
+reference length $L_\mathrm{ref}$ and the terminal uncertainty
+$U_\mathrm{ref}$ of that path. The terminal bound is then tightened in steps
+of 10\% from 100\% to 30\% of $U_\mathrm{ref}$, and every planner is run at
+each level. A planner that fails at one level is not run at the tighter
+levels and is counted as failing there. Scenarios in which a straight line
+already meets the loosest bound are discarded before the sweep, since they
+pose no localization problem, and this screen removed 34 of 84 draws to
+leave the 50 scenarios reported below. Path lengths are reported relative to
+$L_\mathrm{ref}$ over the scenarios a planner solved. Each run is a separate
+Julia process, and the wall-clock times include start-up and graph
+construction.
 
 \subsection{Baselines}
-\budget{$\approx$400 words for the four descriptions}
-\todo{one paragraph each: name the paradigm, cite it, say how it was
-  adapted to the escort formulation. Greedy = myopic active localization;
-  Formation = leader--follower formation control; Sequential = prioritized
-  planning (MAPF); CL-GBT = direct port from the literature.}
 
-\textit{Greedy.} \todo{primary commits to its shortest obstacle-clear route with
-  no uncertainty reasoning; at each step every support picks, from its
-  $\pm60^\circ$ successors, the move that minimizes the primary's uncertainty
-  at that step. Depth-1 myopia --- removes lookahead. Inspired by myopic /
-  greedy sensor placement.}
-\lipsum[35]
+We compare against four planners adapted from adjacent literature. All four
+share the covariance model of Sec.~\ref{sec:pf}, the obstacle test, and the
+continuous refinement of Sec.~\ref{sec:cont}, so the comparison isolates how
+the team is routed.
 
-\textit{Formation.} \todo{primary runs its own weighted A* over (cell, belief);
-  supports hold fixed slots in the primary's body frame (one hex out, a
-  $60^\circ$ multiple off its heading); a goal is accepted on the uncertainty
-  the primary has with supports attached. Removes support routing.
-  Inspired by formation keeping / rigid escort.}
-\lipsum[36]
+\textit{Greedy.} The primary commits to its shortest obstacle-clear route
+with no uncertainty reasoning. At every step the support chooses, among its
+three successors, the move that most reduces the primary's uncertainty at
+that step. This is the myopic rule of greedy information gathering
+\cite{krause2008sensor}, and it removes all lookahead from the support.
 
-\textit{Sequential.} \todo{prioritized planning: primary planned first with the
-  supports parked at their start poses (slackened bound), supports then planned
-  against the committed primary, then a repair leg. Removes the joint state
-  space. Inspired by prioritized / cooperative pathfinding.}
-\lipsum[37]
+\textit{Formation.} The primary plans alone with a weighted A* over cells
+and beliefs while the support holds a fixed slot in the primary's body
+frame, one cell out at a $60^\circ$ multiple off its heading, in the manner
+of leader-follower formation control \cite{balch1998formation}. A goal
+candidate is accepted on the uncertainty the primary has with the support
+attached. With one support both lateral slots are searched and the better
+one is kept. This removes support routing.
 
-\textit{CL-GBT.} \todo{port of the tree-growth strategy of the Cooperative
-  Localization--Guided Belief Tree: one RRT over the joint belief state, goal-
-  and ``besties''-biased sampling. Cite --- theurkauf2025coop? Note what was
-  ported and what was not (our belief model, our constraints).}
-\lipsum[38]
+\textit{Sequential.} Prioritized planning
+\cite{erdmann1987multiple,silver2005cooperative} adapted to the escort
+problem. The primary is planned first with the support parked at its start
+pose, under a bound slackened to twice the threshold, since one agent should
+not be asked to satisfy alone what the team must satisfy together. The
+support is then planned against the committed primary trajectory to minimize
+the primary's terminal uncertainty, and the primary is re-planned once
+against the finished support path. This removes the joint state space.
+
+\textit{CL-GBT.} A port of the tree-growth strategy of the cooperative
+localization guided belief tree of Theurkauf et al. \cite{theurkauf2025coop}:
+one rapidly exploring random tree over the joint state of the team in
+continuous space, with goal-biased sampling for the primary and a bias that
+snaps the support's sample onto the primary's. Its belief propagation and
+measurement model are replaced by ours, and its iteration budget is set for
+equal compute time with our search. This replaces the exhaustive lattice
+search with a sampled one.
 
 \subsection{Comparison With Baselines}
 
@@ -557,9 +594,9 @@ seed and never more violating than an infeasible one.
   \includegraphics[width=\linewidth]{fig3b_length_vs_constraint}\\[-2pt]
   {\footnotesize (b)}
   \caption{Baseline comparison over the 50 randomized scenarios as the terminal
-    uncertainty bound tightens from 100\% to 30\% of the lone-agent reference
+    uncertainty bound tightens from 100\% to 30\% of the single-agent reference
     $U_\mathrm{ref}$. (a)~Fraction of scenarios solved. (b)~Mean primary path
-    length over the solved scenarios, normalized by the lone-agent reference
+    length over the solved scenarios, normalized by the single-agent reference
     length $L_\mathrm{ref}$ (standard deviations in Table~\ref{tab:sweep}).
     Ours still solves 80\% of the scenarios at half the reference bound, at a
     mean cost of $1.34\,L_\mathrm{ref}$.}
@@ -581,7 +618,35 @@ seed and never more violating than an infeasible one.
   \label{fig:wall}
 \end{figure}
 
-\lipsum[39]
+Fig.~\ref{fig:length_success} reports the success rate and the path length
+against the constraint level, and Table~\ref{tab:sweep} lists the lengths
+with their spread across scenarios. Every planner but Greedy solves nearly
+every scenario at the loosest level, where the bound equals the uncertainty
+of the unconstrained reference, and the planners separate as the bound
+tightens. Our planner solves every scenario down to 70\%, 96\% of them at
+60\%, 80\% at 50\%, and 40\% at 30\%. Sequential matches it down to 80\% and
+remains the strongest baseline at 70\% and 60\%, but falls to 52\% at 50\%
+and 16\% at 30\%, and its solutions grow to more than twice the reference
+length at the tightest levels, since at a tight bound the primary must
+already detour to landmarks on its own before the support is planned.
+Formation degrades more gracefully and is the strongest baseline from 50\%
+down, with 54\% at half the reference bound and 22\% at 30\%. CL-GBT solves
+half the scenarios at 60\% and 6\% at 30\%, with paths 1.5 to 2 times the
+reference length at every level, since a rapidly exploring random tree
+returns the first path it finds rather than the shortest. Greedy solves 90\%
+at the loosest level and almost nothing below it, because a support that
+cannot pay a detour now for a fix later rarely reaches a landmark in time.
+
+The price of the higher success rate is modest. Our paths are the shortest
+among the solved scenarios at every level, from $1.14\,L_\mathrm{ref}$ at
+100\% to $1.41\,L_\mathrm{ref}$ at 30\%, and Table~\ref{tab:sweep} shows
+that their spread across scenarios is also the smallest.
+Fig.~\ref{fig:wall} reports the wall-clock time. Our planner takes a median
+of 18\,s per run against 14\,s for Formation and Sequential and 16\,s for the
+single-agent reference, and most of that time is fixed overhead shared by
+every method. Only CL-GBT grows with the bound, since a tighter bound needs
+a support placement that its sampler rarely proposes, and its longest run
+took 730\,s.
 
 \subsection{Ablation}
 
@@ -648,7 +713,25 @@ seed and never more violating than an infeasible one.
   \end{tabular}
 \end{table}
 
+The ablation asks what each stage of the pipeline contributes. It runs on a
+separate set of 30 scenarios drawn without the straight-line screen, since
+one of the arms is the straight seed itself, and it compares the full
+pipeline with the discrete stage alone and with the continuous refinement
+seeded from a straight line. Fig.~\ref{fig:abl_length_success} and the
+bottom block of Table~\ref{tab:sweep} report the results.
 
+The discrete stage alone solves the same scenarios as the full pipeline down
+to 70\% and one or two fewer at 60\% and 50\%. Its paths are 2 to 7\% longer
+at every level down to 50\%, which is the length the refinement recovers by
+cutting the lattice corners, and at the two tightest levels the two arms are
+indistinguishable. The straight seed solves 53\% of the scenarios at the
+loosest level and none below 60\%, and every solution it returns has a
+length ratio of 1.00. The refinement therefore never found a feasible detour
+from a straight seed and succeeded only where the straight line was feasible
+to begin with. The joint search is what finds the landmarks, and the
+refinement is what makes the route short. Fig.~\ref{fig:abl_wall} shows that
+all three arms run in 16 to 21\,s, with the refinement adding about 1.5\,s to
+the discrete stage.
 
 % ===========================================================================
 \section{SIMULATION VALIDATION}
