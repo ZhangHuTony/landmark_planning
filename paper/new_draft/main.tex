@@ -719,45 +719,48 @@ additive Gaussian noise, so the simulation tests the consistency of the
 belief model rather than the realism of any sensor.
 
 \subsection{Factor-Graph State Estimator}
-\budget{$\approx$350 words + \cref{eq:fg} + \cref{tab:noise}}
-\todo{Credit: this is the collaborator's existing GTSAM \todo{cite GTSAM /
-  iSAM2 (Kaess et al.), verify} stack, used essentially unchanged; say so.}
-\todo{What it is (from \texttt{factor\_graph.py} / \texttt{main.py}):
-  (a) iSAM2 incremental smoother over $SE(3)$ pose nodes, one node per 5\,m of
-      arc, per agent;
-  (b) \emph{anchor-node parameterization}: each agent estimates a local
-      trajectory $\mathbf T^{\ell}_k$ plus an anchor $\mathbf T^{a}$, world pose
-      $\mathbf T^{w}_k=\mathbf T^{a}\mathbf T^{\ell}_k$, Gaussian priors on both
-      at deployment; the planner's 2-D $\Sigma$ corresponds to the $xy$ block of
-      the \emph{world-pose} marginal;
-  (c) two layers of graph: a per-agent dead-reckoning graph (own odometry
-      between-factors, unary depth and 3-DOF orientation factors, and
-      azimuth/elevation/range factors to landmarks within visibility range,
-      each landmark carrying a prior with the planner's $\Sigma_\ell$ --- a
-      known map, not SLAM) whose output is the relative pose and marginal the
-      agent transmits acoustically; and the primary's multi-agent graph, which
-      adds at every comm event the sender's compounded between-factor (its
-      motion since the last comm, covariance $S_{jk}$) and an inter-agent
-      acoustic bearing factor;
-  (d) measurement synthesis: all measurements are ground truth from HoloOcean
-      plus additive Gaussian noise (\cref{tab:noise}) --- no DVL/IMU sensor models;
-      this tests the belief model's consistency, not sensor realism (say so,
-      and repeat in Sec.~VII).}
-\todo{OPEN --- write this against what is actually flown for the final numbers.
-  Pending in \texttt{multiagent\_base/ESTIMATOR\_REVIEW.md}: E1 report the
-  world-pose marginal, not the anchor-relative local one; E2 the inter-agent
-  factor is bearing-only today while the planner models a range-gated
-  position transfer (CI) --- either land the relative-position factor or
-  state the mismatch as a limitation; E3 path for a support's landmark fix
-  into the primary's graph; E4 transmitted-covariance bookkeeping; E6 noise
-  parameters calibrated to the planner's dead-reckoning rates (plan A2--A4).}
+\budget{$\approx$150 words on how the graph is built, in place of the filler
+  paragraph below; the configuration paragraph and \cref{tab:noise} are written}
+% For whoever writes the filler paragraph: it should cover (a) the two layers of
+% graph --- a per-agent dead-reckoning graph carrying that agent's odometry
+% between-factors, unary depth and 3-DOF orientation factors, and
+% azimuth/elevation/range factors to landmarks inside the visibility range, each
+% landmark pinned by a prior with the planner's map covariance, so the map is
+% known and this is not SLAM; and the primary's multi-agent graph, which is what
+% the reported covariance comes off; and (b) that every measurement is ground
+% truth from the simulator plus additive Gaussian noise, with no DVL or IMU
+% sensor model, which is why this tests the belief model's consistency and not
+% sensor realism. Credit for the stack belongs in the acknowledgments once the
+% submission is de-anonymized.
+
+The estimator is an existing GTSAM factor-graph stack
+\cite{kaess2012isam2,dellaert2017factor}, developed independently of the
+planner; what we supply is its configuration and, through
+\cref{tab:noise}, its noise. It is an incremental smoother
+\cite{kaess2012isam2} over $SE(3)$ pose nodes, one per 5\,m of arc for each
+agent, returning the trajectory $\hat{\mathcal X}$ that minimizes the weighted
+residuals $r_i$ of the factors $\mathcal F$ the graph holds,
 \begin{equation}
   \hat{\mathcal X}=\arg\min_{\mathcal X}\;\sum_{i\in\mathcal F}
-    \big\lVert r_i(\mathcal X)\big\rVert^{2}_{\Sigma_i},
-  \qquad
-  \mathbf T^{w}_{k}=\mathbf T^{a}\,\mathbf T^{\ell}_{k}
+    \big\lVert r_i(\mathcal X)\big\rVert^{2}_{\Sigma_i}.
   \label{eq:fg}
 \end{equation}
+
+\lipsum[54]
+
+Three configuration choices decide what the comparison in
+Sec.~\ref{sec:sim}-C measures, and all three were in force for the runs
+reported there. Poses are estimated directly in the world frame: the start
+pose is known from the plan, so no separate map-origin node is estimated, and
+the covariance compared against the planner's is the $xy$ block of the
+world-pose marginal. A successful communication delivers the sender's
+buffered nodes into the primary's graph together with a relative-pose factor
+between the two vehicles, whose translation noise carries the planner's own
+link weight; a bearing-only factor would transfer almost no position
+information at these separations, and the primary could never inherit the
+support's landmark fix. Finally, every factor's noise is derived from the
+planner's model rather than set independently, so that the two codebases
+measure uncertainty with one ruler.
 
 \begin{table}[t]
       \centering
@@ -782,11 +785,11 @@ belief model rather than the realism of any sensor.
     communication noise $\sigma_c$ divided by $\sqrt{w}$ for link weight $w$.
     Poses are estimated in the world frame; the prior on the known start pose
     carries the planner's $\Sigma^0$ in $x$, $y$.
-    \todo{the depth factor $\sigma$ (0.5\,m) still differs from the injected
-    depth noise (0.01\,m); not re-verified}}
+    Depth is the one channel the estimator treats more conservatively than
+    the simulation: its factor keeps the stack's own 0.5\,m against the
+    0.01\,m actually injected.}
   \label{tab:noise}
 \end{table}
-\lipsum[54]
 
 \subsection{Monte Carlo Results}
 
