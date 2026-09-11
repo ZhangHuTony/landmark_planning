@@ -72,8 +72,8 @@ subject to a chance-constrained collision-avoidance requirement and a terminal b
 of the underlying belief-space problem by optimizing over the mean-state trajectories of all agents and propagating covariance for terminal constraint evaluation only. 
 We propose a discrete-to-continuous pipeline combining hexagonal-grid joint search with spline-based trajectory refinement. 
 Across 50 randomized scenarios, when the terminal uncertainty constraint is 50\% of the terminal uncertainty of a reference lone primary agent plan, our planner
-finds solutions in 80\% of the scenarios against 54\% for the strongest baseline. We validate these results through the marine robotics simulator HoloOcean \todo{cite it} and show that
-the generated paths satisfy their constraints \todo{figure} of the time through Monte Carlo simulations.
+finds solutions in 80\% of the scenarios against 54\% for the strongest baseline. We validate these results through the marine robotics simulator HoloOcean~\cite{potokar2022holoocean} and show that
+the generated paths satisfy the collision constraint in 100\% and the terminal uncertainty bound in 93\% of closed-loop Monte Carlo trials.
 
 \end{abstract}
 
@@ -97,9 +97,9 @@ In environments where GPS signal is unreliable, such as underwater, or in region
 for localization via GPS-denied solutions. In GPS-denied environments, autonomous agents struggle with state uncertainty due to inertial measurement unit (IMU)
 drift. As the estimation error accumulates, an agent's pose uncertainty can grow to a point where waypoint tracking degrades and mission objectives are compromised.
 Common planning strategies ameliorate this by biasing trajectories toward informative landmarks and introducing cooperating agents to utilize inter-agent measurements for 
-cooperative localization \todo{citation?}. Consequently, trajectory planning must account for uncertainty propagation when estimation error impedes task performance. While
+cooperative localization~\cite{roumeliotis2002dist,bahr2009coop}. Consequently, trajectory planning must account for uncertainty propagation when estimation error impedes task performance. While
 belief-space planning provides a principled formulation for uncertainty-aware decision making, it is typically intractable in multi-agent settings due to the dimensionality of coupled
-belief dynamics \todo{citation?}. This motivates surrogate formulations that optimize mean trajectories while propagating uncertainty only for constraint evaluation.
+belief dynamics~\cite{kaelbling1998pomdp,platt2010belief}. This motivates surrogate formulations that optimize mean trajectories while propagating uncertainty only for constraint evaluation.
 
 In this work, we consider a centralized multi-agent planning problem in which a primary agent must reach a goal in minimum time while subjected to a chance-constrained collision-avoidance 
 requirement and a terminal bound on localization uncertainty.
@@ -109,19 +109,20 @@ continuous space and refined into smooth, dynamically feasible trajectories that
 
 Our contributions are as follows:
 \begin{enumerate}
-  \item A formulation of centralized MAPP-CL with obstacles, in which support
+  \item A formulation of centralized multi-agent path planning with cooperative
+    localization (MAPP-CL) in the presence of obstacles, in which support
     agents are routed jointly with a primary agent subject to a terminal
     localization bound and chance-constrained collision avoidance under both
     agent and obstacle uncertainty.
-  \item A discrete-to-continuous planner---joint search over a heading-aware
-    hexagonal lattice followed by B-spline refinement---that enforces the
+  \item A discrete-to-continuous planner, a joint search over a heading-aware
+    hexagonal lattice followed by B-spline refinement, that enforces the
     curvature, collision, and terminal-uncertainty constraints in both stages.
   \item A benchmark of 50 randomized scenarios against four baselines adapted
     from adjacent literature, on which the planner solves 80\% of scenarios at
     the 50\% constraint level against 54\% for the strongest baseline.
   \item Closed-loop Monte Carlo validation in HoloOcean with an independent
-    factor-graph estimator, showing that the planned constraints hold at
-    \todo{X}\% and \todo{Y}\%.
+    factor-graph estimator, showing that the collision constraint holds in 100\% and the terminal
+    uncertainty bound in 93\% of trials.
 \end{enumerate}
 
 In the following sections, we formalize the problem, describe the discrete and continuous planning stages and evaluate our approach in a simulated GPS-denied environment.
@@ -129,26 +130,66 @@ In the following sections, we formalize the problem, describe the discrete and c
 
 % ===========================================================================
 \section{RELATED WORK}
+\label{sec:related}
 % ===========================================================================
-\budget{$\approx$300 words, 0.3 page}
+Planning under uncertainty is naturally posed as a partially observable Markov
+decision process, which is intractable in general \cite{kaelbling1998pomdp}.
+Belief-space planners make the problem tractable by restricting beliefs to
+Gaussians and propagating them along candidate trajectories, either over a
+roadmap \cite{prentice2009brm}, a tree \cite{bry2011rrbt}, or a locally
+optimized path \cite{vandenberg2011lqgmp}, and they typically assume that the
+most likely observation is received \cite{platt2010belief}. These methods plan
+for a single agent. With several agents the belief includes every agent's
+state, the agents are coupled through inter-agent measurements, and the search
+space grows exponentially with the size of the team.
 
-\lipsum[8-10]
+Cooperative localization lets agents share position estimates to reduce
+dead-reckoning drift \cite{roumeliotis2002dist,bahr2009coop}, and it is a
+standard tool in underwater navigation, where GPS is unavailable below the
+surface \cite{paull2014auv}. Because cooperating agents share measurement
+history, naive fusion double counts information, and covariance intersection
+\cite{julier1997cov} is the usual remedy for fusion under unknown correlation
+\cite{carrillo2013ci}. Planning with cooperative localization in the loop is
+more recent. Theurkauf et al. \cite{theurkauf2025coop} grow a sampling-based
+tree over the joint belief of a team and bias it toward configurations that
+keep the agents in range of one another, and Liu et al. \cite{liu2026risk}
+plan risk-aware trajectories for underwater teams that localize cooperatively.
+Our work differs in that the support agents have no goals of their own and are
+routed only to meet the primary's terminal bound, and in that the joint search
+is exhaustive on a lattice rather than sampled.
+
+Multi-agent path finding solves the discrete coordination problem exactly, for
+example with conflict-based search \cite{sharon2021cbs}, or approximately by
+planning the agents one at a time in priority order
+\cite{erdmann1987multiple,silver2005cooperative}. Both treat agent positions
+as known and do not model localization. Our sequential baseline adapts
+prioritized planning to the escort problem.
+
+Grid-based search followed by continuous refinement is a common way to satisfy
+kinematic constraints. Hexagonal grids offer uniform neighbour spacing and
+less directional bias than square grids \cite{duszak2021hexgrid}, and
+B-splines give smooth trajectories with local control whose curvature can be
+bounded \cite{feng2024bsrrt,karaman2011optimal}. Obstacle avoidance under
+position uncertainty follows the chance-constrained formulation of Blackmore
+et al. \cite{blackmore2011chance}, and we bound each spline segment by its
+MINVO hull \cite{tordesillas2022minvo} so that the constraint is linear in
+the control points.
 
 % ===========================================================================
 \section{PROBLEM FORMULATION}
 % ===========================================================================
 %\budget{$\approx$500 words + 6--8 display equations, 0.65 page}
-
-Let $\mathcal{I} = \{1,2,\dots,P\}$ denote a team of $P$ agents. Agent $i=1$
-is the primary agent tasked with reaching a goal location $G \in \mathbb{R}^2$;
-agents $2,\dots,P$ are support agents whose only role is to aid the primary's
-localization. All agents move at a common constant speed $v$, making
-minimization of time equivalent to minimizing trajectory length, and arc
-length $s = vt$ serves as a shared clock. The environment contains $M$ static
-convex obstacles $\mathcal{O}_1,\dots,\mathcal{O}_M$, each the intersection of
-half-planes with unit outward normals $a_j$ and offsets $b_j$ and located only
-up to a covariance $\Sigma_o$, together with a set $\mathcal{L}$ of landmarks
-with known position $\ell$ and map covariance $\Sigma_\ell$.
+Let $\mathcal{I} = \{1,2,\dots,P\}$ denote a team of $P$ agents, where agent $i=1$
+is the primary agent tasked with reaching a goal location $G\in\mathbb{R}^2$.
+All other agents $2,\dots,P$ are support agents whose sole task is to assist the
+primary agent's localization. All agents move at a common constant speed $v$,
+so minimizing time is equivalent to minimizing trajectory length, and we use
+arc length $s = vt$ as a shared clock throughout. The environment contains $M$
+static convex obstacles $\mathcal{O}_1,\dots,\mathcal{O}_M$, each defined as an
+intersection of half-planes $a_j^{\top}x \le b_j$ with unit outward normals
+$a_j$ and offsets $b_j$, and each located only up to a covariance $\Sigma_o$.
+The environment also contains a set $\mathcal{L}$ of landmarks with known
+positions $\ell\in\mathbb{R}^2$ and positional uncertainty $\Sigma_\ell$.
 
 \subsection{Decision Variables}
 
