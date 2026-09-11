@@ -3,6 +3,7 @@
 
     python fig8_montecarlo.py <mc_run_dir> [--prefix mc] [--out DIR]
                               [--stem fig8_montecarlo] [--nstd 1] [--width 3.5]
+                              [--dev 1]
 
 `<mc_run_dir>` is the planner run directory that `monte_carlo.py` flew, holding
 one `<prefix><i>/` subdirectory per trial with `run_log.npz` + `sim_report.yaml`.
@@ -13,7 +14,8 @@ Writes into <out> (default: this figures/ directory):
                              envelope drawn on the map; (b) the same envelope
                              at true scale against arc length -- on a 1.9 km
                              corridor a 4 m band is a hairline in (a), so the
-                             number the panel is about needs its own axis
+                             number the panel is about needs its own axis.
+                             `--dev=0` drops (b) and ships the map alone
   <stem>_summary.csv         one row per trial, the numbers behind the table
 and prints the LaTeX row for `tab:mc`.
 
@@ -40,7 +42,10 @@ Run it with the simulator's interpreter, which has matplotlib and numpy:
 The shipped set (2026-09-10) is `results/2026-09-02_thr1.8b` (behind_wall, 2
 agents, bound 1.8 m), rendered as `fig8_mc_behind_wall` with `--case=behind_wall`:
     python fig8_montecarlo.py ~/Research/landmark_planning/results/2026-09-02_thr1.8b \
-        --stem=fig8_mc_behind_wall --case=behind_wall
+        --stem=fig8_mc_behind_wall --case=behind_wall --nstd=2 --dev=0
+The paper takes the map alone at 2 sigma (user call, 2026-09-10): on the
+1.1 km behind_wall route the 2-sigma tube is wide enough to read on the map,
+and the float is a third shorter without panel (b).
 All 30 `mc*` trials there were re-flown on 2026-09-09 with the sim's fixed
 estimator (support backlog seeded from its own solved pose, see
 multiagent_base/CLAUDE.md), and 30/30 fly the plan -- the earlier 20-trial
@@ -340,7 +345,7 @@ def summarize(trials, out_csv, case="case"):
 # Figure
 # ---------------------------------------------------------------------------
 
-def draw(trials, agg, nstd, width_in):
+def draw(trials, agg, nstd, width_in, with_dev=True):
     z = trials[0].z
     primary = trials[0].primary
     obstacles = [np.asarray(z[f"obstacle{i}_verts"], float)
@@ -364,15 +369,16 @@ def draw(trials, agg, nstd, width_in):
     left, right, top = 0.50, 0.06, 0.10
     xlabel_h, legend_row_h = 0.30, 0.145
     legend_h = math.ceil(n_entries / 3) * legend_row_h + 0.10
-    gap = 0.06                       # between the map's x label and panel (b)
+    gap = 0.06 if with_dev else 0.0  # between the map's x label and panel (b)
     ax_w = width_in - left - right
     ax_h = ax_w * (y1 - y0) / (x1 - x0)          # equal aspect fixes the map
-    dev_h = DEV_PANEL_IN
-    fig_h = top + ax_h + xlabel_h + gap + dev_h + xlabel_h + legend_h
+    dev_h = DEV_PANEL_IN if with_dev else 0.0
+    dev_block = dev_h + gap + (xlabel_h if with_dev else 0.0)  # (b) + its x label
+    fig_h = top + ax_h + xlabel_h + dev_block + legend_h
 
     fig = plt.figure(figsize=(width_in, fig_h))
     ax = fig.add_axes([left / width_in,
-                       (legend_h + xlabel_h + dev_h + gap + xlabel_h) / fig_h,
+                       (legend_h + xlabel_h + dev_block) / fig_h,
                        ax_w / width_in, ax_h / fig_h])
     ax.set_aspect("equal")
     ax.set_xlim(x0, x1)
@@ -382,10 +388,12 @@ def draw(trials, agg, nstd, width_in):
     for sp in ax.spines.values():
         sp.set_zorder(6)
 
-    dev = fig.add_axes([left / width_in, (legend_h + xlabel_h) / fig_h,
-                        ax_w / width_in, dev_h / fig_h])
-    dev.set_xlabel("arc length (m)")
-    dev.set_ylabel("cross-track (m)")
+    dev = None
+    if with_dev:
+        dev = fig.add_axes([left / width_in, (legend_h + xlabel_h) / fig_h,
+                            ax_w / width_in, dev_h / fig_h])
+        dev.set_xlabel("arc length (m)")
+        dev.set_ylabel("cross-track (m)")
 
     obstacle_handle = None
     for verts in obstacles:
@@ -425,17 +433,19 @@ def draw(trials, agg, nstd, width_in):
 
         # (b) the same envelope, at true scale: on a 1.9 km corridor the map's
         # band is a hairline, and its width is the quantity the figure is for.
-        dev.fill_between(a["grid"], -nstd * std_cross, nstd * std_cross,
-                         facecolor=over_white(c, BAND_ALPHA), edgecolor="none",
-                         zorder=2 if name == primary else 1)
-        dev.plot(a["grid"], nstd * std_cross, "-", color=c, linewidth=lw * 0.7,
-                 zorder=3)
-        dev.plot(a["grid"], -nstd * std_cross, "-", color=c, linewidth=lw * 0.7,
-                 zorder=3)
+        if dev is not None:
+            dev.fill_between(a["grid"], -nstd * std_cross, nstd * std_cross,
+                             facecolor=over_white(c, BAND_ALPHA), edgecolor="none",
+                             zorder=2 if name == primary else 1)
+            dev.plot(a["grid"], nstd * std_cross, "-", color=c, linewidth=lw * 0.7,
+                     zorder=3)
+            dev.plot(a["grid"], -nstd * std_cross, "-", color=c, linewidth=lw * 0.7,
+                     zorder=3)
         if name == primary:
             band_handles.append(fill)
         mean_handles.append(line)
-    dev.axhline(0.0, color="0.5", linewidth=0.4, zorder=0)
+    if dev is not None:
+        dev.axhline(0.0, color="0.5", linewidth=0.4, zorder=0)
 
     lm_handle, = ax.plot(landmarks[:, 0], landmarks[:, 1], linestyle="none",
                          marker="o", markersize=MS_LANDMARK, color="black",
@@ -465,7 +475,7 @@ def main(argv):
     if not args:
         sys.exit(__doc__)
     opts = dict(prefix="mc", out=HERE, stem="fig8_montecarlo", case="",
-                nstd=str(DEFAULT_NSTD), width=str(COLUMN_IN))
+                nstd=str(DEFAULT_NSTD), width=str(COLUMN_IN), dev="1")
     for a in argv[1:]:
         if a.startswith("--") and "=" in a:
             k, v = a[2:].split("=", 1)
@@ -488,7 +498,14 @@ def main(argv):
     agg, n_used = aggregate(trials)
     for name, k in n_used.items():
         print(f"  aggregated {k}/{len(trials)} trials for {name}")
-    fig = draw(trials, agg, nstd, width)
+    for name, a in agg.items():   # the tube's width, for the caption
+        sc = np.asarray(a["std_cross"])
+        print("  %s cross-track sigma: median %.2f m, max %.2f m at arc %.0f m "
+              "(%g-sigma half-width %.1f / %.1f m)" % (
+                  name, np.median(sc), sc.max(), a["grid"][int(np.argmax(sc))],
+                  nstd, nstd * np.median(sc), nstd * sc.max()))
+    fig = draw(trials, agg, nstd, width,
+               with_dev=opts["dev"].lower() not in ("0", "false", "no"))
     save(fig, opts["out"], opts["stem"])
     plt.close(fig)
 
