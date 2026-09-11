@@ -15,7 +15,7 @@
 \usepackage[font=footnotesize,labelsep=period,skip=5pt]{caption}
 \usepackage{cleveref}
 
-\graphicspath{{figures/}}
+\graphicspath{{figures/final/}{figures/}}
 
 \newtheorem{theorem}{Theorem}
 \newtheorem{proposition}{Proposition}
@@ -413,17 +413,18 @@ $x \leftarrow$ control points of the seed splines;
 % where Results begins. Move the source if it drifts.
 \begin{figure*}[t]
   \centering
-  \includegraphics[width=\textwidth]{fig2_ladder_ours_shapes_v14}
-  \caption{Constraint ladder on one scenario (1700\,m corridor, 13 obstacles,
+  \includegraphics[width=\textwidth]{fig2_ladder}
+  \caption{Constraint ladder on one scenario (1700\,m corridor, 14 obstacles,
     three landmarks, 100\,m lattice) as the terminal bound tightens from
     100\% to 30\% of the single-agent reference. Primary solid, support
     dashed, landmarks as dots with their map covariance; each title gives the
     primary's length and terminal $\sigma$. At 100\% the support climbs into
-    the upper pocket to sight the weak landmark there and rejoins. At 70\% it
-    takes the southern lane to a stronger landmark and relays it at half
-    weight. At 50\% the primary adds one turn before the goal so that the
-    support can reach that landmark in time. At 30\% the primary itself
-    detours through the obstacle row toward the third landmark.}
+    the north pocket to sight the weak landmark there and rejoins. At 70\% it
+    takes the southern lane to a stronger landmark and relays it from the far
+    side of the last wall. At 50\% the primary adds one turn before the goal
+    so that the support can relay from closer. At 30\% the primary dips to
+    the centre line before the goal so that the support can reach the last
+    landmark and still relay it.}
   \label{fig:ladder}
 \end{figure*}
 
@@ -549,9 +550,9 @@ This replaces exhaustive lattice search with sampling.
 
 \begin{figure}[t]
   \centering
-  \includegraphics[width=\linewidth]{fig3a_success_vs_constraint}\\[-2pt]
+  \includegraphics[width=\linewidth]{fig3a_success}\\[-2pt]
   {\footnotesize (a)}\\[3pt]
-  \includegraphics[width=\linewidth]{fig3b_length_vs_constraint}\\[-2pt]
+  \includegraphics[width=\linewidth]{fig3b_length}\\[-2pt]
   {\footnotesize (b)}
   \caption{Baseline comparison over the 50 randomized scenarios as the terminal
     uncertainty bound tightens from 100\% to 30\% of the single-agent
@@ -564,7 +565,7 @@ This replaces exhaustive lattice search with sampling.
 
 \begin{figure}[t]
   \centering
-  \includegraphics[width=\linewidth]{fig4_wall_5level_box}
+  \includegraphics[width=\linewidth]{fig4_wall}
   \caption{Wall-clock time per planner over successful runs at five constraint
     levels (log scale). Boxes span the interquartile range, whiskers extend
     to $1.5\times$ IQR, and runs beyond the whiskers are omitted. Levels with
@@ -602,9 +603,9 @@ CL-GBT grows with the bound, and its longest run took 730\,s.
 
 \begin{figure}[t]
   \centering
-  \includegraphics[width=\linewidth]{fig5a_abl_success_vs_constraint}\\[-2pt]
+  \includegraphics[width=\linewidth]{fig5a_abl_success}\\[-2pt]
   {\footnotesize (a)}\\[3pt]
-  \includegraphics[width=\linewidth]{fig5b_abl_length_vs_constraint}\\[-2pt]
+  \includegraphics[width=\linewidth]{fig5b_abl_length}\\[-2pt]
   {\footnotesize (b)}
   \caption{Ablation on a separate set of 30 scenarios drawn without the
     straight-line screen. Same axes as Fig.~\ref{fig:length_success}:
@@ -615,7 +616,7 @@ CL-GBT grows with the bound, and its longest run took 730\,s.
 
 \begin{figure}[t]
   \centering
-  \includegraphics[width=\linewidth]{fig6_abl_wall_5level_box}
+  \includegraphics[width=\linewidth]{fig6_abl_wall}
   \caption{Wall-clock time of the ablation arms over successful runs, drawn as
     in Fig.~\ref{fig:wall} on a linear axis. The refinement adds about
     1.5\,s to the discrete stage. The straight seed's single run at 60\% is
@@ -781,7 +782,7 @@ belief model rather than the realism of any sensor.
 
 \begin{figure}[t]
   \centering
-  \includegraphics[width=\linewidth]{fig8_mc_behind_wall}
+  \includegraphics[width=\linewidth]{fig8_mc}
   \caption{Closed-loop Monte Carlo of the behind-wall plan in HoloOcean, 30 runs
     with different noise seeds: planned trajectories (dashed) against the
     mean executed trajectory of each agent, with the $\pm2\sigma$
