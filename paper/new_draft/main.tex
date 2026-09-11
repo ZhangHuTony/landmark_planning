@@ -18,6 +18,8 @@
 \newtheorem{theorem}{Theorem}
 \newtheorem{proposition}{Proposition}
 \newtheorem{lemma}{Lemma}
+\theoremstyle{remark}
+\newtheorem*{note}{Note}
 
 \crefname{figure}{Fig.}{Fig.}
 \Crefname{figure}{Figure}{Figures}
@@ -314,86 +316,80 @@ joint one.
 
 % ===========================================================================
 \section{METHOD}
+\label{sec:method}
 % ===========================================================================
-\budget{$\approx$1000 words + Alg.~1, 1.2 pages}
+Our planner solves \eqref{eq:opt} in two stages. A joint A* search over a
+heading-aware hexagonal lattice produces a coordinated discrete plan for all
+agents, and a continuous optimization refines that plan into smooth B-spline
+trajectories that satisfy the curvature, collision, and terminal uncertainty
+constraints. Algorithm~\ref{alg:joint} summarizes the full pipeline.
 
 \subsection{Heading-Aware Hexagonal Graph}
 
-We discretize the workspace with a pointy-top hexagonal lattice of cell width
-$w_{\mathrm{hex}}$ covering a padded corridor around the start--goal segment;
-hexagonal grids reduce directional bias and provide uniform neighbor spacing
+The environment is covered by a corridor of hexagonal cells of width
+$w_{\mathrm{hex}}$ around the line from start to goal
 \cite{duszak2021hexgrid}. A graph node pairs a cell with one of six headings
 spaced $60^\circ$ apart, and exactly three moves leave each node: continue
-straight, or turn $\pm 60^\circ$ and step into the cell faced by the new
-heading. Heading changes are therefore bounded by $60^\circ$ per cell
-traversed, a graph-level surrogate of the curvature bound \eqref{eq:kin}.
-Landmarks are appended as non-traversable sensor nodes: they carry no edges
+straight, or turn by $\pm 60^\circ$ and step into the cell faced by the new
+heading. The heading therefore changes by at most $60^\circ$ per cell
+traversed, which serves as the graph-level counterpart of the curvature bound
+\eqref{eq:kin}. Landmarks are appended as sensor nodes that carry no edges
 and enter the search only through the measurement update \eqref{eq:lm}. A
-goal super-node absorbs all six headings of the goal cell, leaving the
-arrival heading unconstrained. Obstacles do not remove cells from the graph;
-they act on beliefs during the search below. Finally, all-pairs shortest-path
-distances are precomputed on the graph and serve as the search heuristic.
+goal node absorbs all six headings of the goal cell, so the arrival heading
+is unconstrained. Obstacles do not remove cells from the graph. They act on
+the beliefs during the search described next. Finally, all-pairs
+shortest-path distances are precomputed on the graph and serve as the search
+heuristic.
 
 \subsection{Joint Discrete Search}
 
-The planner first seeks a resolution-constrained solution of \eqref{eq:opt}
-by an A*-style search over the joint state of the team. A search state
-stacks, for every agent, its graph node, its covariance, and its arc distance
-travelled; each expansion advances every agent by one edge, so successors are
-the Cartesian product of the agents' three moves. The accumulated cost $g$ is
-the primary's arc distance alone, and states are popped by
+The first stage searches for a resolution-constrained solution of
+\eqref{eq:opt} with an A*-style search \cite{hart1968astar} over the joint
+state of the team. A search state stores, for every agent, its graph node,
+its covariance, and the arc distance it has travelled. Each expansion
+advances every agent by one edge, so the successors of a state are the
+Cartesian product of the agents' three moves. The accumulated cost $g$ is the
+primary's arc distance alone, and states are expanded in order of
 $f = g + (1+\varepsilon)\,h$, where $h$ is the precomputed shortest-path
-distance from the primary's node to the goal and support agents contribute
-zero heuristic cost, making $h$ an admissible lower bound. With
-$\varepsilon = 0$ the key is admissible; $\varepsilon > 0$ yields a weighted
-search that trades a $(1+\varepsilon)$ factor on the seed length for fewer
-expansions. Ties are broken toward lower primary uncertainty and busier
-supports.
+distance from the primary's node to the goal. Support agents contribute no
+heuristic cost, so $h$ is an admissible lower bound and the search with
+$\varepsilon = 0$ is admissible. With $\varepsilon > 0$ the search becomes a
+weighted A* \cite{pohl1970weighted} that trades a factor of
+$(1+\varepsilon)$ on the seed length for fewer expansions. Ties are broken
+toward lower primary uncertainty and then toward fewer idle supports.
 
 During expansion each agent's covariance is propagated along its edge by
 \eqref{eq:prop}--\eqref{eq:lm}, and covariance intersection \eqref{eq:ci} is
-applied whenever two agents' arc distances align within a communication
-checkpoint. A successor is discarded outright if any agent violates the
-chance constraint \eqref{eq:cc} along its edge or if a support outruns the
-primary. The joint space is tamed by Pareto pruning: at each joint node
-signature we keep a frontier of $(g, \Sigma_1)$ labels and discard a new
-label only if an existing one has no larger $g$ and a covariance no larger in
-the positive-semidefinite order. Such pruning is sound because the heuristic
-is shared at the same node tuple, the primary path cost of the dominated
-state cannot be lower, and the covariance used for feasibility assessment
-cannot improve under future propagation.
+applied whenever two agents reach a communication checkpoint at the same arc
+distance. A successor is discarded if any agent violates the chance
+constraint \eqref{eq:cc} along its edge or if a support travels farther than
+the primary. The joint space is kept manageable by Pareto pruning. At each
+joint node signature the search keeps a frontier of $(g, \Sigma_1)$ labels
+and discards a new label if an existing one has no larger $g$ and a
+covariance no larger in the positive semidefinite order. This pruning is
+sound because the heuristic is shared at the same node tuple, the primary
+path cost of the dominated state cannot be lower, and a covariance that is
+larger in the positive semidefinite order cannot become smaller under
+further propagation.
 
 The search is anytime with respect to the terminal constraint
-\eqref{eq:term}. When a popped state places the primary at the goal and its
-induced spline seed (Sec.~\ref{sec:cont}) clears all obstacles, the state is
-returned immediately if \eqref{eq:term} holds; otherwise it is recorded as
-the incumbent whenever its terminal uncertainty is the smallest seen so far.
-If the expansion budget is exhausted, the incumbent---the least-violating
-obstacle-clear candidate---is handed to the continuous stage, which attempts
-to recover feasibility. Only the terminal bound is ever relaxed in this way;
-obstacle clearance is not.
+\eqref{eq:term}. When a popped state places the primary at the goal and the
+spline seed it induces (Sec.~\ref{sec:cont}) clears all obstacles, the state
+is returned immediately if \eqref{eq:term} holds. Otherwise the state is
+kept as the incumbent if its terminal uncertainty is the lowest seen so far.
+If the expansion budget is exhausted, the incumbent is handed to the
+continuous stage, which attempts to recover feasibility. Only the terminal
+bound is relaxed in this way. Obstacle clearance is never relaxed.
 
-\begin{lemma}[Seed feasibility and near-optimality]
-Suppose \eqref{eq:opt} admits a solution of length $S_1^\star$ whose
-constraint slacks are strictly positive. Then for sufficiently small
-$w_{\mathrm{hex}}$, the search with $\varepsilon = 0$ returns a feasible seed
-of length at most $\tfrac{2}{\sqrt{3}}\big(1 + O(w_{\mathrm{hex}})\big)\,
-S_1^\star$.
-\end{lemma}
-\begin{proof}[Proof sketch]
-Any continuous trajectory can be traced by a lattice path within Hausdorff
-distance $O(w_{\mathrm{hex}})$ whose length exceeds the trajectory's by at
-most the direction-quantization factor $2/\sqrt{3}$, attained when a segment
-bisects two of the six headings. The covariance maps
-\eqref{eq:prop}--\eqref{eq:ci} are continuous in the path, so for small
-enough $w_{\mathrm{hex}}$ the traced path inherits strictly positive slacks,
-and dominance pruning never discards every feasible label at a signature. An
-admissible search therefore pops a feasible goal state no longer than the
-traced path.
-\end{proof}
-The $2/\sqrt{3}$ overhead is a property of the six-heading move set, not of
-the resolution; removing it is precisely the role of the continuous
-refinement.
+\begin{note}
+Six headings quantize direction to within $30^\circ$, so a lattice path that
+traces a smooth trajectory is at most $2/\sqrt{3}$ times longer than it. If
+\eqref{eq:opt} has a solution whose constraint slacks are strictly positive,
+a fine enough lattice therefore contains a feasible seed within that factor
+of the optimum, and the admissible search returns a feasible seed no longer
+than it. The factor comes from the move set rather than the resolution, and
+removing it is the job of the continuous refinement.
+\end{note}
 
 \begin{algorithm}[t]
   \caption{Discrete-to-continuous escort planning}
@@ -445,42 +441,43 @@ refinement.
   \includegraphics[width=\textwidth]{fig2_ladder_ours_shapes_v14}
   \caption{Constraint ladder on one scenario (1700\,m corridor, 13 obstacles,
     three landmarks, $\varepsilon = 0$, 100\,m lattice). Each panel is our
-    planner's solution as the terminal bound tightens from 100\% to 30\% of the
-    lone-agent reference $U_\mathrm{ref}$; the primary is the solid curve, the
-    support the dashed one, landmarks are dots with their map covariance, and
-    each title gives the primary's length and terminal $\sigma$. At 100\% the
-    support climbs into the upper pocket to sight the weak landmark there and
-    rejoins (1738\,m); at 70\% it takes the southern lane to a stronger
-    landmark and relays it at half weight (1761\,m); at 50\% the primary adds
-    one wiggle before the goal so the support can reach that landmark in time
-    (1770\,m, $\sigma = 6.5$\,m); at 30\% the primary itself detours through
-    the obstacle row toward the third landmark (1909\,m, $\sigma = 3.5$\,m).
-    Each 100\,m of primary length buys the support one more option.}
+    planner's solution as the terminal bound tightens from 100\% to 30\% of
+    the single-agent reference $U_\mathrm{ref}$. The primary is the solid
+    curve and the support the dashed one, landmarks are dots with their map
+    covariance, and each title gives the primary's length and terminal
+    $\sigma$. At 100\% the support climbs into the upper pocket to sight the
+    weak landmark there and rejoins (1738\,m). At 70\% it takes the southern
+    lane to a stronger landmark and relays it at half weight (1761\,m). At
+    50\% the primary adds one turn before the goal so that the support can
+    reach that landmark in time (1770\,m, $\sigma = 6.5$\,m). At 30\% the
+    primary itself detours through the obstacle row toward the third landmark
+    (1909\,m, $\sigma = 3.5$\,m).}
   \label{fig:ladder}
 \end{figure*}
 
 \subsection{Continuous B-Spline Refinement}
 \label{sec:cont}
 
-The discrete seed is lifted into continuous space as clamped cubic B-splines,
-one per agent, whose control points are the seed's cell centres; support
-paths are padded to the primary's node count and the primary's final control
-point is pinned to $G$. The decision vector $x$ stacks the free control
-points: all interior points of the primary, whose endpoints are fixed, and
-all but the first point of each support, whose terminal position is free.
+The discrete seed is lifted into continuous space as clamped cubic B-splines
+\cite{piegl1997nurbs}, one per agent, whose control points are the centres of
+the seed's cells. Support paths are padded to the primary's node count, and
+the primary's final control point is pinned to $G$. The decision vector $x$
+stacks the free control points: every interior point of the primary, whose
+endpoints are fixed, and every point but the first of each support, whose
+terminal position is free.
 
-The constraints of \eqref{eq:opt} are collected in a slack vector
-$s(x)$, feasible when $s(x) \ge 0$: the terminal bound \eqref{eq:term},
-evaluated by propagating \eqref{eq:prop}--\eqref{eq:ci} along the sampled
-splines; the curvature bound, sampled analytically from the spline
-derivatives; the requirement that no support spline exceed the primary's
-length; and obstacle clearance. For the latter, each spline segment is
-enclosed in the convex hull of its MINVO control points
-\todo{cite MINVO (Tordesillas--How)}, and each segment--obstacle pair is
-committed to the single face of \eqref{eq:cc} most cleared by the seed,
-fixing the homotopy class and replacing the disjunction with conservative
-per-vertex rows. Refinement then minimizes the primary length under the
-log-barrier merit function
+The constraints of \eqref{eq:opt} are collected in a slack vector $s(x)$
+that is feasible when $s(x) \ge 0$. It contains the terminal bound
+\eqref{eq:term}, evaluated by propagating \eqref{eq:prop}--\eqref{eq:ci}
+along the sampled splines, the curvature bound, sampled analytically from the
+spline derivatives, the requirement that no support spline be longer than the
+primary's, and obstacle clearance. For obstacle clearance each spline segment
+is enclosed in the convex hull of its MINVO control points
+\cite{tordesillas2022minvo}, and each segment-obstacle pair is committed to
+the single face of \eqref{eq:cc} that the seed clears by the largest margin.
+This fixes the homotopy class and replaces the disjunction over faces with
+conservative linear rows, one per hull vertex. The refinement then minimizes
+the primary's length under the log-barrier merit function
 \begin{equation}
   J(x;\mu) = S_1(x) + \sum\nolimits_k B\big(s_k(x);\mu\big),
   \label{eq:merit}
@@ -494,22 +491,21 @@ log-barrier merit function
   \label{eq:barrier}
 \end{equation}
 where the tangent extension below the knee $\delta_b$ keeps $J$ finite for
-violated constraints and supplies a constant restoring gradient, so a single
-objective serves feasible and infeasible iterates alike.
+violated constraints and supplies a constant restoring gradient. A single
+objective therefore serves feasible and infeasible iterates alike.
 
-We minimize $J$ with Adam on forward-difference gradients and a backtracking
-line search over a schedule of barrier stages. A feasibility latch splits the
-run into two regimes. While no feasible iterate has been accepted---the case
-when the search handed over its incumbent---any step that decreases $J$ is
-accepted and $\mu$ is held large, so the barrier dominates and drives the
-violation down (\emph{recovery}). The first feasible iterate arms the latch
-permanently: thereafter only feasible $J$-decreasing steps are accepted and
-$\mu$ decays between stages, shifting effort from constraint satisfaction to
-shortening (\emph{refinement}). Throughout, the least-violating and the
-shortest feasible iterates are tracked as incumbents and the best is
-returned, so the output is never longer than a feasible seed nor more
-violating than an infeasible one. Algorithm~\ref{alg:joint} summarizes the
-full pipeline.
+We minimize $J$ with Adam \cite{kingma2015adam} on forward-difference
+gradients and a backtracking line search over a schedule of barrier stages. A
+feasibility latch divides the run into two regimes. While no feasible iterate
+has been accepted, which is the case when the search handed over its
+incumbent, any step that decreases $J$ is accepted and $\mu$ is held large,
+so that the barrier dominates and drives the violation down. The first
+feasible iterate arms the latch permanently. From then on only feasible steps
+that decrease $J$ are accepted and $\mu$ decays between stages, which shifts
+the effort from constraint satisfaction to shortening. Throughout the run the
+least-violating and the shortest feasible iterates are tracked, and the
+better of the two is returned, so the output is never longer than a feasible
+seed and never more violating than an infeasible one.
 
 % ===========================================================================
 \section{RESULTS}
