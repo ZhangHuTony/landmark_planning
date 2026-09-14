@@ -22,10 +22,16 @@ trivial-straight draws, the ablation sweep does not), so the ablation arms are
 only ever compared with hexspline_cl from the ablation sweep itself.
 
 Wall-clock figures show successful runs only and hide the fliers beyond
-1.5 x IQR; the y axis spans the whiskers that remain. The baseline keeps a log
-axis because CL-GBT at 60% has a *legitimate* whisker to 124 s (Q3 = 61 s)
-while the other four planners sit in 13-22 s; the ablation arms all live in
-16-21 s and take a linear axis. Groups with too few successes to summarize are
+1.5 x IQR; the y axis spans the whiskers that remain. All of them are LINEAR
+(user's call, 2026-09-14: a log axis over barely one decade gives the reader
+no cue that the tick spacing is logarithmic, and reads as a broken linear
+axis). Linear only works because exactly one group runs away -- CL-GBT at 60%,
+Q3 = 61 s with a legitimate whisker to 124 s, against 13-22 s everywhere else.
+That group is CLIPPED by `clip_above` and carries a caret plus its real
+numbers, so the reader loses nothing; see `_clip_note`. The wide all-level
+spare stays on a log axis, where three CL-GBT groups (70/60/50%) exceed the
+cap and three clip notes would be clutter. The ablation arms all live in
+16-21 s and need neither. Groups with too few successes to summarize are
 drawn as their individual runs instead; see MIN_BOX / MIN_VIOLIN.
 
 Each figure is written four ways: PDF is what LaTeX includes, SVG and EPS both
@@ -276,12 +282,32 @@ def _wall_axes(ax, mode, lim):
     despine(ax)
 
 
-def fig4(stats, methods, levels, kind, stem, width, yscale="log"):
+def _clip_note(ax, x, color, q3, hi):
+    """Mark a box the axis cuts off, and say in numbers where it really ends.
+
+    A caret sits on the frame over the clipped box; the text goes to its right
+    because the neighbouring groups are all far down the axis there. Without
+    this the cut box would read as "runs off the top by some unknown amount".
+    """
+    y0, y1 = ax.get_ylim()
+    ax.plot([x], [y1], marker="^", ms=3.0, mew=0, color=color,
+            clip_on=False, zorder=6)
+    ax.text(x + 0.55, y1 - 0.045 * (y1 - y0),
+            "Q3 %.0f s, whisker %.0f s" % (q3, hi),
+            fontsize=6, color=color, ha="left", va="top", zorder=6)
+
+
+def fig4(stats, methods, levels, kind, stem, width, yscale="log",
+         clip_above=None):
     """One grouped figure: `kind` is "box" or "violin".
 
     Boxes hide their fliers (beyond 1.5 x IQR) and the axis is fitted to what
     is left -- the whiskers and the small-n tick strips -- with `yscale` "log"
     or "linear". Violins are the old log10-space spares and keep WALL_LIM.
+
+    `clip_above` (linear only) keeps a single runaway group from flattening
+    everything else: any drawn value above it is left out of the axis fit, so
+    that group's box is cut by the frame and gets a `_clip_note` instead.
     """
     wide = width > 4
     fig = plt.figure(figsize=(width, 2.15 if wide else 1.8))  # column version shortened 2026-09-10
@@ -291,6 +317,12 @@ def fig4(stats, methods, levels, kind, stem, width, yscale="log"):
     step = len(methods) + 1.3  # one slot per planner, then a gap
     box_w = 0.78 if wide else 0.70
     drawn = []  # every y the reader will see; the box axis is fitted to it
+    over = []   # (x, color, Q3, whisker) for groups `clip_above` cuts off
+
+    def keep(vals):
+        """The part of `vals` the axis is fitted to."""
+        return [v for v in vals if clip_above is None or v <= clip_above]
+
     for gi, pct in enumerate(levels):
         for mi, (m, _, color, _) in enumerate(methods):
             vals = stats[m].get(pct, {}).get("wall", [])
@@ -304,7 +336,7 @@ def fig4(stats, methods, levels, kind, stem, width, yscale="log"):
                         vals if kind == "box" else np.log10(vals),
                         ls="none", marker="_", ms=3.2, mew=0.8, color=color,
                         zorder=3)
-                drawn += list(vals)
+                drawn += keep(vals)
             elif kind == "box":
                 bp = ax.boxplot([vals], positions=[x], widths=box_w,
                                 patch_artist=True, showfliers=False,
@@ -315,7 +347,11 @@ def fig4(stats, methods, levels, kind, stem, width, yscale="log"):
                 patch.set_facecolor(over_white(color, 0.45))
                 patch.set_edgecolor(color)
                 patch.set_linewidth(0.7)
-                drawn += [float(c.get_ydata()[0]) for c in bp["caps"]]
+                caps = [float(c.get_ydata()[0]) for c in bp["caps"]]
+                drawn += keep(caps)
+                if clip_above is not None and max(caps) > clip_above:
+                    over.append((x, color, float(np.percentile(vals, 75)),
+                                 max(caps)))
             else:
                 lv = np.log10(vals)
                 vp = ax.violinplot([lv], positions=[x], widths=box_w * 1.15,
@@ -340,6 +376,8 @@ def fig4(stats, methods, levels, kind, stem, width, yscale="log"):
     else:
         pad = 0.08 * (max(drawn) - min(drawn))
         _wall_axes(ax, "linear", (min(drawn) - pad, max(drawn) + pad))
+        for note in over:
+            _clip_note(ax, *note)
 
     handles = [plt.Rectangle((0, 0), 1, 1, fc=over_white(c, 0.45), ec=c,
                              lw=0.7, label=label)
@@ -372,7 +410,10 @@ if __name__ == "__main__":
     fig_success(base, METHODS, "fig3a_success_vs_constraint")
     fig_length(base, METHODS, "fig3b_length_vs_constraint",
                ylim=(0.95, 2.9), yticks=[1.0, 1.5, 2.0, 2.5])
-    fig4(base, METHODS, LEVELS_5, "box", "fig4_wall_5level_box", 3.5, "log")
+    # 30 s cuts CL-GBT at 60% (whisker 124 s) and nothing else: the next
+    # highest drawn value anywhere in this figure is Ours at 30%, 27.2 s.
+    fig4(base, METHODS, LEVELS_5, "box", "fig4_wall_5level_box", 3.5, "linear",
+         clip_above=30)
     fig4(base, METHODS, LVL_PCTS, "box", "fig4_wall_alllevel_box", 7.16, "log")
     fig4(base, METHODS, LEVELS_5, "violin", "fig4_wall_5level_violin", 3.5)
     fig4(base, METHODS, LVL_PCTS, "violin", "fig4_wall_alllevel_violin", 7.16)

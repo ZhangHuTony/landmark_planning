@@ -589,11 +589,12 @@ This replaces exhaustive lattice search with sampling.
   \centering
   \includegraphics[width=\figw]{fig4_wall}
   \caption{Wall-clock time per planner over successful runs at five constraint
-    levels (log scale). Boxes span the interquartile range, whiskers extend
+    levels. Boxes span the interquartile range, whiskers extend
     to $1.5\times$ IQR, and runs beyond the whiskers are omitted. Levels with
     fewer than five solved scenarios are drawn as individual runs. Only
-    CL-GBT grows with the bound: at 60\% its upper quartile reaches 61\,s and
-    its whisker 124\,s.}
+    CL-GBT grows with the bound, and at 60\% it leaves the axis: that box is
+    cut at the top, with its upper quartile at 61\,s and its whisker at
+    124\,s.}
   \label{fig:wall}
 \end{figure}
 
