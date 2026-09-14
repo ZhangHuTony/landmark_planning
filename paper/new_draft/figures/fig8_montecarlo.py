@@ -42,10 +42,12 @@ Run it with the simulator's interpreter, which has matplotlib and numpy:
 The shipped set (2026-09-10) is `results/2026-09-02_thr1.8b` (behind_wall, 2
 agents, bound 1.8 m), rendered as `fig8_mc_behind_wall` with `--case=behind_wall`:
     python fig8_montecarlo.py ~/Research/landmark_planning/results/2026-09-02_thr1.8b \
-        --stem=fig8_mc_behind_wall --case=behind_wall --nstd=2 --dev=0
-The paper takes the map alone at 2 sigma (user call, 2026-09-10): on the
-1.1 km behind_wall route the 2-sigma tube is wide enough to read on the map,
-and the float is a third shorter without panel (b).
+        --stem=fig8_mc_behind_wall --case=behind_wall --nstd=3 --dev=0
+The paper takes the map alone, at 3 sigma since 2026-09-13 (user call; it was
+2 sigma from 2026-09-10): on the 1.1 km behind_wall route the tube is wide
+enough to read on the map, and the float is a third shorter without panel (b).
+At 3 sigma the half-width is 6.3 m over most of the route and 12.5 m on the
+primary's final bend (6.7 / 10.6 m for the support).
 All 30 `mc*` trials there were re-flown on 2026-09-09 with the sim's fixed
 estimator (support backlog seeded from its own solved pose, see
 multiagent_base/CLAUDE.md), and 30/30 fly the plan -- the earlier 20-trial
