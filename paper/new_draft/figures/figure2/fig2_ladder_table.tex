@@ -2,7 +2,13 @@
 % can be combined with the Fig. 2 artwork in a vector editor.
 %
 %   latex fig2_ladder_table.tex && dvips -E -o fig2_ladder_table.eps fig2_ladder_table.dvi
-%   epstopdf fig2_ladder_table.eps
+%   epstopdf --outfile=fig2_ladder_table.pdf fig2_ladder_table.eps
+%   gs -q -dNOPAUSE -dBATCH -dSAFER -sDEVICE=png16m -r600 -dEPSCrop \
+%      -dTextAlphaBits=4 -dGraphicsAlphaBits=4 \
+%      -sOutputFile=fig2_ladder_table.png fig2_ladder_table.eps
+%
+% The PNG is 600 dpi (693x1992 px), twice the 300 dpi the matplotlib figures
+% export at, so it survives being scaled up next to them.
 %
 % dvips -E (not pdflatex) keeps the glyphs as Type 1 text so Illustrator can
 % still select them -- the same reason the other figures avoid alpha fills.
