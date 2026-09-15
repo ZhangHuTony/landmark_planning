@@ -7,6 +7,7 @@ Baseline  constraint_sweep/baseline_2026-08-17 -- 5 planners x 50 screened scena
                                                   the solved scenarios, same x (the
                                                   SD is in Table I, not drawn)
   fig4_wall_5level_box.{pdf,svg,eps,png}          <- the one in the paper
+  fig4_wall_5level_box_log.{pdf,svg,eps,png}      spare, log axis, nothing clipped
   fig4_wall_alllevel_box.{pdf,svg,eps,png}        spare, all eight levels, text width
   fig4_wall_{5,all}level_violin.{pdf,svg,eps,png} spare
 Ablation  constraint_sweep/ablation_2026-08-17 -- 3 arms x 30 UNscreened scenarios
@@ -414,6 +415,11 @@ if __name__ == "__main__":
     # highest drawn value anywhere in this figure is Ours at 30%, 27.2 s.
     fig4(base, METHODS, LEVELS_5, "box", "fig4_wall_5level_box", 3.5, "linear",
          clip_above=30)
+    # Same five levels as the paper's Fig. 4, on the log axis it used until
+    # 2026-09-14 and with nothing clipped: CL-GBT's 124 s whisker is drawn in
+    # full, at the cost of tick spacing the reader has to know is logarithmic.
+    # Kept as the alternative to the linear+clipped version above.
+    fig4(base, METHODS, LEVELS_5, "box", "fig4_wall_5level_box_log", 3.5, "log")
     fig4(base, METHODS, LVL_PCTS, "box", "fig4_wall_alllevel_box", 7.16, "log")
     fig4(base, METHODS, LEVELS_5, "violin", "fig4_wall_5level_violin", 3.5)
     fig4(base, METHODS, LVL_PCTS, "violin", "fig4_wall_alllevel_violin", 7.16)
