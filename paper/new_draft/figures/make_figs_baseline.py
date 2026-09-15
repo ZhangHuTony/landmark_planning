@@ -256,16 +256,55 @@ def fig_length(stats, methods, stem, ylim, yticks):
 MIN_BOX, MIN_VIOLIN = 5, 10
 LEVELS_5 = [100, 80, 60, 40, 30]  # the cut that fits a single column
 WALL_TICKS = [10, 15, 20, 30, 50, 70, 100, 150, 200, 300, 500, 700]
+# Every 10 s instead, for the log spare (user's call, 2026-09-15). These are
+# round numbers but NOT evenly spaced on a log axis -- 90 to 100 is a tenth of
+# the gap from 10 to 20 -- so the top of the axis crowds.
+WALL_TICKS_10S = list(range(10, 1001, 10))
 WALL_LIM = (11, 900)  # violins only; boxes size their axis to the whiskers
 
 
-def _wall_axes(ax, mode, lim):
-    """Shared y scale. `mode` is "log", "linear" or "log10data" (violins)."""
+def _thin_log_labels(ax, ticks, lim, min_pt=8.0):
+    """Label the ticks that fit; the rest keep their mark and grid line.
+
+    10-s ticks are round numbers but not evenly spaced on a log axis: over
+    12-140 s in a 1.34 in panel, 90 to 140 is about 4 pt per step against 7 pt
+    type, so labelling every one prints them on top of each other. Marks stay
+    on every ten seconds, labels thin out where there is no room.
+    """
+    h_pt = ax.get_position().height * ax.figure.get_figheight() * 72.0
+    span = np.log10(lim[1]) - np.log10(lim[0])
+    out, last = [], None
+    for t in ticks:
+        frac = (np.log10(t) - np.log10(lim[0])) / span
+        if last is None or (frac - last) * h_pt >= min_pt:
+            out.append(str(t))
+            last = frac
+        else:
+            out.append("")
+    return out
+
+
+def _wall_axes(ax, mode, lim, wall_ticks=None):
+    """Shared y scale. `mode` is "log", "linear" or "log10data" (violins).
+
+    `wall_ticks` overrides WALL_TICKS for the log modes; whatever it holds is
+    still filtered to `lim`.
+    """
+    custom = wall_ticks is not None
+    wall_ticks = WALL_TICKS if wall_ticks is None else wall_ticks
     if mode == "log":
         ax.set_yscale("log")
-        ticks = [t for t in WALL_TICKS if lim[0] <= t <= lim[1]]
+        if custom:
+            # start the axis on a tick, so the bottom of the data has a round
+            # number under it rather than a bare spine
+            below = [t for t in wall_ticks if t <= lim[0]]
+            if below:
+                lim = (max(below), lim[1])
+        ticks = [t for t in wall_ticks if lim[0] <= t <= lim[1]]
         ax.set_yticks(ticks)
-        ax.set_yticklabels([str(t) for t in ticks])
+        ax.set_ylim(*lim)
+        ax.set_yticklabels(_thin_log_labels(ax, ticks, lim) if custom
+                           else [str(t) for t in ticks])
         ax.yaxis.set_minor_formatter(NullFormatter())
         ax.set_ylim(*lim)
     elif mode == "linear":
@@ -274,7 +313,7 @@ def _wall_axes(ax, mode, lim):
         # violins are built on log10(wall) against a linear axis: a KDE has to
         # be estimated in the space the reader sees it in, and on a log axis a
         # linear-space KDE turns every distribution into a spike at the bottom
-        ticks = [t for t in WALL_TICKS if lim[0] <= t <= lim[1]]
+        ticks = [t for t in wall_ticks if lim[0] <= t <= lim[1]]
         ax.set_yticks(np.log10(ticks))
         ax.set_yticklabels([str(t) for t in ticks])
         ax.set_ylim(*np.log10(lim))
@@ -300,12 +339,13 @@ def _clip_note(ax, x, color, q3, hi):
 
 
 def fig4(stats, methods, levels, kind, stem, width, yscale="log",
-         clip_above=None):
+         clip_above=None, wall_ticks=None):
     """One grouped figure: `kind` is "box" or "violin".
 
     Boxes hide their fliers (beyond 1.5 x IQR) and the axis is fitted to what
     is left -- the whiskers and the small-n tick strips -- with `yscale` "log"
     or "linear". Violins are the old log10-space spares and keep WALL_LIM.
+    `wall_ticks` passes a tick list through to `_wall_axes`.
 
     `clip_above` (linear only) keeps a single runaway group from flattening
     everything else: any drawn value above it is left out of the axis fit, so
@@ -374,7 +414,8 @@ def fig4(stats, methods, levels, kind, stem, width, yscale="log",
     if kind == "violin":
         _wall_axes(ax, "log10data", WALL_LIM)
     elif yscale == "log":
-        _wall_axes(ax, "log", (min(drawn) * 0.9, max(drawn) * 1.15))
+        _wall_axes(ax, "log", (min(drawn) * 0.9, max(drawn) * 1.15),
+                   wall_ticks)
     else:
         pad = 0.08 * (max(drawn) - min(drawn))
         _wall_axes(ax, "linear", (min(drawn) - pad, max(drawn) + pad))
@@ -420,7 +461,8 @@ if __name__ == "__main__":
     # 2026-09-14 and with nothing clipped: CL-GBT's 124 s whisker is drawn in
     # full, at the cost of tick spacing the reader has to know is logarithmic.
     # Kept as the alternative to the linear+clipped version above.
-    fig4(base, METHODS, LEVELS_5, "box", "fig4_wall_5level_box_log", 3.5, "log")
+    fig4(base, METHODS, LEVELS_5, "box", "fig4_wall_5level_box_log", 3.5, "log",
+         wall_ticks=WALL_TICKS_10S)
     # And the third combination: linear, also unclipped, so the axis has to
     # reach CL-GBT's 124 s whisker and the other four planners compress into
     # the bottom of the panel. Kept because it is the alternative the paper's
