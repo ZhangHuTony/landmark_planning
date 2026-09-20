@@ -8,6 +8,7 @@ Q="${QUALITY:-l}"
 scenes=(
   "s01_problem.py Problem"
   "s02_escort.py Escort"
+  "s03a_astar.py AStar"
   "s03b_refine.py Refine"
   "s03c_ladder.py Ladder"
   "s04_baselines.py Baselines"
