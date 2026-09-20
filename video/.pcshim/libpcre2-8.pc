@@ -1,0 +1,7 @@
+prefix=/usr
+libdir=/usr/lib/x86_64-linux-gnu
+Name: libpcre2-8
+Description: PCRE2 8-bit runtime (shim pointing at the system runtime .so; manimpango's build only needs this to satisfy glib's Requires.private, no header use)
+Version: 10.42
+Libs: -L${libdir} -l:libpcre2-8.so.0
+Cflags:

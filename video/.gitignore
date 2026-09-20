@@ -1,0 +1,7 @@
+.venv/
+runs/
+render/
+deliverables/
+__pycache__/
+*.pyc
+media/
