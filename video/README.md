@@ -53,10 +53,15 @@ video/env.sh && pip install -r video/requirements.txt`.
 source video/env.sh
 
 # 1. data  (Julia re-derives; Python only slices the sim logs)
+# the Fig. 1 run is re-run with the traces on; video/config/fig1 sets both flags
 julia video/julia/export_scene.jl paper/new_draft/figures/figure1/D_island/tight \
       --alone --out=video/data/fig1/scene.json
 julia video/julia/export_seed.jl  paper/new_draft/figures/figure1/D_island/tight \
       --out=video/data/fig1/seed.json
+OUTPUT_DIR=video/runs/fig1 julia generate_plan.jl video/config/fig1   # writes the traces
+julia video/julia/export_cont_dense.jl video/config/fig1 \
+      video/runs/fig1/hexspline_cl/csv/main_cont_trace.csv video/data/fig1 5
+cp video/runs/fig1/hexspline_cl/csv/astar_trace.csv video/data/fig1/
 video/julia/run_ladder_exports.sh                 # Fig. 2 rungs 100/70/50/30
 SID=s049 video/julia/run_baselines.sh             # re-run 5 planners WITH geometry
 SID=s049 video/julia/run_greedy_fallback.sh       # the rung the sweep skipped
@@ -80,8 +85,8 @@ ID=1234 video/ffmpeg/encode_icra.sh   # -> deliverables/ICRA2027_1234.mp4 + chec
 |---|---|---|---|
 | `s01_problem.py` | `Problem` | one AUV alone, σ 2.37 > ū 2.0 | `fig1/scene.json` `alone` block |
 | `s02_escort.py` | `Escort` | Fig. 1 animated: lattice, divert, blackout, one fusion | `fig1/scene.json` |
-| `s03a_astar.py` | — | **not built**: needs the A* expansion tap | — |
-| `s03b_refine.py` | `Refine` | lattice seed 1200 m → spline 1100 m | `fig1/seed.json` + `scene.json` |
+| `s03a_astar.py` | `AStar` | expansion order, both agents, 1748 pops | `fig1/astar_trace.csv` |
+| `s03b_refine.py` | `Refine` | 91 optimizer iterates, 1158.6 → 1100.0 m | `fig1/cont_dense.csv` + `cont_steps.csv` |
 | `s03c_ladder.py` | `Ladder` | ū 100%→30%, path 1741→1890 m | `ladder/scene_p*.json` |
 | `s04_baselines.py` | `Baselines` | what each baseline removes, one scenario | `baselines/s049_p050/*.json` |
 | `s05_results.py` | `Results` | success vs length, swept over the ladder | `sweep/levels.json` |
@@ -106,14 +111,23 @@ One trap: that footage is a *separate render* (seed 1000, made 2026-09-02,
 before the estimator fix), **not** `mc0`. Anything frame-locked must read
 `video/run_log.npz`; the statistics panels read `mc0..mc29`.
 
+## The planner traces
+
+`trace_astar` and `trace_cont` in `src/config.jl` are off by default. With them
+on, `joint_astar` and `optimize_continuous` each write a CSV of what they did.
+They are writes only, and the no-op was checked rather than assumed: the Fig. 1
+run's `results.yaml` and `main_ctrls.csv` are byte-identical before the patch,
+after the patch with the flags off, and with the flags on. The traces agree with
+the run they came from (1748 pop rows against `astar_iterations`, last iterate
+1100.0000280 m at σ 1.7988387).
+
+**Do not turn `trace_astar` on for a sweep rung.** At a 10^6 expansion budget it
+writes gigabytes; the Fig. 1 run writes 944 KB.
+
 ## Still open
 
-- **Scenes 3a and 3b are limited by what the planner logs.** Expansion order and
-  the optimizer's iterates exist only inside `joint_astar` and
-  `optimize_continuous` and are never returned, so `s03a_astar.py` does not
-  exist and `s03b_refine.py` tweens seed → result rather than replaying Adam
-  (it says so on screen). Both need the flag-gated logging taps described in the
-  plan, which touch planner files and are pending approval.
+- Timings are first-draft throughout, and the narration is 493 words against a
+  420 target, so both want a pass once the picture is agreed.
 - The AUV glyph is drawn from primitives; the shipped Fig. 1 icon is a bitmap
   embedded in an Illustrator PDF with no vector source in the repo. Drop an
   `manim/assets/auv.svg` in and swap `AUVGlyph` for an `SVGMobject` if wanted.
