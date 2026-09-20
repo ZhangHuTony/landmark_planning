@@ -153,3 +153,12 @@ const TRACK_LANDMARK_EVENTS      = Bool(CFG["track_landmark_events"])
 # PNGs nobody looks at.
 const EMIT_FIGURES               = Bool(get(CFG, "emit_figures", true))
 const EMIT_CSV                   = Bool(get(CFG, "emit_csv",     true))
+
+# Diagnostic traces for the supplementary video: the expansion order of the
+# joint A* and the refinement's accepted iterates. Both are pure `println` into
+# a file opened by the caller — nothing is read back and no value reaches a
+# branch, so a run with these off is bit-identical to one before they existed.
+# Off by default: the A* trace is one row per pop/push/prune, which on a sweep
+# rung at 1e6 expansions would be gigabytes.
+const TRACE_ASTAR                = Bool(get(CFG, "trace_astar", false))
+const TRACE_CONT                 = Bool(get(CFG, "trace_cont",  false))
