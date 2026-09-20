@@ -21,7 +21,7 @@ order=(
   "s03c_ladder/$Q/Ladder.mp4"
   "s04_baselines/$Q/Baselines.mp4"
   "s05_results/$Q/Results.mp4"
-  "s06_holo_composite.mp4"
+  "${COMPOSITE:-s06_holo_composite.mp4}"
   "s06_holo/$Q/HoloMC.mp4"
   "s07_close/$Q/Close.mp4"
 )
