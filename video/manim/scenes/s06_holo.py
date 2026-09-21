@@ -23,11 +23,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from consort.data import DATA
 from consort.world import World
 from consort.mobjects import cov_ellipse, UncMeter, Caption, polyline, obstacle_poly
+from consort.geometry import make_local_scale
 from consort.palette import (
     PRIMARY, SUPPORT, GOAL, LANDMARK, COMM, COMM_DEAD, INK, MUTED, OK, BAD, FONT,
 )
 
-SIGMA_SCALE = 10.0
 FLASH_TICKS = 260          # how long a comm marker stays up, in ticks
 SPEED = 30                 # x30: 900 ticks of sim per second of video
 
@@ -91,9 +91,10 @@ class HoloRun(Scene):
             return int(np.clip(np.searchsorted(ntick, tick.get_value(), "right") - 1,
                                0, len(ntick) - 1))
 
+        scale_at = make_local_scale([z["obstacle0_verts"]], default=6.0, floor=1.5, margin=3.0)
         self.add(always_redraw(lambda: cov_ellipse(
-            world, nest[node_idx()], ncov[node_idx()], nstd=2, sigma_scale=SIGMA_SCALE,
-            color=PRIMARY, fill_opacity=0.22)))
+            world, nest[node_idx()], ncov[node_idx()], nstd=2, sigma_scale=scale_at,
+            color=PRIMARY)))
         self.add(always_redraw(lambda: Dot(
             world.pt(*t0[min(int(tick.get_value() / 10), len(t0) - 1)][1:3]),
             radius=0.06, color=PRIMARY)))
@@ -137,26 +138,37 @@ class HoloRun(Scene):
         clock = always_redraw(lambda: Text(
             f"t = {tick.get_value()/30:5.0f} s", font=FONT, font_size=21, color=MUTED
         ).to_corner(UR, buff=0.30))
-        note = Text("estimator 2σ, σ ×10", font=FONT, font_size=16, color=MUTED)
+        note = Text("estimator 2σ, magnified for visibility",
+                    font=FONT, font_size=16, color=MUTED)
         note.next_to(meter, DOWN, buff=0.30)
         self.add(clock, note)
 
         cap = Caption("The plan is flown with vehicle dynamics, a controller, and an "
                       "independent factor-graph estimator.")
         self.add(cap)
-        self.wait(1.0)
 
-        self.play(tick.animate.set_value(4800), run_time=5.3, rate_func=linear)
-        cap.set_text("The support goes behind the wall. Every packet is dropped "
-                     "and the primary is on dead reckoning.")
-        self.play(tick.animate.set_value(12400), run_time=8.4, rate_func=linear)
-        cap.set_text("Its uncertainty climbs over the bound.")
-        self.play(tick.animate.set_value(12800), run_time=1.2, rate_func=linear)
-        cap.set_text("The first packet after the support rejoins pulls it back down.")
-        self.play(tick.animate.set_value(n_ticks), run_time=3.0, rate_func=linear)
+        # Every segment's run_time is EXACTLY its tick delta / 900 (the x30
+        # decimation rate: 30 ticks/sec sim * 30x speed / 30 fps = 900 ticks
+        # per second of video). No wait() calls and no off-rate segments here:
+        # the composited footage is a fixed 17.0 s clip with no pauses of its
+        # own, so any real-time gap or rate change on this side desyncs the
+        # two halves. Captions still change at the same tick boundaries via
+        # set_text, which costs no timeline time.
+        checkpoints = [0, 4800, 12400, 12800, n_ticks]
+        assert checkpoints[-1] == n_ticks
+        captions = [
+            None,
+            "The support goes behind the wall. Every packet is dropped "
+            "and the primary is on dead reckoning.",
+            "Its uncertainty climbs over the bound.",
+            "The first packet after the support rejoins pulls it back down.",
+        ]
+        for (a, b), text in zip(zip(checkpoints, checkpoints[1:]), captions):
+            if text:
+                cap.set_text(text)
+            self.play(tick.animate.set_value(b), run_time=(b - a) / 900.0, rate_func=linear)
         meter.clear_updaters()
         cap.set_text("The vehicle steers on its own estimate throughout.")
-        self.wait(2.0)
 
 
 class HoloMC(Scene):
@@ -209,11 +221,30 @@ class HoloMC(Scene):
         pred = float(num["predicted"])
         pred_e = Circle(radius=zoom.length(pred), color=BAD, stroke_width=2.6)
         pred_e.move_to(zoom.pt(0, 0)).set_fill(opacity=0)
-        samp = cov_ellipse(zoom, (0, 0), np.asarray(num["sample_cov"], float),
-                           nstd=1, sigma_scale=1.0, color=PRIMARY,
+        # The sample covariance is computed ABOUT THE MEAN (fig8_montecarlo.py's
+        # own np.cov convention), so its ellipse belongs at the mean, not at the
+        # origin -- the 30 runs have a real ~2.7 m bias, and drawing the ellipse
+        # at (0,0) would make a correctly-calibrated model look wrong on screen.
+        mean_xy = tuple(num["mean_offset"])
+        samp = cov_ellipse(zoom, mean_xy, np.asarray(num["sample_cov"], float),
+                           nstd=2, sigma_scale=1.0, color=PRIMARY,
                            fill_opacity=0.10, stroke_width=2.6)
+        mean_mark = VGroup(
+            Cross(stroke_color=PRIMARY, stroke_width=2.5).scale(0.09).move_to(zoom.pt(*mean_xy)),
+            Text(f"mean bias, {np.hypot(*mean_xy):.1f} m", font=FONT, font_size=16, color=PRIMARY),
+        )
+        mean_mark[1].next_to(mean_mark[0], DOWN, buff=0.08)
         dots = VGroup(*[Dot(zoom.pt(*e), radius=0.045, color=INK, fill_opacity=0.8)
                         for e in errs])
+        # How many of the 30 dots actually fall inside the 2-sigma sample
+        # ellipse -- a DIFFERENT count from "bound_met" (which compares each
+        # run's own estimator marginal to the 1.8 m threshold, nothing to do
+        # with this ellipse). Computed here, not exported, since it is purely
+        # a property of the ellipse being drawn on screen.
+        cov = np.asarray(num["sample_cov"], float)
+        d = errs - np.asarray(mean_xy)
+        maha2 = np.einsum("ij,jk,ik->i", d, np.linalg.inv(cov), d)
+        n_inside = int((maha2 <= 2.0 ** 2).sum())
         scale_bar = VGroup(
             Line(zoom.pt(-span * 0.85, -span * 0.85), zoom.pt(-span * 0.85 + 2, -span * 0.85),
                  stroke_color=INK, stroke_width=2.4),
@@ -222,19 +253,23 @@ class HoloMC(Scene):
         scale_bar[1].next_to(scale_bar[0], DOWN, buff=0.08)
 
         legend = VGroup(
-            Text(f"predicted  σ = {pred:.2f} m", font=FONT, font_size=25, color=BAD),
-            Text(f"flown sample  σ = {num['empirical']:.2f} m", font=FONT, font_size=25,
-                 color=PRIMARY),
+            Text(f"predicted (zero-bias)  σ = {pred:.2f} m", font=FONT, font_size=22, color=BAD),
+            Text(f"flown sample, 2σ about its mean  σ = {num['empirical']:.2f} m",
+                 font=FONT, font_size=22, color=PRIMARY),
             Text(f"terminal bound met in {num['bound_met']}/{num['n']} runs",
-                 font=FONT, font_size=22, color=INK),
-            Text("each dot is one run's terminal error, true scale",
-                 font=FONT, font_size=18, color=MUTED),
-        ).arrange(DOWN, aligned_edge=LEFT, buff=0.20).shift(RIGHT * 3.3 + UP * 0.3)
+                 font=FONT, font_size=21, color=INK),
+            Text("each dot: one run's (estimate − truth) at the goal",
+                 font=FONT, font_size=17, color=MUTED),
+        ).arrange(DOWN, aligned_edge=LEFT, buff=0.20).to_edge(RIGHT, buff=0.35).shift(UP * 0.3)
 
         self.play(FadeIn(axes), FadeIn(scale_bar), run_time=0.5)
         self.play(LaggedStart(*[FadeIn(x, scale=0.6) for x in dots],
                               lag_ratio=0.03, run_time=1.4))
+        cap.set_text("The model predicts no bias; the estimator has a small one.")
+        self.play(FadeIn(mean_mark), run_time=0.6)
         self.play(Create(pred_e), FadeIn(legend[0]), run_time=0.7)
+        cap.set_text(f"Centred on that bias, the 2σ ellipse covers {n_inside} "
+                     f"of {num['n']} runs.")
         self.play(Create(samp), FadeIn(legend[1]), run_time=0.7)
         self.play(FadeIn(legend[2:]), run_time=0.5)
         cap.set_text("The planner's belief model is calibrated to within 6%.")
