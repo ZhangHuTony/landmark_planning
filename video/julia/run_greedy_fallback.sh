@@ -23,6 +23,7 @@ sed -i -e 's/^emit_csv: false/emit_csv: true/' \
        -e 's/^track_comm_events: false/track_comm_events: true/' \
        -e 's/^track_landmark_events: false/track_landmark_events: true/' \
        -e "s/^unc_radius_threshold: .*/unc_radius_threshold: $THR/" "$dst/main.yaml"
+printf 'trace_astar: true\ntrace_cont: true\ntrace_greedy: true\n' >> "$dst/main.yaml"
 grep -E "^(unc_radius_threshold|algorithms|scenario_seed)" "$dst/main.yaml"
 out="video/runs/baselines/${SID}_p050/greedy"
 OUTPUT_DIR="$out" ~/.juliaup/bin/julia generate_plan.jl "$dst" > "$out.log" 2>&1 || true

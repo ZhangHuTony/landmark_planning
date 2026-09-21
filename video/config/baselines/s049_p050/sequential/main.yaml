@@ -195,3 +195,6 @@ scenario_seed: 1116
 scenario_goal_dist: 900.0
 scenario_n_landmarks: 4
 scenario_n_obstacles: 3
+trace_astar: true
+trace_cont: true
+trace_sequential: true
