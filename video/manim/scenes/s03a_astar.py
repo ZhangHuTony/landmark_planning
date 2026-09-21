@@ -15,15 +15,16 @@ expansions, split 1517/1076 between the two agents (fixed: the trace now
 records WHICH agent triggered each obstacle rejection, since the two are not
 always at the same place).
 """
+import json
 import sys
 from pathlib import Path
 from manim import *
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from consort.data import load_scene
+from consort.data import DATA, load_scene
 from consort.world import World
 from consort.mapview import base_map
-from consort.mobjects import Caption
+from consort.mobjects import Caption, polyline
 from consort.astarreplay import WavefrontReplay, load_trace, reason_counts
 from consort.palette import PRIMARY, SUPPORT, INK, MUTED, BAD, FONT
 
@@ -54,7 +55,9 @@ class AStar(Scene):
         wf = WavefrontReplay("../data/fig1/astar_trace.csv", nodes,
                             [SUPPORT, PRIMARY], world)
         g = ValueTracker(0.0)
-        self.add(wf.mobject(g), wf.prune_flash_mobject(g))
+        wf_mob = wf.mobject(g)
+        wf_prune = wf.prune_flash_mobject(g)
+        self.add(wf_mob, wf_prune)
 
         counter = wf.counter_mobject(g, INK, MUTED, corner=UR, buff=0.35)
         key = VGroup(
@@ -101,4 +104,20 @@ class AStar(Scene):
 
         cap.set_text(f"The first feasible goal state it pops is the seed: "
                      f"{sc.result('primary_disc_unc', 0):.2f} m at the goal.")
+        self.wait(1.4)
+
+        # --- clean final path: what the search actually returns, nothing else ---
+        wf_mob.clear_updaters(); wf_prune.clear_updaters(); counter.clear_updaters()
+        self.play(FadeOut(wf_mob), FadeOut(wf_prune),
+                  FadeOut(counter), FadeOut(key), run_time=0.6)
+        seed = json.loads((DATA / "fig1" / "seed.json").read_text())
+        final_lines = VGroup()
+        for a in seed["agents"]:
+            pts = a["path"]
+            xs = [p[0] for p in pts]; ys = [p[1] for p in pts]
+            col = PRIMARY if a["primary"] else SUPPORT
+            final_lines.add(polyline(world, xs, ys, stroke_color=col, stroke_width=3.6))
+        cap.set_text("The discrete route it returns: both agents, no search "
+                     "clutter left on screen.")
+        self.play(Create(final_lines), run_time=1.0)
         self.wait(2.0)
