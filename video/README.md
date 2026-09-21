@@ -71,6 +71,9 @@ video/.venv/bin/python video/python/export_holo.py    # simulator replay + 30 tr
 
 # 2. render  (-ql while iterating, -qh for the master)
 cd video/manim && manim -qh scenes/s02_escort.py Escort
+# every render should be followed by the concat-corruption fix (below), or
+# just use render_all.sh, which already does this for all ten scenes:
+QUALITY=h video/render_all.sh
 
 # 3. assemble
 video/ffmpeg/decimate_closeup.sh      # footage x30, 510 frames
@@ -78,6 +81,19 @@ video/ffmpeg/composite_holo.sh        # footage into the slot HoloRun leaves
 video/ffmpeg/concat_master.sh         # -> deliverables/consort_master_1080p.mp4
 ID=1234 video/ffmpeg/encode_icra.sh   # -> deliverables/ICRA2027_1234.mp4 + checks
 ```
+
+**A render is not done until `fix_manim_concat.sh` has run on it.** Manim's
+own final-assembly step (`combine_files()` in `scene_file_writer.py`)
+concatenates a scene's per-animation clips by demuxing raw H.264 packets and
+muxing them straight into the output with no re-encode — a real fragility,
+not a hypothetical one: it silently blanked a 0.4 s `FadeIn` near a splice
+point in `Baselines.mp4`, verified by comparing the individual partial movie
+file (correct) against the concatenated scene (blank at that timestamp).
+ffmpeg's own concat *demuxer*, even told to re-encode, reproduced the
+identical loss on the same file list — only the concat *filter* (fully
+decoding every clip first) fixed it. `render_all.sh` runs
+`ffmpeg/fix_manim_concat.sh` after every scene automatically; `concat_master.sh`
+uses the same filter approach for the final assembly, for the same reason.
 
 ## Scenes
 
@@ -88,7 +104,7 @@ ID=1234 video/ffmpeg/encode_icra.sh   # -> deliverables/ICRA2027_1234.mp4 + chec
 | `s03a_astar.py` | `AStar` | wavefront replay (by distance, not pop order), 1748 pops | `fig1/astar_trace.csv` |
 | `s03b_refine.py` | `Refine` | 91 optimizer iterates, 1158.6 → 1100.0 m | `fig1/cont_dense.csv` + `cont_steps.csv` |
 | `s03c_ladder.py` | `Ladder` | ū 100%→30%, path 1741→1890 m | `ladder/scene_p*.json` |
-| `s04_baselines.py` | `Baselines` | each baseline's OWN search (4 grammars), one scenario | `baselines/s049_p050/*.{json,csv}` |
+| `s04_baselines.py` | `Baselines` | one baseline at a time, full screen: its own search (4 grammars), clean final path, ✓/✗ verdict, then the next | `baselines/s049_p050/*.{json,csv}` |
 | `s05_results.py` | `Results` | success vs length, swept over the ladder | `sweep/levels.json` |
 | `s06_holo.py` | `HoloRun` | synced replay, footage slot on the left | `holo/holo_video.npz` |
 | `s06_holo.py` | `HoloMC` | 30 runs, predicted vs flown terminal ellipse | `holo/holo_mc.json` |

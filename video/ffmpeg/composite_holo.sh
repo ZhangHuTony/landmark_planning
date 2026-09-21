@@ -16,7 +16,13 @@ PANEL="${PANEL:-$R/videos/s06_holo/1080p30/HoloRun.mp4}"
 FOOT="${FOOT:-$R/holo_closeup_x30.mp4}"
 OUT="${OUT:-$R/s06_holo_composite.mp4}"
 [ -f "$PANEL" ] || { echo "no HoloRun render at $PANEL (render it at -qh first)"; exit 1; }
+# y-offset centers the footage vertically in whatever resolution PANEL was
+# rendered at (270 at 1080p, scaled down for a draft -ql render) -- a fixed
+# pixel offset only centers correctly at 1080p.
+PANEL_H=$(ffprobe -v error -select_streams v:0 -show_entries stream=height -of csv=p=0 "$PANEL")
+FOOT_H=$(ffprobe -v error -select_streams v:0 -show_entries stream=height -of csv=p=0 "$FOOT")
+Y=$(( (PANEL_H - FOOT_H) / 2 ))
 ffmpeg -y -v error -i "$PANEL" -i "$FOOT" \
-  -filter_complex "[0:v][1:v]overlay=x=0:y=270:eof_action=repeat[v]" \
+  -filter_complex "[0:v][1:v]overlay=x=0:y=$Y:eof_action=repeat[v]" \
   -map "[v]" -c:v libx264 -preset slow -crf 16 -pix_fmt yuv420p "$OUT"
 echo "-> $OUT"

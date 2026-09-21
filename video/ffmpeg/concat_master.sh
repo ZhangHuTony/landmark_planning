@@ -1,10 +1,14 @@
 #!/usr/bin/env bash
 # Concatenate the rendered scenes into the 1080p master.
 #
-# Every input must already be 1920x1080 / 30 fps / yuv420p, which manim.cfg
-# guarantees, so the concat demuxer can stitch without re-encoding decisions
-# per input. Metadata is stripped (-map_metadata -1): the project-page master
-# and the review attachment must not carry a username or machine name.
+# Uses ffmpeg's concat FILTER (every input fully decoded, then re-encoded),
+# not the concat demuxer. The demuxer reproduced a real frame-loss bug on
+# this project's own partial-movie-file lists -- a short animation near a
+# splice point decoded as blank -- and re-encoding on top of the demuxer did
+# NOT fix it (see ffmpeg/fix_manim_concat.sh for the full investigation).
+# Every segment here is being re-encoded anyway (crf 18), so the filter costs
+# nothing extra. Metadata is stripped (-map_metadata -1): the project-page
+# master and the review attachment must not carry a username or machine name.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 R="$ROOT/video/render"
@@ -25,20 +29,30 @@ order=(
   "s06_holo/$Q/HoloMC.mp4"
   "s07_close/$Q/Close.mp4"
 )
-list="$R/concat.txt"; : > "$list"
+files=()
 for f in "${order[@]}"; do
   p="$R/videos/$f"; [ -f "$p" ] || p="$R/$f"
-  if [ -f "$p" ]; then echo "file '$p'" >> "$list"; else echo "skip (missing): $f" >&2; fi
+  if [ -f "$p" ]; then files+=("$p"); else echo "skip (missing): $f" >&2; fi
 done
-echo "--- concatenating ---"; cat "$list"
+echo "--- concatenating (concat filter, ${#files[@]} segments) ---"
+printf '%s\n' "${files[@]}"
+
+args=(); filt=""
+for i in "${!files[@]}"; do
+  args+=(-i "${files[$i]}")
+  filt+="[$i:v]"
+done
+filt+="concat=n=${#files[@]}:v=1:a=0[v]"
 
 if [ -f "$VOICE" ]; then
-  ffmpeg -y -v error -f concat -safe 0 -i "$list" -i "$VOICE" \
+  args+=(-i "$VOICE")
+  ffmpeg -y -v error "${args[@]}" -filter_complex "$filt" \
+    -map "[v]" -map "${#files[@]}:a" \
     -c:v libx264 -preset slow -crf 18 -pix_fmt yuv420p -r 30 \
     -c:a aac -b:a 160k -shortest -movflags +faststart -map_metadata -1 "$OUT"
 else
   echo "(no narration/voice.wav yet: silent master)"
-  ffmpeg -y -v error -f concat -safe 0 -i "$list" \
+  ffmpeg -y -v error "${args[@]}" -filter_complex "$filt" -map "[v]" \
     -c:v libx264 -preset slow -crf 18 -pix_fmt yuv420p -r 30 \
     -movflags +faststart -map_metadata -1 "$OUT"
 fi
