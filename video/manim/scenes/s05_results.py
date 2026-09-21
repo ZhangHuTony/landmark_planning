@@ -49,10 +49,10 @@ class Results(Scene):
         base = d["baseline"]
 
         ax = Axes(x_range=[0, 105, 20], y_range=[0.95, YCLIP, 0.2],
-                  x_length=8.4, y_length=4.7,
+                  x_length=8.4, y_length=4.2,
                   axis_config={"color": MUTED, "stroke_width": 2,
                                "include_ticks": True, "font_size": 22},
-                  tips=False).shift(LEFT * 1.5 + DOWN * 0.15)
+                  tips=False).shift(LEFT * 1.5 + UP * 0.35)
         xlab = Text("scenarios solved (%)", font=FONT, font_size=24, color=INK)
         xlab.next_to(ax.x_axis, DOWN, buff=0.38)
         ylab = Text("path length / reference", font=FONT, font_size=24, color=INK)
@@ -62,12 +62,6 @@ class Results(Scene):
                           .next_to(ax.c2p(v, 0.95), DOWN, buff=0.14) for v in (0, 20, 40, 60, 80, 100)]),
                  VGroup(*[Text(f"{v:.1f}", font=FONT, font_size=19, color=MUTED)
                           .next_to(ax.c2p(0, v), LEFT, buff=0.14) for v in (1.0, 1.4, 1.8, 2.2)]))
-
-        better = Text("better", font=FONT, font_size=22, color=INK)
-        better.next_to(ax.c2p(96, 1.03), UP, buff=0.22)
-        arrow = Arrow(ax.c2p(72, 1.30), ax.c2p(96, 1.03), buff=0, color=INK,
-                      stroke_width=3, max_tip_length_to_length_ratio=0.12)
-        self.add(better, arrow)
 
         # per-planner series, in sweep order
         series = {}
@@ -139,7 +133,7 @@ class Results(Scene):
             Text("bound", font=FONT, font_size=22, color=MUTED),
             Text(f"{lvl.get_value():.0f}%", font=FONT, font_size=54, color=INK),
             Text("of the reference", font=FONT, font_size=18, color=MUTED),
-        ).arrange(DOWN, buff=0.07).to_edge(RIGHT, buff=0.55).shift(DOWN * 2.05))
+        ).arrange(DOWN, buff=0.07).to_edge(RIGHT, buff=0.55).shift(DOWN * 1.15))
         self.add(counter)
 
         cap = Caption("Fifty randomised scenarios. The bound tightens; every planner pays.")

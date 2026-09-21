@@ -5,3 +5,4 @@ deliverables/
 __pycache__/
 *.pyc
 media/
+render_nocap/

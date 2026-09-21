@@ -18,11 +18,11 @@ from consort.data import load_scene
 from consort.world import World
 from consort.mapview import base_map
 from consort.mobjects import cov_ellipse, UncMeter, AUVGlyph, Caption, polyline
+from consort.geometry import make_local_scale
 from consort.palette import (
     PRIMARY, SUPPORT, COMM, COMM_DEAD, LANDMARK, INK, MUTED, FONT,
 )
 
-SIGMA_SCALE = 10.0      # sigma x10 for visibility, as Fig. 1 does
 FLASH_WIN = 26.0        # metres of arc either side of a checkpoint that a flash spans
 LM_WIN = 30.0
 
@@ -62,12 +62,13 @@ class Escort(Scene):
         trail_s = always_redraw(lambda: polyline(
             world, *support.upto(arc.get_value()), stroke_color=SUPPORT, stroke_width=3.4))
 
+        scale_at = make_local_scale(sc.obstacles, default=6.0, floor=1.5, margin=3.0)
         ell_p = always_redraw(lambda: cov_ellipse(
             world, primary.pos_at(arc.get_value()), primary.cov_at(arc.get_value()),
-            nstd=2, sigma_scale=SIGMA_SCALE, color=PRIMARY, fill_opacity=0.20))
+            nstd=2, sigma_scale=scale_at, color=PRIMARY))
         ell_s = always_redraw(lambda: cov_ellipse(
             world, support.pos_at(arc.get_value()), support.cov_at(arc.get_value()),
-            nstd=2, sigma_scale=SIGMA_SCALE, color=SUPPORT, fill_opacity=0.20))
+            nstd=2, sigma_scale=scale_at, color=SUPPORT))
 
         auv_p = AUVGlyph(PRIMARY)
         auv_s = AUVGlyph(SUPPORT)
@@ -115,7 +116,8 @@ class Escort(Scene):
         self.add(trail_s, trail_p, ell_s, ell_p,
                  always_redraw(comm_link), always_redraw(lm_ray), auv_s, auv_p)
 
-        sig_note = Text("covariance drawn at 2σ, σ ×10", font=FONT, font_size=17, color=MUTED)
+        sig_note = Text("2σ, magnified for visibility",
+                        font=FONT, font_size=17, color=MUTED)
         sig_note.next_to(meter, DOWN, buff=0.55)
         self.add(sig_note)
 

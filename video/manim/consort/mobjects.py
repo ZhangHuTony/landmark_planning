@@ -1,4 +1,5 @@
 """Reusable mobjects: lattice, covariance ellipse, uncertainty meter, AUV glyph."""
+import os
 import textwrap
 
 import numpy as np
@@ -42,21 +43,28 @@ class HexLattice(VGroup):
 
 
 def cov_ellipse(world, mu, cov, nstd=2.0, sigma_scale=1.0, color=INK,
-                fill_opacity=0.22, stroke_width=1.0):
+                fill_opacity=0.12, stroke_width=2.2, z_index=6):
     """n-sigma ellipse of a 2x2 covariance, with sigma optionally inflated.
 
     `sigma_scale` blows up the standard deviation for visibility only (a 1.8 m
-    sigma on a 1 km map is sub-pixel). Same convention as Fig. 1, which draws
-    2-sigma at sigma x10; state the factor on screen whenever it is not 1.
+    sigma on a 1 km map is sub-pixel) -- pass a callable `scale_at(x, y,
+    sigma_major)` (see geometry.make_local_scale) instead of a constant to
+    keep the display honest near an obstacle. Stroke carries the shape (fill
+    is deliberately light) so the boundary stays legible even where an AUV
+    glyph sits on top of the ellipse's centre; z_index defaults above the
+    glyph for the same reason.
     """
     cov = np.asarray(cov, float)
     vals, vecs = np.linalg.eigh((cov + cov.T) / 2.0)
     vals = np.clip(vals, 0.0, None)
     order = np.argsort(vals)[::-1]
     vals, vecs = vals[order], vecs[:, order]
+    if callable(sigma_scale):
+        sigma_scale = sigma_scale(mu[0], mu[1], float(np.sqrt(vals[0])))
     a, b = (nstd * sigma_scale * np.sqrt(vals))
     e = Ellipse(width=2 * world.length(a), height=2 * world.length(b),
-                color=color, fill_opacity=fill_opacity, stroke_width=stroke_width)
+                color=color, fill_opacity=fill_opacity, stroke_width=stroke_width,
+                z_index=z_index)
     e.rotate(float(np.arctan2(vecs[1, 0], vecs[0, 0])))
     e.move_to(world.pt(mu[0], mu[1]))
     return e
@@ -117,19 +125,26 @@ class AUVGlyph(VGroup):
     SVGMobject here if a real vector icon ever appears in manim/assets/.
     """
 
-    def __init__(self, color, size=0.34, **kw):
+    def __init__(self, color, size=0.24, **kw):
         super().__init__(**kw)
         L, H = size * 2.1, size * 0.62
+        # A thin white outline on every part keeps the glyph legible against a
+        # same-colour ellipse boundary (the ellipse is now stroke-forward, per
+        # the visibility fix, so an unoutlined hull of the same colour could
+        # blend into it right where the two overlap).
         hull = Ellipse(width=L, height=H, fill_color=color, fill_opacity=1.0,
-                       stroke_color=color, stroke_width=1.0)
+                       stroke_color=WHITE, stroke_width=1.4)
         sail = Rectangle(width=L * 0.22, height=H * 0.62, fill_color=color,
-                         fill_opacity=1.0, stroke_width=0)
+                         fill_opacity=1.0, stroke_color=WHITE, stroke_width=1.0)
         sail.next_to(hull.get_center(), UP, buff=0).shift(LEFT * L * 0.02 + DOWN * H * 0.10)
-        fin = Triangle(fill_color=color, fill_opacity=1.0, stroke_width=0)
+        fin = Triangle(fill_color=color, fill_opacity=1.0, stroke_color=WHITE, stroke_width=1.0)
         fin.set(width=H * 0.85).rotate(-PI / 2)
         fin.move_to(hull.get_left() + RIGHT * L * 0.04)
         self.add(fin, hull, sail)
         self.base_angle = 0.0
+        self.set_z_index(7)   # over the covariance ellipse now (its own white
+                               # outline keeps it legible without hiding the
+                               # ellipse boundary, which still pokes out past it)
 
     def place(self, world, x, y, heading=0.0):
         self.rotate(heading - self.base_angle, about_point=self.get_center())
@@ -138,20 +153,32 @@ class AUVGlyph(VGroup):
         return self
 
 
+def _captions_enabled():
+    return os.environ.get("CONSORT_CAPTIONS", "1") == "1"
+
+
 class Caption(VGroup):
     """Bottom caption strip, burned in (the video ships watchable without audio).
 
     Wraps on word boundaries and then shrinks to fit, so a long line can never
     run off the frame the way an unwrapped Text does.
+
+    Set CONSORT_CAPTIONS=0 to suppress this bar entirely (an empty, invisible
+    group) for the per-scene deliverables that ship without narration text.
+    This is the only thing that env var touches -- meters, counters and other
+    on-screen numbers are not "subtitles" and are unaffected.
     """
 
     def __init__(self, text="", max_chars=62, max_width=12.4, font_size=27, **kw):
         super().__init__(**kw)
         self.max_chars, self.max_width, self.fs = max_chars, max_width, font_size
+        self.enabled = _captions_enabled()
         self.txt = self._make(text)
         self.add(self.txt)
 
     def _make(self, text):
+        if not self.enabled:
+            return VGroup()
         lines = textwrap.wrap(text, self.max_chars) or [""]
         g = VGroup(*[Text(l, font=FONT, font_size=self.fs, color=INK) for l in lines])
         g.arrange(DOWN, buff=0.12)
@@ -161,6 +188,8 @@ class Caption(VGroup):
         return g
 
     def set_text(self, text):
+        if not self.enabled:
+            return self
         self.txt.become(self._make(text))
         return self
 
