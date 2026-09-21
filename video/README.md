@@ -85,10 +85,10 @@ ID=1234 video/ffmpeg/encode_icra.sh   # -> deliverables/ICRA2027_1234.mp4 + chec
 |---|---|---|---|
 | `s01_problem.py` | `Problem` | one AUV alone, σ 2.37 > ū 2.0 | `fig1/scene.json` `alone` block |
 | `s02_escort.py` | `Escort` | Fig. 1 animated: lattice, divert, blackout, one fusion | `fig1/scene.json` |
-| `s03a_astar.py` | `AStar` | expansion order, both agents, 1748 pops | `fig1/astar_trace.csv` |
+| `s03a_astar.py` | `AStar` | wavefront replay (by distance, not pop order), 1748 pops | `fig1/astar_trace.csv` |
 | `s03b_refine.py` | `Refine` | 91 optimizer iterates, 1158.6 → 1100.0 m | `fig1/cont_dense.csv` + `cont_steps.csv` |
 | `s03c_ladder.py` | `Ladder` | ū 100%→30%, path 1741→1890 m | `ladder/scene_p*.json` |
-| `s04_baselines.py` | `Baselines` | what each baseline removes, one scenario | `baselines/s049_p050/*.json` |
+| `s04_baselines.py` | `Baselines` | each baseline's OWN search (4 grammars), one scenario | `baselines/s049_p050/*.{json,csv}` |
 | `s05_results.py` | `Results` | success vs length, swept over the ladder | `sweep/levels.json` |
 | `s06_holo.py` | `HoloRun` | synced replay, footage slot on the left | `holo/holo_video.npz` |
 | `s06_holo.py` | `HoloMC` | 30 runs, predicted vs flown terminal ellipse | `holo/holo_mc.json` |
