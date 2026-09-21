@@ -72,6 +72,18 @@ open(joinpath(OUT_DIR, "cont_dense.csv"), "w") do io
         end
     end
 end
+# The RAW control points of each kept iterate -- not resampled, so an
+# animation can move a fixed number of dots (one per hex node) smoothly
+# between iterates instead of resampling a changing-length curve. Iteration 0
+# here is seed_control_points itself, i.e. the hex cell centres exactly.
+open(joinpath(OUT_DIR, "cont_ctrls.csv"), "w") do io
+    println(io, "iter,agent,ctrl_index,x,y")
+    for it in keep, ag in sort(collect(keys(rows[it])))
+        for (k, p) in enumerate(rows[it][ag])
+            @printf(io, "%d,%d,%d,%.6f,%.6f\n", it, ag, k, p[1], p[2])
+        end
+    end
+end
 open(joinpath(OUT_DIR, "cont_steps.csv"), "w") do io
     println(io, "iter,stage,mu,len,unc,feasible,min_slack,backtracks")
     for it in keep
