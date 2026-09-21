@@ -15,8 +15,10 @@ from consort.data import load_scene
 from consort.world import World
 from consort.mapview import base_map
 from consort.mobjects import cov_ellipse, UncMeter, AUVGlyph, Caption, polyline
-from consort.geometry import make_local_scale
+from consort.geometry import shrink_obstacle_for_clearance
 from consort.palette import PRIMARY, INK, MUTED, BAD, FONT
+
+SIGMA_SCALE = 6.0   # fixed everywhere; obstacles are drawn shrunk instead
 
 
 class Problem(Scene):
@@ -25,6 +27,13 @@ class Problem(Scene):
         world = World.from_scene(sc, width=10.4, height=5.0, center=LEFT * 1.15 + UP * 0.30)
         alone = sc.alone
         arc_end = alone.arc_end
+
+        # Obstacles are drawn a little smaller than the real ones so a
+        # full-strength, fixed-scale ellipse never LOOKS like it clips one --
+        # the planner's own obstacle test still ran against the real size.
+        sc.obstacles = [shrink_obstacle_for_clearance(
+            o, [(alone.eval_x, alone.eval_y, alone.cov)], scale=SIGMA_SCALE)[0]
+            for o in sc.obstacles]
 
         base = base_map(world, sc, with_lattice=False)
         base.landmarks.set_opacity(0.25)      # present, but this agent cannot use them
@@ -39,12 +48,11 @@ class Problem(Scene):
         meter.add_updater(lambda m: m.set_value(alone.unc_at(arc.get_value())))
         self.add(meter)
 
-        scale_at = make_local_scale(sc.obstacles, default=6.0, floor=1.5, margin=3.0)
         trail = always_redraw(lambda: polyline(
             world, *alone.upto(arc.get_value()), stroke_color=PRIMARY, stroke_width=4.0))
         ell = always_redraw(lambda: cov_ellipse(
             world, alone.pos_at(arc.get_value()), alone.cov_at(arc.get_value()),
-            nstd=2, sigma_scale=scale_at, color=PRIMARY))
+            nstd=2, sigma_scale=SIGMA_SCALE, color=PRIMARY))
         auv = AUVGlyph(PRIMARY)
         auv.add_updater(lambda m: m.place(world, *alone.pos_at(arc.get_value()),
                                           heading=alone.heading_at(arc.get_value())))

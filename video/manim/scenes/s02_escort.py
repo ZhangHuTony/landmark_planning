@@ -18,13 +18,14 @@ from consort.data import load_scene
 from consort.world import World
 from consort.mapview import base_map
 from consort.mobjects import cov_ellipse, UncMeter, AUVGlyph, Caption, polyline
-from consort.geometry import make_local_scale
+from consort.geometry import shrink_obstacle_for_clearance
 from consort.palette import (
     PRIMARY, SUPPORT, COMM, COMM_DEAD, LANDMARK, INK, MUTED, FONT,
 )
 
 FLASH_WIN = 26.0        # metres of arc either side of a checkpoint that a flash spans
 LM_WIN = 30.0
+SIGMA_SCALE = 6.0   # fixed everywhere; obstacles are drawn shrunk instead
 
 
 class Escort(Scene):
@@ -33,6 +34,11 @@ class Escort(Scene):
         world = World.from_scene(sc, width=10.4, height=5.0, center=LEFT * 1.15 + UP * 0.30)
         primary, support = sc.primary, sc.supports[0]
         arc_end = primary.arc_end
+
+        sc.obstacles = [shrink_obstacle_for_clearance(
+            o, [(primary.eval_x, primary.eval_y, primary.cov),
+                (support.eval_x, support.eval_y, support.cov)], scale=SIGMA_SCALE)[0]
+            for o in sc.obstacles]
 
         base = base_map(world, sc)
         cap = Caption("")
@@ -62,13 +68,12 @@ class Escort(Scene):
         trail_s = always_redraw(lambda: polyline(
             world, *support.upto(arc.get_value()), stroke_color=SUPPORT, stroke_width=3.4))
 
-        scale_at = make_local_scale(sc.obstacles, default=6.0, floor=1.5, margin=3.0)
         ell_p = always_redraw(lambda: cov_ellipse(
             world, primary.pos_at(arc.get_value()), primary.cov_at(arc.get_value()),
-            nstd=2, sigma_scale=scale_at, color=PRIMARY))
+            nstd=2, sigma_scale=SIGMA_SCALE, color=PRIMARY))
         ell_s = always_redraw(lambda: cov_ellipse(
             world, support.pos_at(arc.get_value()), support.cov_at(arc.get_value()),
-            nstd=2, sigma_scale=scale_at, color=SUPPORT))
+            nstd=2, sigma_scale=SIGMA_SCALE, color=SUPPORT))
 
         auv_p = AUVGlyph(PRIMARY)
         auv_s = AUVGlyph(SUPPORT)

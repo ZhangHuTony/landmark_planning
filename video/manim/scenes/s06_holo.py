@@ -23,13 +23,14 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from consort.data import DATA
 from consort.world import World
 from consort.mobjects import cov_ellipse, UncMeter, Caption, polyline, obstacle_poly
-from consort.geometry import make_local_scale
+from consort.geometry import shrink_obstacle_for_clearance
 from consort.palette import (
     PRIMARY, SUPPORT, GOAL, LANDMARK, COMM, COMM_DEAD, INK, MUTED, OK, BAD, FONT,
 )
 
 FLASH_TICKS = 260          # how long a comm marker stays up, in ticks
 SPEED = 30                 # x30: 900 ticks of sim per second of video
+SIGMA_SCALE = 6.0          # fixed everywhere; obstacles are drawn shrunk instead
 
 
 def load_video_run():
@@ -58,7 +59,13 @@ class HoloRun(Scene):
         slot_lab.next_to(slot, UP, buff=0.18)
         self.add(slot, slot_lab)
 
-        self.add(obstacle_poly(world, z["obstacle0_verts"]))
+        # Obstacle drawn slightly smaller than the real one so a full-strength,
+        # fixed-scale ellipse never LOOKS like it clips it; the estimator's
+        # own obstacle test (and the planner's) ran against the real size.
+        shrunk_obstacle, _ = shrink_obstacle_for_clearance(
+            z["obstacle0_verts"], [(z["auv0_node_est"][:, 0], z["auv0_node_est"][:, 1],
+                                    z["auv0_node_cov"])], scale=SIGMA_SCALE)
+        self.add(obstacle_poly(world, shrunk_obstacle))
         lm = z["landmarks"][0]
         self.add(Triangle(fill_color=LANDMARK, fill_opacity=1, stroke_width=0)
                  .set(width=0.22).move_to(world.pt(lm[0], lm[1])))
@@ -91,9 +98,8 @@ class HoloRun(Scene):
             return int(np.clip(np.searchsorted(ntick, tick.get_value(), "right") - 1,
                                0, len(ntick) - 1))
 
-        scale_at = make_local_scale([z["obstacle0_verts"]], default=6.0, floor=1.5, margin=3.0)
         self.add(always_redraw(lambda: cov_ellipse(
-            world, nest[node_idx()], ncov[node_idx()], nstd=2, sigma_scale=scale_at,
+            world, nest[node_idx()], ncov[node_idx()], nstd=2, sigma_scale=SIGMA_SCALE,
             color=PRIMARY)))
         self.add(always_redraw(lambda: Dot(
             world.pt(*t0[min(int(tick.get_value() / 10), len(t0) - 1)][1:3]),
