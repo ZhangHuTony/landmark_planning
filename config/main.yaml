@@ -42,12 +42,12 @@ algorithms: hexspline_cl
 # obstacles: 200,-150; 260,-150; 260,-100; 200,-100 | 400,60; 460,60; 430,120 @ 4,0,0,4
 
 # Physical / sensor model
-dir_uncertainty_per_meter: 0.05
+dir_uncertainty_per_meter: 0.01
 maj_min_unc_ratio: 3
 marker_proportion: 5.0
-landmark_sensor_noise: 0.038
-comm_sensor_noise: 0.038
-bearing_noise_ratio: 2.2
+landmark_sensor_noise: 0.33
+comm_sensor_noise: 0.5
+bearing_noise_ratio: 0.44
 comm_radius: 300.0
 visibility_range: 100.0
 visibility_width: 2.5
@@ -69,7 +69,7 @@ comm_interval_dist: 5.0
 #     on the threshold is not rejected by floating-point noise.
 #   min_turn_radius_m — vehicle turn radius; the curvature constraint is
 #     κ ≤ 1/min_turn_radius_m.
-unc_radius_threshold: 7.0
+unc_radius_threshold: 1.8
 unc_feas_tol: 1.0e-6
 min_turn_radius_m: 40.0
 

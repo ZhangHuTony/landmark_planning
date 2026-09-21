@@ -1,0 +1,28 @@
+\begin{figure}[tpb]
+  \centering
+    \includegraphics[width=\columnwidth]{example-image-a}
+    \caption{Discrete joint A* solutions over a coupled multi-agent graph, later refined in continuous space.}
+  \label{fig:discrete}
+\end{figure}
+
+We first solve the problem on a joint discrete graph using standard A* over the composite state of all agents. Let $\mathbf{x}=(x_1,\dots,x_P)$ denote a joint state and let $g(\mathbf{x})$ denote the accumulated primary path cost from the start. The evaluation function is
+\begin{equation}
+f(\mathbf{x}) = g(\mathbf{x}) + h(\mathbf{x}),
+\end{equation}
+where $h(\mathbf{x})$ is an admissible heuristic defined using only the primary agent’s state. Specifically, $h(\mathbf{x})$ is computed as a shortest-path lower bound on the underlying graph, obtained via precomputed all-pairs shortest paths. Support agents contribute zero heuristic cost.
+
+To improve search efficiency, we apply sound dominance pruning among states with the same joint node tuple. Given two states $A$ and $B$ at the same joint tuple, $A$ dominates $B$ if
+\[
+g(A) \le g(B)
+\quad \text{and} \quad
+\det(\Sigma_A) \le \det(\Sigma_B),
+\]
+where $\Sigma_A$ and $\Sigma_B$ denote the primary-agent covariance matrices at the corresponding states. If one state dominates the other under this criterion, the dominated state is discarded. This pruning is sound for our objective because the heuristic is shared at the same node tuple, the primary path cost of the dominated state cannot be lower, and the covariance metric used for feasibility assessment cannot improve under future propagation.
+
+Under standard assumptions of admissible and consistent heuristics and nonnegative edge costs, A* returns an optimal feasible solution on the pruned discrete joint graph. Let $L^\star$ denote the optimal feasible trajectory cost in the continuous state space defined above. Let $L_{\text{returned}}$ denote the cost of the trajectory returned by the proposed pipeline. This optimality holds with respect to the discrete graph cost.
+
+We assume the discrete graph is a geometric discretization of the continuous environment with resolution parameter $h$. Under this discretization, there exists a constant $\epsilon_{\mathrm{disc}} \ge 0$ such that for any continuous feasible trajectory with cost $L^\star$, there exists a discrete feasible trajectory satisfying
+\begin{equation}
+L_{\mathrm{disc}}^\star \le (1+\epsilon_{\mathrm{disc}}) L^\star.
+\end{equation}
+This captures the approximation error induced by finite graph resolution and path quantization.

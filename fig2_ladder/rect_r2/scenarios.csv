@@ -1,0 +1,2 @@
+scenario_id,seed,goal_dist,n_landmarks,n_obstacles,L_ref,U_ref,U_ref_cont,wall_ref,reject_reason
+s001,2,0.0,0,0,1713.271,13.749503082929923,12.212469210217627,16.5,

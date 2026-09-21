@@ -1,0 +1,584 @@
+
+
+
+@article{platt2010belief,
+	title = {Belief space planning assuming maximum likelihood observations},
+	abstract = {We cast the partially observable control problem as a fully observable underactuated stochastic control problem in belief space and apply standard planning and control techniques. One of the difﬁculties of belief space planning is modeling the stochastic dynamics resulting from unknown future observations. The core of our proposal is to deﬁne deterministic beliefsystem dynamics based on an assumption that the maximum likelihood observation (calculated just prior to the observation) is always obtained. The stochastic effects of future observations are modeled as Gaussian noise. Given this model of the dynamics, two planning and control methods are applied. In the ﬁrst, linear quadratic regulation (LQR) is applied to generate policies in the belief space. This approach is shown to be optimal for linearGaussian systems. In the second, a planner is used to ﬁnd locally optimal plans in the belief space. We propose a replanning approach that is shown to converge to the belief space goal in a ﬁnite number of replanning steps. These approaches are characterized in the context of a simple nonlinear manipulation problem where a planar robot simultaneously locates and grasps an object.},
+	language = {en},
+	author = {Jr, Robert Platt and Tedrake, Russ and Kaelbling, Leslie and Lozano-Perez, Tomas},
+	file = {PDF:C\:\\Users\\Zhang\\Zotero\\storage\\UGCEX627\\Jr et al. - Belief space planning assuming maximum likelihood observations.pdf:application/pdf},
+}
+
+
+
+@article{liu2026risk,
+	title = {Explicit risk-{Aware} belief space planning for underwater active cooperative localization},
+	volume = {346},
+	issn = {0029-8018},
+	url = {https://www.sciencedirect.com/science/article/pii/S002980182503392X},
+	doi = {10.1016/j.oceaneng.2025.123710},
+	abstract = {Active cooperative localization introduces spatial interactions between autonomous underwater vehicles in belief space to mitigate positioning uncertainty. Minimizing belief uncertainty while ensuring safety is a challenging task, as overly conservative risk evaluations can result in a narrow feasible space and diminish mutual information gain. In this work, a stochastic optimization problem is formulated to reduce localization uncertainty under a joint chance constraint that limits the overall collision risk. To avoid conservatism, an external relaxation method is proposed to expand the original feasible space of the joint chance constraint. This raises two critical issues: how to evaluate the feasibility of current solutions and how to handle infeasible solutions. To address the former, a conditional collision probability evaluation method is developed to estimate the overall risk by considering the correlation of vehicle motions. For the latter, risk iterative probability boundaries are regenerated through a fuzzy risk allocation method when solutions are infeasible. Simulation results from both static and dynamic active localization scenarios demonstrate that the proposed methods achieve better performance in reducing localization uncertainty while explicitly satisfying the joint chance constraint.},
+	urldate = {2026-09-14},
+	journal = {Ocean Engineering},
+	author = {Liu, Haoyu and Yu, Min and Wang, Yuanxiang and Zhang, Wenkai and Tang, Qirong},
+	month = feb,
+	year = {2026},
+	keywords = {Active cooperative localization, Belief space planning, Collision avoidance, Joint risk evaluation},
+	pages = {123710},
+}
+
+
+
+@inproceedings{theurkauf2025coop,
+	title = {Multi-{Robot} {Motion} {Planning} with {Cooperative} {Localization}},
+	issn = {2153-0866},
+	url = {https://ieeexplore.ieee.org/abstract/document/11246763},
+	doi = {10.1109/IROS60139.2025.11246763},
+	abstract = {We consider the uncertain multi-robot motion planning (MRMP) problem with cooperative localization (CL-MRMP), under both motion and measurement noise, where each robot can act as a sensor for its nearby teammates. We formalize CL-MRMP as a chance-constrained motion planning problem, and propose a safety-guaranteed algorithm that explicitly accounts for robot-robot correlations. Our approach extends a sampling-based planner to solve CL-MRMP while preserving probabilistic completeness. To improve efficiency, we introduce novel biasing techniques. We evaluate our method across diverse benchmarks, demonstrating its effectiveness in generating motion plans, with significant performance gains from biasing strategies.},
+	urldate = {2026-09-14},
+	booktitle = {2025 {IEEE}/{RSJ} {International} {Conference} on {Intelligent} {Robots} and {Systems} ({IROS})},
+	author = {Theurkauf, Anne and Ahmed, Nisar and Lahijanian, Morteza},
+	month = oct,
+	year = {2025},
+	note = {ISSN: 2153-0866},
+	keywords = {Benchmark testing, Collision avoidance, Location awareness, Performance gain, Planning, Probabilistic logic, Reliability engineering, Robot sensing systems, Robots, Scalability},
+	pages = {3962--3969},
+}
+
+
+
+@article{duszak2021hexgrid,
+	title = {Hexagonal {Grid}-{Based} {Framework} for {Mobile} {Robot} {Navigation}},
+	volume = {13},
+	copyright = {http://creativecommons.org/licenses/by/3.0/},
+	issn = {2072-4292},
+	url = {https://www.mdpi.com/2072-4292/13/21/4216},
+	doi = {10.3390/rs13214216},
+	abstract = {The paper addresses the problem of mobile robots’ navigation using a hexagonal lattice. We carried out experiments in which we used a vehicle equipped with a set of sensors. Based on the data, a traversable map was created. The experimental results proved that hexagonal maps of an environment can be easily built based on sensor readings. The path planning method has many advantages: the situation in which obstacles surround the position of the robot or the target is easily detected, and we can influence the properties of the path, e.g., the distance from obstacles or the type of surface can be taken into account. A path can be smoothed more easily than with a rectangular grid.},
+	language = {en},
+	number = {21},
+	urldate = {2026-09-14},
+	journal = {Remote Sensing},
+	publisher = {Multidisciplinary Digital Publishing Institute},
+	author = {Duszak, Piotr and Siemiątkowska, Barbara and Więckowski, Rafał},
+	month = jan,
+	year = {2021},
+	keywords = {data fusion, hexagonal grid, mapping, path planning},
+	pages = {4216},
+}
+
+
+
+@article{sharon2015cbs,
+	title = {Conflict-based search for optimal multi-agent pathfinding},
+	volume = {219},
+	issn = {0004-3702},
+	url = {https://www.sciencedirect.com/science/article/pii/S0004370214001386},
+	doi = {10.1016/j.artint.2014.11.006},
+	abstract = {In the multi-agent pathfinding problem (MAPF) we are given a set of agents each with respective start and goal positions. The task is to find paths for all agents while avoiding collisions. Most previous work on solving this problem optimally has treated the individual agents as a single ‘joint agent’ and then applied single-agent search variants of the A* algorithm. In this paper we present the Conflict Based Search (CBS) a new optimal multi-agent pathfinding algorithm. CBS is a two-level algorithm that does not convert the problem into the single ‘joint agent’ model. At the high level, a search is performed on a Conflict Tree (CT) which is a tree based on conflicts between individual agents. Each node in the CT represents a set of constraints on the motion of the agents. At the low level, fast single-agent searches are performed to satisfy the constraints imposed by the high level CT node. In many cases this two-level formulation enables CBS to examine fewer states than A* while still maintaining optimality. We analyze CBS and show its benefits and drawbacks. Additionally we present the Meta-Agent CBS (MA-CBS) algorithm. MA-CBS is a generalization of CBS. Unlike basic CBS, MA-CBS is not restricted to single-agent searches at the low level. Instead, MA-CBS allows agents to be merged into small groups of joint agents. This mitigates some of the drawbacks of basic CBS and further improves performance. In fact, MA-CBS is a framework that can be built on top of any optimal and complete MAPF solver in order to enhance its performance. Experimental results on various problems show a speedup of up to an order of magnitude over previous approaches.},
+	urldate = {2026-09-14},
+	journal = {Artificial Intelligence},
+	author = {Sharon, Guni and Stern, Roni and Felner, Ariel and Sturtevant, Nathan R.},
+	month = feb,
+	year = {2015},
+	keywords = {Heuristic search, Multi-agent, Pathfinding},
+	pages = {40--66},
+}
+
+
+
+
+@misc{karaman2011optimal,
+	title = {Sampling-based {Algorithms} for {Optimal} {Motion} {Planning}},
+	url = {https://arxiv.org/abs/1105.1186v1},
+	abstract = {During the last decade, sampling-based path planning algorithms, such as Probabilistic RoadMaps (PRM) and Rapidly-exploring Random Trees (RRT), have been shown to work well in practice and possess theoretical guarantees such as probabilistic completeness. However, little effort has been devoted to the formal analysis of the quality of the solution returned by such algorithms, e.g., as a function of the number of samples. The purpose of this paper is to fill this gap, by rigorously analyzing the asymptotic behavior of the cost of the solution returned by stochastic sampling-based algorithms as the number of samples increases. A number of negative results are provided, characterizing existing algorithms, e.g., showing that, under mild technical conditions, the cost of the solution returned by broadly used sampling-based algorithms converges almost surely to a non-optimal value. The main contribution of the paper is the introduction of new algorithms, namely, PRM* and RRT*, which are provably asymptotically optimal, i.e., such that the cost of the returned solution converges almost surely to the optimum. Moreover, it is shown that the computational complexity of the new algorithms is within a constant factor of that of their probabilistically complete (but not asymptotically optimal) counterparts. The analysis in this paper hinges on novel connections between stochastic sampling-based path planning algorithms and the theory of random geometric graphs.},
+	language = {en},
+	urldate = {2026-09-14},
+	journal = {arXiv.org},
+	author = {Karaman, Sertac and Frazzoli, Emilio},
+	month = may,
+	year = {2011},
+	file = {Full Text PDF:C\:\\Users\\Zhang\\Zotero\\storage\\4C8KL374\\Karaman and Frazzoli - 2011 - Sampling-based Algorithms for Optimal Motion Planning.pdf:application/pdf},
+}
+
+
+
+
+
+
+
+
+
+@article{feng2024bsrrt,
+	title = {Smooth path planning under maximum curvature constraints for autonomous underwater vehicles based on rapidly-exploring random tree star with {B}-spline curves},
+	volume = {133},
+	issn = {0952-1976},
+	url = {https://www.sciencedirect.com/science/article/pii/S0952197624007413},
+	doi = {10.1016/j.engappai.2024.108583},
+	abstract = {In recent decades, Rapidly-exploring Random Tree star (RRT*) has garnered significant attention in the field of path planning due to its asymptotical optimality feature. However, the paths obtained by RRT* are comprised of polylines and too tortuous to be followed by underwater robots. To solve the drawback, this paper proposes a novel autonomous underwater vehicle (AUV) path planning method based on B-spline RRT* (BSRRT*). It focuses on planning optimal paths under maximum curvature constraints, which considerably improves the path smoothness. Different from conventional RRT*-based methods, the tree generated by BSRRT* is composed of piecewise B-spline curves that meet the curvature constraint. The analytical formulas of curve curvature and curve length enable BSRRT* to extend the tree with a low computational cost. Furthermore, start and end orientations constraints are imposed via the introduction of start node pairs and end node pairs. BSRRT* also combines with the expanded candidate strategy and the goal-biased strategy for a faster convergence rate. Simulation results demonstrate that compared to existing approaches, BSRRT* can provide shorter smooth paths with lower time costs.},
+	urldate = {2026-09-14},
+	journal = {Engineering Applications of Artificial Intelligence},
+	author = {Feng, Haobo and Hu, Qiao and Zhao, Zhenyi and Feng, Xinglong},
+	month = jul,
+	year = {2024},
+	keywords = {B-spline curve, Expanded candidate strategy, Goal-biased strategy, Orientation node pair strategy, Path planning, Rapidly-exploring random tree},
+	pages = {108583},
+}
+
+
+
+@inproceedings{julier1997cov,
+	title = {A non-divergent estimation algorithm in the presence of unknown correlations},
+	volume = {4},
+	issn = {0743-1619},
+	url = {https://ieeexplore.ieee.org/abstract/document/609105},
+	doi = {10.1109/ACC.1997.609105},
+	abstract = {This paper addresses the problem of estimation when the cross-correlation in the errors between different random variables are unknown. A new data fusion algorithm, the covariance intersection algorithm (CI), is presented. It is proved that this algorithm yields consistent estimates irrespective of the actual correlations. This property is illustrated in an application of decentralised estimation where it is impossible to consistently use a Kalman filter.},
+	urldate = {2026-09-14},
+	booktitle = {Proceedings of the 1997 {American} {Control} {Conference} ({Cat}. {No}.{97CH36041})},
+	author = {Julier, S.J. and Uhlmann, J.K.},
+	month = jun,
+	year = {1997},
+	note = {ISSN: 0743-1619},
+	keywords = {Covariance matrix, Information filtering, Information filters, Predictive models, Random variables, Sensor fusion, Sensor systems, State estimation, Vehicles, Yield estimation},
+	pages = {2369--2373 vol.4},
+	file = {Full Text PDF:C\:\\Users\\Zhang\\Zotero\\storage\\NV8FIFVJ\\Julier and Uhlmann - 1997 - A non-divergent estimation algorithm in the presence of unknown correlations.pdf:application/pdf},
+}
+
+
+@article{roumeliotis2002dist,
+  author={Roumeliotis, S.I. and Bekey, G.A.},
+  journal={IEEE Transactions on Robotics and Automation}, 
+  title={Distributed multirobot localization}, 
+  year={2002},
+  volume={18},
+  number={5},
+  pages={781-795},
+  keywords={Robot sensing systems;Robot kinematics;Information filters;Information filtering;Mobile robots;Magnetic field measurement;Working environment noise;Computer science;Magnetic sensors;Area measurement},
+  doi={10.1109/TRA.2002.803461}}
+
+
+
+
+
+
+@article{olfati2007consensus,
+  author={Olfati-Saber, Reza and Fax, J. Alex and Murray, Richard M.},
+  journal={Proceedings of the IEEE}, 
+  title={Consensus and Cooperation in Networked Multi-Agent Systems}, 
+  year={2007},
+  volume={95},
+  number={1},
+  pages={215-233},
+  keywords={Multiagent systems;Performance analysis;Sensor fusion;Failure analysis;Information analysis;Algorithm design and analysis;Robustness;Network topology;Convergence;Matrices;Consensus algorithms;cooperative control;flocking;graph Laplacians;information fusion;multi-agent systems;networked control systems;synchronization of coupled oscillators},
+  doi={10.1109/JPROC.2006.887293}}
+
+
+
+@article{kaelbling1998pomdp,
+	title = {Planning and acting in partially observable stochastic domains},
+	volume = {101},
+	copyright = {https://www.elsevier.com/tdm/userlicense/1.0/},
+	issn = {00043702},
+	url = {https://linkinghub.elsevier.com/retrieve/pii/S000437029800023X},
+	doi = {10.1016/S0004-3702(98)00023-X},
+	abstract = {In this paper, we bring techniques from operations research to bear on the problem of choosing optimal actions in partially observable stochastic domains. We begin by introducing the theory of Markov decision processes (MDPs) and partially observable MDPs (POMDPs). We then outline a novel algorithm for solving POMDPs off line and show how, in some cases, a ﬁnite-memory controller can be extracted from the solution to a POMDP. We conclude with a discussion of how our approach relates to previous work, the complexity of ﬁnding exact solutions to POMDPs, and of some possibilities for ﬁnding approximate solutions.  1998 Elsevier Science B.V. All rights reserved.},
+	language = {en},
+	number = {1-2},
+	urldate = {2026-09-13},
+	journal = {Artificial Intelligence},
+	author = {Kaelbling, Leslie Pack and Littman, Michael L. and Cassandra, Anthony R.},
+	month = may,
+	year = {1998},
+	pages = {99--134},
+	file = {PDF:C\:\\Users\\Zhang\\Zotero\\storage\\G77RVPKP\\Kaelbling et al. - 1998 - Planning and acting in partially observable stochastic domains.pdf:application/pdf},
+}
+
+
+@article{prentice2009brm,
+	title = {The {Belief} {Roadmap}: {Efficient} {Planning} in {Belief} {Space} by {Factoring} the {Covariance}},
+	volume = {28},
+	issn = {0278-3649},
+	shorttitle = {The {Belief} {Roadmap}},
+	url = {https://doi.org/10.1177/0278364909341659},
+	doi = {10.1177/0278364909341659},
+	abstract = {When a mobile agent does not know its position perfectly, incorporating the predicted uncertainty of future position estimates into the planning process can lead to substantially better motion performance. However, planning in the space of probabilistic position estimates, or belief space, can incur a substantial computational cost. In this paper, we show that planning in belief space can be performed efficiently for linear Gaussian systems by using a factored form of the covariance matrix. This factored form allows several prediction and measurement steps to be combined into a single linear transfer function, leading to very efficient posterior belief prediction during planning. We give a belief-space variant of the probabilistic roadmap algorithm called the belief roadmap (BRM) and show that the BRM can compute plans substantially faster than conventional belief space planning. We conclude with performance results for an agent using ultra-wide bandwidth radio beacons to localize and show that we can efficiently generate plans that avoid failures due to loss of accurate position estimation.},
+	language = {EN},
+	number = {11-12},
+	urldate = {2026-09-13},
+	journal = {The International Journal of Robotics Research},
+	publisher = {SAGE Publications Ltd STM},
+	author = {Prentice, Samuel and Roy, Nicholas},
+	month = nov,
+	year = {2009},
+	pages = {1448--1465},
+}
+
+
+
+
+@inproceedings{bry2011rrbt,
+	title = {Rapidly-exploring {Random} {Belief} {Trees} for motion planning under uncertainty},
+	issn = {1050-4729},
+	url = {https://ieeexplore.ieee.org/abstract/document/5980508},
+	doi = {10.1109/ICRA.2011.5980508},
+	abstract = {In this paper we address the problem of motion planning in the presence of state uncertainty, also known as planning in belief space. The work is motivated by planning domains involving nontrivial dynamics, spatially varying measurement properties, and obstacle constraints. To make the problem tractable, we restrict the motion plan to a nominal trajectory stabilized with a linear estimator and controller. This allows us to predict distributions over future states given a candidate nominal trajectory. Using these distributions to ensure a bounded probability of collision, the algorithm incrementally constructs a graph of trajectories through state space, while efficiently searching over candidate paths through the graph at each iteration. This process results in a search tree in belief space that provably converges to the optimal path. We analyze the algorithm theoretically and also provide simulation results demonstrating its utility for balancing information gathering to reduce uncertainty and finding low cost paths.},
+	urldate = {2026-09-14},
+	booktitle = {2011 {IEEE} {International} {Conference} on {Robotics} and {Automation}},
+	author = {Bry, Adam and Roy, Nicholas},
+	month = may,
+	year = {2011},
+	note = {ISSN: 1050-4729},
+	keywords = {Equations, Heuristic algorithms, Kalman filters, Planning, Trajectory, Uncertainty, Vehicle dynamics},
+	pages = {723--730},
+	file = {Full Text PDF:C\:\\Users\\Zhang\\Zotero\\storage\\KQN9RP5Y\\Bry and Roy - 2011 - Rapidly-exploring Random Belief Trees for motion planning under uncertainty.pdf:application/pdf},
+}
+
+
+
+
+@article{vandenberg2011lqgmp,
+	title = {{LQG}-{MP}: {Optimized} path planning for robots with motion uncertainty and imperfect state information},
+	volume = {30},
+	issn = {0278-3649},
+	shorttitle = {{LQG}-{MP}},
+	url = {https://doi.org/10.1177/0278364911406562},
+	doi = {10.1177/0278364911406562},
+	abstract = {In this paper we present LQG-MP (linear-quadratic Gaussian motion planning), a new approach to robot motion planning that takes into account the sensors and the controller that will be used during the execution of the robot’s path. LQG-MP is based on the linear-quadratic controller with Gaussian models of uncertainty, and explicitly characterizes in advance (i.e. before execution) the a priori  probability distributions of the state of the robot along its path. These distributions can be used to assess the quality of the path, for instance by computing the probability of avoiding collisions. Many methods can be used to generate the required ensemble of candidate paths from which the best path is selected; in this paper we report results using rapidly exploring random trees (RRT). We study the performance of LQG-MP with simulation experiments in three scenarios: (A) a kinodynamic car-like robot, (B) multi-robot planning with differential-drive robots, and (C) a 6-DOF serial manipulator. We also present a method that applies Kalman smoothing to make paths Ck-continuous and apply LQG-MP to precomputed roadmaps using a variant of Dijkstra’s algorithm to efficiently find high-quality paths.},
+	language = {EN},
+	number = {7},
+	urldate = {2026-09-13},
+	journal = {The International Journal of Robotics Research},
+	publisher = {SAGE Publications Ltd STM},
+	author = {van den Berg, Jur and Abbeel, Pieter and Goldberg, Ken},
+	month = jun,
+	year = {2011},
+	pages = {895--913},
+}
+
+
+
+
+
+@article{bahr2009coop,
+	title = {Cooperative {Localization} for {Autonomous} {Underwater} {Vehicles}},
+	volume = {28},
+	issn = {0278-3649},
+	url = {https://doi.org/10.1177/0278364908100561},
+	doi = {10.1177/0278364908100561},
+	abstract = {This paper describes an algorithm for distributed acoustic navigation for Autonomous Underwater Vehicles (AUVs). Whereas typical AUV navigation systems utilize pre-calibrated arrays of static transponders, our work seeks to create a fully mobile network of AUVs that perform acoustic ranging and data exchange with one another to achieve cooperative positioning for extended duration missions over large areas. The algorithm enumerates possible solutions for the AUV trajectory based on dead-reckoning and range-only measurements provided by acoustic modems that are mounted on each vehicle, and chooses the trajectory via minimization of a cost function based on these constraints. The resulting algorithm is computationally efficient, meets the strict bandwidth requirements of available AUV modems, and has potential to scale well to networks of large numbers of vehicles. The method has undergone extensive experimentation, and results from three different scenarios are reported in this paper, each of which utilizes MIT SCOUT Autonomous Surface Craft (ASC) as convenient platforms for testing. In the first experiment, we utilize three ASCs, each equipped with a Woods Hole acoustic modem, as surrogates for AUVs. In this scenario, two ASCs serve as Communication/Navigation Aids (CNAs) for a third ASC that computes its position based exclusively on GPS positions of the CNAs and acoustic range measurements between platforms. In the second scenario, an undersea glider is used in conjunction with two ASCs serving as CNAs. Finally, in the third experiment, a Bluefin12 AUV serves as the target vehicle. All three experiments demonstrate the successful operation of the technique with real ocean data.},
+	language = {EN},
+	number = {6},
+	urldate = {2026-09-14},
+	journal = {The International Journal of Robotics Research},
+	publisher = {SAGE Publications Ltd STM},
+	author = {Bahr, Alexander and Leonard, John J. and Fallon, Maurice F.},
+	month = jun,
+	year = {2009},
+	pages = {714--728},
+	file = {Full Text PDF:C\:\\Users\\Zhang\\Zotero\\storage\\HGA2EPND\\Bahr et al. - 2009 - Cooperative Localization for Autonomous Underwater Vehicles.pdf:application/pdf},
+}
+
+
+
+
+@article{paull2014auv,
+	title = {{AUV} {Navigation} and {Localization}: {A} {Review}},
+	volume = {39},
+	issn = {1558-1691},
+	shorttitle = {{AUV} {Navigation} and {Localization}},
+	url = {https://ieeexplore.ieee.org/abstract/document/6678293},
+	doi = {10.1109/JOE.2013.2278891},
+	abstract = {Autonomous underwater vehicle (AUV) navigation and localization in underwater environments is particularly challenging due to the rapid attenuation of Global Positioning System (GPS) and radio-frequency signals. Underwater communications are low bandwidth and unreliable, and there is no access to a global positioning system. Past approaches to solve the AUV localization problem have employed expensive inertial sensors, used installed beacons in the region of interest, or required periodic surfacing of the AUV. While these methods are useful, their performance is fundamentally limited. Advances in underwater communications and the application of simultaneous localization and mapping (SLAM) technology to the underwater realm have yielded new possibilities in the field. This paper presents a review of the state of the art of AUV navigation and localization, as well as a description of some of the more commonly used methods. In addition, we highlight areas of future research potential.},
+	number = {1},
+	urldate = {2026-09-14},
+	journal = {IEEE Journal of Oceanic Engineering},
+	author = {Paull, Liam and Saeedi, Sajad and Seto, Mae and Li, Howard},
+	month = jan,
+	year = {2014},
+	keywords = {Acoustics, Autonomous underwater vehicles (AUVs), marine navigation, simultaneous localization and mapping, Simultaneous localization and mapping, Sonar navigation},
+	pages = {131--149},
+	file = {Full Text PDF:C\:\\Users\\Zhang\\Zotero\\storage\\RPKJIS2F\\Paull et al. - 2014 - AUV Navigation and Localization A Review.pdf:application/pdf},
+}
+
+
+
+
+
+@inproceedings{carrillo2013ci,
+	title = {Decentralized multi-robot cooperative localization using covariance intersection},
+	issn = {2153-0866},
+	url = {https://ieeexplore.ieee.org/abstract/document/6696534},
+	doi = {10.1109/IROS.2013.6696534},
+	abstract = {In this paper, we present a Covariance Intersection (CI)-based algorithm for reducing the processing and communication complexity of multi-robot Cooperative Localization (CL). Specifically, for a team of N robots, our proposed approximate CI-based CL approach has processing and communication complexity only linear, O(N), in the number of robots. Moreover, and in contrast to alternative approximate methods, our approach is provably consistent, can handle asynchronous communication, and does not place any restriction on the robots' motion. We test the performance of our proposed approach in both simulations and experimentally, and show that it outperforms the existing linear-complexity split CI-based CL method.},
+	urldate = {2026-09-14},
+	booktitle = {2013 {IEEE}/{RSJ} {International} {Conference} on {Intelligent} {Robots} and {Systems}},
+	author = {Carrillo-Arce, Luis C. and Nerurkar, Esha D. and Gordillo, José L. and Roumeliotis, Stergios I.},
+	month = nov,
+	year = {2013},
+	note = {ISSN: 2153-0866},
+	keywords = {Approximation algorithms, Estimation, Fuses, Robot sensing systems, Standards, Time measurement},
+	pages = {1412--1417},
+	file = {Full Text PDF:C\:\\Users\\Zhang\\Zotero\\storage\\PVGFFHKN\\Carrillo-Arce et al. - 2013 - Decentralized multi-robot cooperative localization using covariance intersection.pdf:application/pdf},
+}
+
+
+
+
+
+@article{erdmann1987multiple,
+	title = {On multiple moving objects},
+	volume = {2},
+	issn = {1432-0541},
+	url = {https://doi.org/10.1007/BF01840371},
+	doi = {10.1007/BF01840371},
+	abstract = {This paper explores the motion-planning problem for multiple moving objects. The approach taken consists of assigning priorities to the objects, then planning motions one object at a time. For each moving object, the planner constructs a configuration space-time that represents the time-varying constraints imposed on the moving object by the other moving and stationary objects. The planner represents this space-time approximately, using two-dimensional slices. The space-time is then searched for a collision-free path. The paper demonstrates this approach in two domains. One domain consists of translating planar objects; the other domain consists of two-link planar articulated arms.},
+	language = {en},
+	number = {1},
+	urldate = {2026-09-14},
+	journal = {Algorithmica},
+	author = {Erdmann, Michael and Lozano-Pérez, Tomás},
+	month = nov,
+	year = {1987},
+	keywords = {Autonomous robots, Collision avoidance, Configuration space, Coordinated motion, Motion planning, Robotics},
+	pages = {477--521},
+}
+
+
+
+
+@article{silver2005cooperative,
+	title = {Cooperative {Pathfinding}},
+	volume = {1},
+	copyright = {Copyright (c) 2005 Proceedings of the AAAI Conference on Artificial Intelligence and Interactive Digital Entertainment},
+	issn = {2334-0924},
+	url = {https://ojs.aaai.org/index.php/AIIDE/article/view/18726},
+	doi = {10.1609/aiide.v1i1.18726},
+	abstract = {Cooperative Pathfinding is a multi-agent path planning problem where agents must find non-colliding routes to separate destinations, given full information about the routes of other agents. This paper presents three new algorithms for efficiently solving this problem, suitable for use in Real-Time Strategy games and other real-time environments. The algorithms are decoupled approaches that break down the problem into a series of single-agent searches. Cooperative A* (CA*) searches space-time for a non-colliding route. Hierarchical Cooperative A* (HCA*) uses an abstract heuristic to boost performance. Finally, Windowed Hierarchical Cooperative A* (WHCA*) limits the space-time search depth to a dynamic window, spreading computation over the duration of the route. The algorithms are applied to a series of challenging, maze-like environments, and compared to A* with Local Repair (the current video-games industry standard). The results show that the new algorithms, especially WHCA*, are robust and efficient solutions to the Cooperative Pathfinding problem, finding more successful routes and following better paths than Local Repair A*},
+	language = {en},
+	number = {1},
+	urldate = {2026-09-14},
+	journal = {Proceedings of the AAAI Conference on Artificial Intelligence and Interactive Digital Entertainment},
+	author = {Silver, David},
+	month = jun,
+	year = {2005},
+	pages = {117--122},
+	file = {Full Text PDF:C\:\\Users\\Zhang\\Zotero\\storage\\UEQ9EBAP\\Silver - 2005 - Cooperative Pathfinding.pdf:application/pdf},
+}
+
+
+
+@article{balch1998formation,
+  author={Balch, T. and Arkin, R.C.},
+  journal={IEEE Transactions on Robotics and Automation}, 
+  title={Behavior-based formation control for multirobot teams}, 
+  year={1998},
+  volume={14},
+  number={6},
+  pages={926-939},
+  keywords={Robot sensing systems;Navigation;Laboratories;Animals;Hazards;Hidden Markov models;Land vehicles;Mobile robots;Robot control;Communication system control},
+  doi={10.1109/70.736776}}
+
+
+
+
+
+@article{krause2008sensor,
+	title = {Near-{Optimal} {Sensor} {Placements} in {Gaussian} {Processes}: {Theory}, {Efﬁcient} {Algorithms} and {Empirical} {Studies}},
+	abstract = {When monitoring spatial phenomena, which can often be modeled as Gaussian processes (GPs), choosing sensor locations is a fundamental task. There are several common strategies to address this task, for example, geometry or disk models, placing sensors at the points of highest entropy (variance) in the GP model, and A-, D-, or E-optimal design. In this paper, we tackle the combinatorial optimization problem of maximizing the mutual information between the chosen locations and the locations which are not selected. We prove that the problem of ﬁnding the conﬁguration that maximizes mutual information is NP-complete. To address this issue, we describe a polynomial-time approximation that is within (1 − 1/e) of the optimum by exploiting the submodularity of mutual information. We also show how submodularity can be used to obtain online bounds, and design branch and bound search procedures. We then extend our algorithm to exploit lazy evaluations and local structure in the GP, yielding signiﬁcant speedups. We also extend our approach to ﬁnd placements which are robust against node failures and uncertainties in the model. These extensions are again associated with rigorous theoretical approximation guarantees, exploiting the submodularity of the objective function. We demonstrate the advantages of our approach towards optimizing mutual information in a very extensive empirical study on two real-world data sets.},
+	language = {en},
+	author = {Krause, Andreas and Singh, Ajit and Guestrin, Carlos},
+	file = {PDF:C\:\\Users\\Zhang\\Zotero\\storage\\ZXVYJV6J\\Krause et al. - Near-Optimal Sensor Placements in Gaussian Processes Theory, Efﬁcient Algorithms and Empirical Stud.pdf:application/pdf},
+}
+
+
+@article{blackmore2011chance,
+	title = {Chance-{Constrained} {Optimal} {Path} {Planning} {With} {Obstacles}},
+	volume = {27},
+	issn = {1941-0468},
+	url = {https://ieeexplore.ieee.org/abstract/document/5970128},
+	doi = {10.1109/TRO.2011.2161160},
+	abstract = {Autonomous vehicles need to plan trajectories to a specified goal that avoid obstacles. For robust execution, we must take into account uncertainty, which arises due to uncertain localization, modeling errors, and disturbances. Prior work handled the case of set-bounded uncertainty. We present here a chance-constrained approach, which uses instead a probabilistic representation of uncertainty. The new approach plans the future probabilistic distribution of the vehicle state so that the probability of failure is below a specified threshold. Failure occurs when the vehicle collides with an obstacle or leaves an operator-specified region. The key idea behind the approach is to use bounds on the probability of collision to show that, for linear-Gaussian systems, we can approximate the nonconvex chance-constrained optimization problem as a disjunctive convex program. This can be solved to global optimality using branch-and-bound techniques. In order to improve computation time, we introduce a customized solution method that returns almost-optimal solutions along with a hard bound on the level of suboptimality. We present an empirical validation with an aircraft obstacle avoidance example.},
+	number = {6},
+	urldate = {2026-09-14},
+	journal = {IEEE Transactions on Robotics},
+	author = {Blackmore, Lars and Ono, Masahiro and Williams, Brian C.},
+	month = dec,
+	year = {2011},
+	keywords = {Atmospheric modeling, Autonomous agents, chance constraints, Intelligent vehicles, Linear systems, Mathematical model, Optimization, optimization under uncertainty, probabilistic planning, Trajectory},
+	pages = {1080--1094},
+	file = {Full Text PDF:C\:\\Users\\Zhang\\Zotero\\storage\\C5XMXYRU\\Blackmore et al. - 2011 - Chance-Constrained Optimal Path Planning With Obstacles.pdf:application/pdf},
+}
+
+
+
+
+@article{tordesillas2022minvo,
+	title = {{MINVO} {Basis}: {Finding} {Simplexes} with {Minimum} {Volume} {Enclosing} {Polynomial} {Curves}},
+	volume = {151},
+	issn = {0010-4485},
+	shorttitle = {{MINVO} {Basis}},
+	url = {https://www.sciencedirect.com/science/article/pii/S0010448522000975},
+	doi = {10.1016/j.cad.2022.103341},
+	abstract = {This paper studies the polynomial basis that generates the smallest n-simplex enclosing a given nth-degree polynomial curve in Rn. Although the Bernstein and B-Spline polynomial bases provide feasible solutions to this problem, the simplexes obtained by these bases are not the smallest possible, which leads to overly conservative results in many CAD (computer-aided design) applications. We first prove that the polynomial basis that solves this problem (MINVO basis) also solves for the nth-degree polynomial curve with largest convex hull enclosed in a given n-simplex. Then, we present a formulation that is independent of the n-simplex or nth-degree polynomial curve given. By using Sum-Of-Squares (SOS) programming, branch and bound, and moment relaxations, we obtain high-quality feasible solutions for any n∈N, and prove (numerical) global optimality for n=1,2,3 and (numerical) local optimality for n=4. The results obtained for n=3 show that, for any given 3rd-degree polynomial curve in R3, the MINVO basis is able to obtain an enclosing simplex whose volume is 2.36 and 254.9 times smaller than the ones obtained by the Bernstein and B-Spline bases, respectively. When n=7, these ratios increase to 902.7 and 2.997⋅1021, respectively.},
+	urldate = {2026-09-14},
+	journal = {Computer-Aided Design},
+	author = {Tordesillas, Jesus and How, Jonathan P.},
+	month = oct,
+	year = {2022},
+	keywords = {Curve with largest convex hull, Minimum enclosing simplex, Polynomial basis, Polynomial curve, Spline},
+	pages = {103341},
+}
+
+
+@INPROCEEDINGS{potokar2022holoocean,
+  author={Potokar, Easton and Ashford, Spencer and Kaess, Michael and Mangelson, Joshua G.},
+  booktitle={2022 International Conference on Robotics and Automation (ICRA)}, 
+  title={HoloOcean: An Underwater Robotics Simulator}, 
+  year={2022},
+  volume={},
+  number={},
+  pages={3040-3046},
+  keywords={Buildings;Octrees;Sonar;Robot sensing systems;Optical imaging;Modems;Real-time systems},
+  doi={10.1109/ICRA46639.2022.9812353}
+}
+
+
+@article{kaess2012isam2,
+  title={{iSAM2}: Incremental smoothing and mapping using the {B}ayes tree},
+  author={Kaess, Michael and Johannsson, Hordur and Roberts, Richard and Ila, Viorela and Leonard, John J. and Dellaert, Frank},
+  journal={International Journal of Robotics Research},
+  year={2012},
+  volume={31},
+  number={2},
+  pages={216--235}
+}
+
+
+
+
+@article{dellaert2017factor,
+	title = {Factor {Graphs} for {Robot} {Perception}},
+	volume = {6},
+	issn = {1935-8253},
+	url = {https://doi.org/10.1561/2300000043},
+	doi = {10.1561/2300000043},
+	abstract = {We review the use of factor graphs for the modeling and solving of large-scale inference problems in robotics. Factor graphs are a family of probabilistic graphical models, other examples of which are Bayesian networks and Markov random fields, well known from the statistical modeling and machine learning literature. They provide a powerful abstraction that gives insight into particular inference problems, making it easier to think about and design solutions, and write modular software to perform the actual inference. We illustrate their use in the simultaneous localization and mapping problem and other important problems associated with deploying robots in the real world. We introduce factor graphs as an economical representation within which to formulate the different inference problems, setting the stage for the subsequent sections on practical methods to solve them. We explain the nonlinear optimization techniques for solving arbitrary nonlinear factor graphs, which requires repeatedly solving large sparse linear systems.The sparse structure of the factor graph is the key to understanding this more general algorithm, and hence also understanding (and improving) sparse factorization methods. We provide insight into the graphs underlying robotics inference, and how their sparsity is affected by the implementation choices we make, crucial for achieving highly performant algorithms. As many inference problems in robotics are incremental, we also discuss the iSAM class of algorithms that can reuse previous computations, re-interpreting incremental matrix factorization methods as operations on graphical models, introducing the Bayes tree in the process. Because in most practical situations we will have to deal with 3D rotations and other nonlinear manifolds, we also introduce the more sophisticated machinery to perform optimization on nonlinear manifolds. Finally, we provide an overview of applications of factor graphs for robot perception, showing the broad impact factor graphs had in robot perception.},
+	number = {1-2},
+	urldate = {2026-09-14},
+	journal = {Foundations and Trends in Robotics},
+	author = {Dellaert, Frank and Kaess, Michael},
+	month = aug,
+	year = {2017},
+	pages = {1--139},
+}
+
+
+
+
+
+@article{pohl1970weighted,
+	title = {Heuristic search viewed as path finding in a graph},
+	volume = {1},
+	issn = {0004-3702},
+	url = {https://www.sciencedirect.com/science/article/pii/000437027090007X},
+	doi = {10.1016/0004-3702(70)90007-X},
+	abstract = {This paper presents a particular model of heuristic search as a path-finding problem in a directed graph. A class of graph-searching procedures is described which uses a heuristic function to guide search. Heuristic functions are estimates of the number of edges that remain to be traversed in reaching a goal node. A number of theoretical results for this model, and the intuition for these results, are presented. They relate the efficiency of search to the accuracy of the heuristic function. The results also explore efficiency as a consequence of the reliance or weight placed on the heuristics used.},
+	number = {3},
+	urldate = {2026-09-14},
+	journal = {Artificial Intelligence},
+	author = {Pohl, Ira},
+	month = jan,
+	year = {1970},
+	pages = {193--204},
+	file = {ScienceDirect Snapshot:C\:\\Users\\Zhang\\Zotero\\storage\\ZHKXIMWB\\000437027090007X.html:text/html},
+}
+
+
+
+@article{hart1968astar,
+  author={Hart, Peter E. and Nilsson, Nils J. and Raphael, Bertram},
+  journal={IEEE Transactions on Systems Science and Cybernetics}, 
+  title={A Formal Basis for the Heuristic Determination of Minimum Cost Paths}, 
+  year={1968},
+  volume={4},
+  number={2},
+  pages={100-107},
+  keywords={Costs;Mathematical programming;Minimization methods;Functional programming;Automatic control;Minimax techniques;Gradient methods;Chemical technology;Automatic programming;Instruction sets},
+  doi={10.1109/TSSC.1968.300136}}
+
+
+
+
+
+@misc{kingma2014adam,
+	title = {Adam: {A} {Method} for {Stochastic} {Optimization}},
+	shorttitle = {Adam},
+	url = {https://arxiv.org/abs/1412.6980v9},
+	abstract = {We introduce Adam, an algorithm for first-order gradient-based optimization of stochastic objective functions, based on adaptive estimates of lower-order moments. The method is straightforward to implement, is computationally efficient, has little memory requirements, is invariant to diagonal rescaling of the gradients, and is well suited for problems that are large in terms of data and/or parameters. The method is also appropriate for non-stationary objectives and problems with very noisy and/or sparse gradients. The hyper-parameters have intuitive interpretations and typically require little tuning. Some connections to related algorithms, on which Adam was inspired, are discussed. We also analyze the theoretical convergence properties of the algorithm and provide a regret bound on the convergence rate that is comparable to the best known results under the online convex optimization framework. Empirical results demonstrate that Adam works well in practice and compares favorably to other stochastic optimization methods. Finally, we discuss AdaMax, a variant of Adam based on the infinity norm.},
+	language = {en},
+	urldate = {2026-09-14},
+	journal = {arXiv.org},
+	author = {Kingma, Diederik P. and Ba, Jimmy},
+	month = dec,
+	year = {2014},
+	file = {Full Text PDF:C\:\\Users\\Zhang\\Zotero\\storage\\PULHEARH\\Kingma and Ba - 2014 - Adam A Method for Stochastic Optimization.pdf:application/pdf},
+}
+
+
+
+
+@book{fossen2021handbook,
+	title = {Handbook of {Marine} {Craft} {Hydrodynamics} and {Motion} {Control}},
+	isbn = {978-1-119-57503-0},
+	abstract = {Handbook of MARINE CRAFT HYDRODYNAMICS AND MOTION CONTROL The latest tools for analysis and design of advanced GNC systemsHandbook of Marine Craft Hydrodynamics and Motion Control is an extensive study of the latest research in hydrodynamics, guidance, navigation, and control systems for marine craft. The text establishes how the implementation of mathematical models and modern control theory can be used for simulation and verification of control systems, decision-support systems, and situational awareness systems. Coverage includes hydrodynamic models for marine craft, models for wind, waves and ocean currents, dynamics and stability of marine craft, advanced guidance principles, sensor fusion, and inertial navigation.This important book includes the latest tools for analysis and design of advanced GNC systems and presents new material on unmanned underwater vehicles, surface craft, and autonomous vehicles. References and examples are included to enable engineers to analyze existing projects before making their own designs, as well as MATLAB scripts for hands-on software development and testing. Highlights of this Second Edition include:Topical case studies and worked examples demonstrating how you can apply modeling and control design techniques to your own designsA Github repository with MATLAB scripts (MSS toolbox) compatible with the latest software releases from MathworksNew content on mathematical modeling, including models for ships and underwater vehicles, hydrostatics, and control forces and momentsNew methods for guidance and navigation, including line-of-sight (LOS) guidance laws for path following, sensory systems, model-based navigation systems, and inertial navigation systemsThis fully revised Second Edition includes innovative research in hydrodynamics and GNC systems for marine craft, from ships to autonomous vehicles operating on the surface and under water. Handbook of Marine Craft Hydrodynamics and Motion Control is a must-have for students and engineers working with unmanned systems, field robots, autonomous vehicles, and ships.MSS toolbox: https://github.com/cybergalactic/mssLecture notes: https://www.fossen.biz/wileyAuthor’s home page: https://www.fossen.biz},
+	language = {en},
+	publisher = {John Wiley \& Sons},
+	author = {Fossen, Thor I.},
+	month = apr,
+	year = {2021},
+	note = {Google-Books-ID: tCQqEAAAQBAJ},
+	keywords = {Science / Mechanics / Hydrodynamics, Science / System Theory, Technology \& Engineering / Electronics / General, Technology \& Engineering / Power Resources / General, Transportation / Ships \& Shipbuilding / Submarines},
+}
+
+@book{piegl1997nurbs,
+  title={The {NURBS} Book},
+  author={Piegl, Les and Tiller, Wayne},
+  publisher={Springer},
+  edition={2nd},
+  year={1997}
+}
+
+@book{piegl_nurbs_2012,
+	title = {The {NURBS} {Book}},
+	isbn = {978-3-642-59223-2},
+	abstract = {Until recently B-spline curves and surfaces (NURBS) were principally of interest to the computer aided design community, where they have become the standard for curve and surface description. Today we are seeing expanded use of NURBS in modeling objects for the visual arts, including the film and entertainment industries, art, and sculpture. NURBS are now also being used for modeling scenes for virtual reality applications. These applications are expected to increase. Consequently, it is quite appropriate for The.N'URBS Book to be part of the Monographs in Visual Communication Series. B-spline curves and surfaces have been an enduring element throughout my pro fessional life. The first edition of Mathematical Elements for Computer Graphics, published in 1972, was the first computer aided design/interactive computer graph ics textbook to contain material on B-splines. That material was obtained through the good graces of Bill Gordon and Louie Knapp while they were at Syracuse University. A paper of mine, presented during the Summer of 1977 at a Society of Naval Architects and Marine Engineers meeting on computer aided ship surface design, was arguably the first to examine the use of B-spline curves for ship design. For many, B-splines, rational B-splines, and NURBS have been a bit mysterious.},
+	language = {en},
+	publisher = {Springer Science \& Business Media},
+	author = {Piegl, Les and Tiller, Wayne},
+	month = dec,
+	year = {2012},
+	note = {Google-Books-ID: 58KqCAAAQBAJ},
+	keywords = {Computers / Design, Graphics \& Media / CAD-CAM, Computers / Software Development \& Engineering / Computer Graphics, Computers / Software Development \& Engineering / General},
+}
+
+
+@inproceedings{roy_coastal_1999,
+	address = {Detroit, MI, USA},
+	title = {Coastal navigation-mobile robot navigation with uncertainty in dynamic environments},
+	volume = {1},
+	isbn = {978-0-7803-5180-6},
+	url = {http://ieeexplore.ieee.org/document/769927/},
+	doi = {10.1109/ROBOT.1999.769927},
+	abstract = {Ships often use the coasts of continents for navigation in the absence of better tools such as GPS, since being close to land allows sailors to determine with high accuracy where they are. Similarly for mobile robots, in many environments global and accurate localization is not always feasible. Environments can lack features, and dynamic obstacles such as people can confuse and block sensors.},
+	language = {en},
+	urldate = {2026-09-13},
+	booktitle = {Proceedings 1999 {IEEE} {International} {Conference} on {Robotics} and {Automation} ({Cat}. {No}.{99CH36288C})},
+	publisher = {IEEE},
+	author = {Roy, N. and Burgard, W. and Fox, D. and Thrun, S.},
+	year = {1999},
+	pages = {35--40},
+	file = {PDF:C\:\\Users\\Zhang\\Zotero\\storage\\ZLRXXWBV\\Roy et al. - 1999 - Coastal navigation-mobile robot navigation with uncertainty in dynamic environments.pdf:application/pdf},
+}
+
+

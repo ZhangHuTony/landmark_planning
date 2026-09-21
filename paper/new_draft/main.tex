@@ -400,13 +400,18 @@ $\mathit{open} \leftarrow \{\text{joint start}\}$;
 \lIf{$\mathit{seed} = \varnothing$}{$\mathit{seed} \leftarrow \mathit{inc}$, the least-violating candidate}
 $x \leftarrow$ control points of the seed splines;
   $\mathit{feas} \leftarrow \min s(x) \ge 0$\;
-\ForEach{barrier stage; Adam step on $\nabla_x J(x;\mu)$}{
-  accept iff $J$ decreases and ($\lnot\mathit{feas}$ or trial feasible)\;
-  $\mathit{feas} \leftarrow \mathit{feas} \lor \text{trial feasible}$\;
-  track least-violating and shortest feasible incumbents\;
-  decay $\mu$ only once $\mathit{feas}$\;
+$x^\star \leftarrow x$ if $\mathit{feas}$ else $\varnothing$;
+  $x^{-} \leftarrow x$ \tcp*[r]{incumbents}
+\ForEach{barrier stage; iterate until stationary or stalled}{
+  $x' \leftarrow$ backtracked Adam step on $\nabla_x J(x;\mu)$\;
+  \uIf(\tcp*[f]{recovery}){$\lnot\mathit{feas}$}{
+    accept iff $J(x') < J(x)$; then $\mathit{feas} \leftarrow \min s(x') \ge 0$\;
+  }
+  \lElse{accept iff $J(x') < J(x)$ and $\min s(x') \ge 0$}
+  update $x^\star$ (shortest feasible) and $x^{-}$ (least violating) with $x'$\;
+  at stage end, decay $\mu$ only once $\mathit{feas}$\;
 }
-\Return the best incumbent trajectory\;
+\Return $x^\star$ if $x^\star \neq \varnothing$ else $x^{-}$\;
 \caption{Discrete-to-continuous escort planning}
 \label{alg:joint}
 \end{algorithm}
@@ -623,6 +628,7 @@ single-agent reference, most of it shared overhead. Only CL-GBT grows with
 the bound, and its longest run took 730\,s.
 
 \subsection{Ablation}
+\label{sec:ablation}
 
 \begin{figure}[t]
   \centering
@@ -683,10 +689,16 @@ Table~\ref{tab:sweep}). The discrete stage alone solves the same scenarios
 down to 70\% and one or two fewer at 60\% and 50\%, with paths 2 to 7\%
 longer at every level down to 50\%, which is the length the refinement
 recovers by cutting the lattice corners. The straight seed solves 53\% of
-the scenarios at the loosest level and none below 60\%, and every solution
-it returns has a length ratio of 1.00: the refinement never found a detour
-from a straight seed and succeeded only where the straight line was already
-feasible. The joint search finds the landmarks, and the
+the scenarios at the loosest level and none below 60\%. Its solutions are
+not all straight lines. Of the 16 at the loosest level, 11 started inside an
+obstacle by 7 to 55\,m, and the barrier deflected them clear at a cost of
+under 4\% of the straight length in all but one. In seven of those the
+deflected line is 7 to 44\% shorter than the route of the full pipeline,
+which went around the same obstacle by whole cells: the direct passage exists
+in continuous space but not on the lattice
+(Sec.~\ref{sec:limitations}). Below 80\% the straight seed fails because
+recovery moves the path by metres, and reaching a landmark takes a detour of
+hundreds. The joint search finds the landmarks, and the
 refinement makes the route short, at a cost of about 1.5\,s
 (Fig.~\ref{fig:abl_wall}).
 
@@ -862,13 +874,18 @@ quantity under test.
 
 % ===========================================================================
 \section{DISCUSSION AND LIMITATIONS}
+\label{sec:limitations}
 % ===========================================================================
 The discrete stage is complete only with respect to the lattice. The lattice
 is laid over the corridor without regard to the obstacles, so the lattice
 paths that clear them are neither a subset nor a superset of the continuous
 feasible set, and a route that exists only between two cells is not found.
 The refinement can shorten a seed and recover a small violation but cannot
-change its homotopy class. A finer lattice narrows the gap at the cost of a
+change its homotopy class. The ablation shows the cost: on seven of its 30
+scenarios the refinement, started from a straight line, deflected the primary
+a few metres around an obstacle and finished 7 to 44\% shorter than the
+lattice route, which had detoured around the same obstacle by whole cells
+(Sec.~\ref{sec:ablation}). A finer lattice narrows the gap at the cost of a
 larger graph, and the all-pairs heuristic is cubic in the number of nodes.
 
 The belief model is Gaussian and assumes that the planned trajectory

@@ -1,0 +1,12 @@
+
+Despite the theoretical structure of the proposed pipeline, several limitations remain.
+
+First, the end-to-end optimality guarantee is conditional on discretization and refinement assumptions. In particular, the $\epsilon$-suboptimality result relies on the existence of a sufficiently fine discretization of the continuous space and a bounded distortion property of the spline refinement. If either assumption is violated (e.g., coarse graphs or aggressive curvature constraints), the bound may not accurately reflect performance.
+
+Second, the continuous refinement stage is a local nonlinear projection procedure that enforces curvature and feasibility constraints. While it does not worsen trajectory cost under the admissible refinement operator, its final outcome may depend on initialization from the discrete solution.
+
+Third, uncertainty propagation is based on an information-form approximation that neglects higher-order correlations and unknown cross-covariances between agents. While this improves computational tractability, it may introduce conservatism or inconsistency in tightly coupled sensing scenarios.
+
+Fourth, feasibility enforcement relies on penalty and barrier methods rather than hard constraint satisfaction throughout optimization. Although constraints are enforced at convergence and during candidate evaluation, intermediate iterates may temporarily violate constraints.
+
+Finally, the approach assumes that the underlying graph structure and motion primitives sufficiently capture the connectivity of the continuous environment. In highly cluttered or dynamically changing environments, this assumption may fail, leading to degraded solution quality or loss of feasible paths.

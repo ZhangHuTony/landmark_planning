@@ -1,0 +1,17 @@
+
+The discrete solution is lifted into continuous space and refined using clamped cubic B-splines. Let \(P_{\text{disc}}\) denote the discrete path obtained from the joint A* search, and let \(R(\cdot)\) denote the spline refinement operator that maps \(P_{\text{disc}}\) to a continuous trajectory \(\tau_{\text{spline}}\).
+
+We define:
+\begin{equation}
+\tau_{\mathrm{spline}} = \mathcal{R}(P_{\mathrm{disc}}).
+\end{equation}
+
+The refinement operator enforces $C^2$ continuity and curvature feasibility constraints, while producing a smooth trajectory that interpolates or approximates the discrete path. However, this transformation introduces geometric distortion relative to the original discrete solution.
+
+We model this distortion as an additional multiplicative suboptimality term:
+\begin{equation}
+L(\tau_{\mathrm{spline}}) \le (1 + \epsilon_{\mathrm{spline}})\, L(P_{\mathrm{disc}}),
+\end{equation}
+where $\epsilon_{\mathrm{spline}} \ge 0$ captures the approximation error induced by spline smoothing, curvature enforcement, and deviation from piecewise-linear geodesics.
+
+Unlike the discrete solution, spline refinement is not cost-preserving in general, as curvature constraints and smoothness requirements may increase trajectory length relative to the discrete path.

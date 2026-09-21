@@ -1,0 +1,29 @@
+
+\begin{proposition}[End-to-end $\epsilon$-suboptimality]
+Assume:
+(i) A* returns an optimal solution on the discrete graph,
+(ii) the discretization induces a bounded approximation error $\epsilon_{\mathrm{disc}}$ such that any continuous feasible trajectory admits a discrete approximation satisfying
+\begin{equation}
+L_{\mathrm{disc}} \le (1 + \epsilon_{\mathrm{disc}}) L^*,
+\end{equation}
+and (iii) spline refinement induces bounded distortion $\epsilon_{\mathrm{spline}}$ such that
+\begin{equation}
+L_{\mathrm{spline}} \le (1 + \epsilon_{\mathrm{spline}}) L_{\mathrm{disc}}.
+\end{equation}
+
+Then the returned trajectory satisfies:
+\begin{equation}
+L_{\mathrm{returned}} \le (1 + \epsilon_{\mathrm{disc}})(1 + \epsilon_{\mathrm{spline}})\, L^*.
+\end{equation}
+
+Equivalently, for small $\epsilon_{\mathrm{disc}}, \epsilon_{\mathrm{spline}}$, we obtain:
+\begin{equation}
+L_{\mathrm{returned}} \le (1 + \epsilon_{\mathrm{total}})\, L^*,
+\quad
+\epsilon_{\mathrm{total}} \approx \epsilon_{\mathrm{disc}} + \epsilon_{\mathrm{spline}}.
+\end{equation}
+\end{proposition}
+
+\begin{remark}
+Spline refinement introduces additional suboptimality due to curvature enforcement and geometric smoothing, and should be interpreted as a bounded approximation operator rather than a cost-preserving projection.
+\end{remark}

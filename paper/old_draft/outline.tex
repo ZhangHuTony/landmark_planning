@@ -1,0 +1,132 @@
+\documentclass[11pt,a4paper,twoside]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[english]{babel}
+\usepackage{blindtext}
+
+
+\begin{document}
+
+\noindent {\bfseries\LARGE Paper Outline\par}
+\bigskip\noindent
+
+\section*{Contributions}
+
+The contributions within this work can be summarized as follows:
+\begin{itemize}
+    \item To the best of our knowledge... first to present the multi-robot informative path planning problem as an information-theoretic variant of the team orienteering problem
+    % \item We formulate a mathematical mixed-integer linear programming model  that models the influence of altitude and sensing resolution on information gain for teams of aerial robotics systems
+    \item We formulate our multi-agent planning problem as a novel mixed-integer programming problem which explicitly models dependent rewards from varied altitude and sensing resolutions observations
+    \item Evaluate the mixed-integer mathematical problem against ant colony optimization and greedy baselines on multiple maps of varying information distributions. MILP model demonstrates an improvement of XX\% over greedy baseline for teams of A to B agents and the ACO method demonstrates an improvement over the greedy baseline by YY\% for teams of C to D robots. 
+    % \item We present a greedy, mixed-integer linear programming, and ant colony optimization implementations of this model. 
+    % \item We evaluate these models for teams of agents on maps of varying information distributions and present an analysis on the performance of exact solvers and metaheuristics and when each approach becomes advantageous. 
+    % \item We present an ablation on the performance of the system for various team budgets and demonstrate <todo>
+    % \item We demonstrate this approach in Isaac sim...
+\end{itemize}
+
+% up to XX% improvement over Y baseline
+% focus on broad knowledge. to our knowledge. ipp formulation team of uavs.
+% one pragraph intro, next structure, third up to % improvement and results
+% results vs discussion: results - describe connotation in what's being presented in table, color the data, why is this important/why does it matter in the discussion
+% i.e. range of spread in map for results. 
+% add DNF for unfinished solving
+% assign discussion items to the contributions.
+
+\section*{Structural Organization}
+% Unit - (# of Columns)
+% 1. Abstract - [0.5] - ![RAL guidelines on how long this can be.]!
+% 2. Intro - [1.5] - Why this problem and facets (multi-agent, multi-altitude; ...); contributions of work; basic references need to explain the problem/why this problem is hard; figure (1 column width) + caption (1 column width); author affiliation + funding <-- 
+% 3. Related Works - [1.5] - Purpose: (You're given "4" reviewers) Not claiming superority of method, providing context into what methods exist and what "sub problems" they solve where sub problem: -> subset(you constraints/problem) - How to solve SA/MA IPP (*) - single agent maybe one/two references (Intro paragraph of RW) - Subsection 1 - (Routing-based Solutions) - (OP); Subsection 2 - "IPP" MAPF/"MA Tigris"; Subsection 3. ("Learning-based"/"Heuristic"/MARL); Subsection 4. Other methods (Crowd Sim/Market-based Approaches)
+% 4. Problem Formulation - [max 2.5, min 2.0] - Describe your problem, and all mathematics required (vars, p. form, objective function) <-- IPP 4 objective function - any assumptions H() some style observation positive/negative measurement, the parameters used are in App. A and if you want more information see (/ref{TIGRIS})
+% 5. Numerical Studies - [4-6] - experimental setup; greedy; (ACO overview) - All tables, all figures, results and discussion (subsection)\
+% 6. Conclusion and future - [1 column]
+% 7. References + Appendix [1/1.5]
+\section*{Additional Work}
+
+Include in Abstract and Introduction?
+\begin{itemize}
+    \item Provide additional insight into the problem by comparing performance across varying team budgets
+    \item Demonstrate our approach in a high-fidelity simulated environment through a motivating real-world scenario
+\end{itemize}
+
+\section*{Main Takeaway}
+
+Across all maps, the mixed integer and ant colony approach are able to outperform the greedy baseline. The mixed-integer model produces the best results for small teams, while the aco method provides the best performance on larger team sizes. 
+
+\section*{Abstract/Introduction}
+\begin{itemize}
+    \item Figure: Motivating example with an abstract graph overlayed on top with high flying and low flying agents
+    \item Motivating Examples for Information Gathering
+    \begin{itemize}
+        \item search and rescue, environmental monitoring, inspection, and agriculture
+    \end{itemize}
+    \item Motivation Behind Multi-Agent Information Gathering
+    \begin{itemize}
+        \item Multiple agents can cover more "area" than single agent
+        \item Multiple agents can also be used to simultaneously revisit areas of interest at varying resolutions
+    \end{itemize}
+    \item High-Level Overview of Existing Methods
+        \begin{itemize}
+            \item define what ipp is
+            \item ipp is a hard problem esp with multiple agents
+            \item Most methods assume independent observations across multiple sensing resolutions. Reason over it instead of constraining the problem. 
+            \item other ipp simplifications (check tigris papers)
+        \end{itemize}
+    \item List of Contributions
+    \item Paper Outline
+    
+\end{itemize}
+
+\section*{Related Work}
+\begin{itemize}
+    \item Overview of orienteering problem
+    \item Overview of team orienteering problem
+    \item Overview of informative path planning
+    \item Overview of informative path planning
+    \item Overview of multi-resolution informative path planning
+    \item Overview of multi-agent informative path planning
+\end{itemize}
+
+\section*{Problem Formulation}
+\begin{itemize}
+    \item Figure: System Diagram
+    \item Graph Formulation
+    \item Region Cost
+    \item Sensor Model
+    \item Information Gain Function
+    \item Region Reward
+    \item Reward from Sequential Multi-Resolution Observations
+    \item IPP Proof
+\end{itemize}
+
+\section*{Mixed-Integer Linear Programming Model}
+\begin{itemize}
+    \item Mathematical Graph Representation
+    \item Mathematical Node Representation
+    \item Mathematical Representation of High to Low Altitude Mapping
+    \item Cost by Cost Breakdown of Objective Function
+    \item Breakdown of Decision Variables
+    \item Breakdown of Model Constraints
+\end{itemize}
+
+\section*{Results and Discussion}
+\begin{itemize}
+    \item Table: Large Table of Results 
+    \item Algorithm: Explanation of ACO Planner
+    \item Algorithm: Explanation of Greedy Planner
+    \item Overview of Experimental Setup
+    \item Discussion on Large Table Results
+    \item Figure: Qualitative Path Examples
+    \item Figure: Plot for Ablation Test Results
+    \item Discussion on Ablation Test Results
+    \item Overview of Isaac Sim System
+    \item Figure: Demonstration of Isaac Sim System
+    \item Explanation of Isaac Sim System
+\end{itemize}
+
+\section*{Conclusion}
+\begin{itemize}
+    \item Review of Contributions
+    \item Overview of Future Work
+\end{itemize}
+
+\end{document}

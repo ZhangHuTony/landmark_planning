@@ -1,0 +1,196 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%2345678901234567890123456789012345678901234567890123456789012345678901234567890
+%        1         2         3         4         5         6         7         8
+
+\documentclass[letterpaper, 10 pt, conference]{ieeeconf}  % Comment this line out if you need a4paper
+
+%\documentclass[a4paper, 10pt, conference]{ieeeconf}      % Use this line for a4 paper
+
+\IEEEoverridecommandlockouts                              % This command is only needed if 
+                                                          % you want to use the \thanks command
+
+\overrideIEEEmargins                                      % Needed to meet printer requirements.
+
+%In case you encounter the following error:
+%Error 1010 The PDF file may be corrupt (unable to open PDF file) OR
+%Error 1000 An error occurred while parsing a contents stream. Unable to analyze the PDF file.
+%This is a known problem with pdfLaTeX conversion filter. The file cannot be opened with acrobat reader
+%Please use one of the alternatives below to circumvent this error by uncommenting one or the other
+%\pdfobjcompresslevel=0
+%\pdfminorversion=4
+
+% See the \addtolength command later in the file to balance the column lengths
+% on the last page of the document
+
+% The following packages can be found on http:\\www.ctan.org
+
+%% PACKAGE DECLARATIONS
+
+\usepackage{import} % PACKAGE FOR HIERARCHICAL FOLDER STRUCTURE
+% references.bib uses \k{a} (ogonek), which OT1 cannot encode.
+\usepackage[T1]{fontenc}
+\usepackage{graphicx} % PACKAGE FOR FIGURE TOOLS
+% ieeeconf.cls defines \proof (line 3947); amsthm redefines it -> "already defined".
+\let\proof\relax
+\let\endproof\relax
+\usepackage{amsmath, amssymb, amsfonts, amsthm, amssymb} % ASSUMES amsmath INSTALLED, MATH PACKAGES
+\usepackage[dvipsnames]{xcolor} % COLORS
+\usepackage{tabularx}
+\usepackage{multirow}
+\usepackage{cleveref} % CLEVER REFERENCE PACKAGE
+\usepackage{algorithm,algpseudocode}
+\usepackage{array,tabularx, booktabs, makecell}
+\usepackage[table]{xcolor}
+
+\newtheorem{theorem}{Theorem}
+\newtheorem{proposition}{Proposition}
+\newtheorem{remark}{Remark}
+
+% defined centered version of "X" column type:
+\newcolumntype{C}{>{\centering\arraybackslash}X} 
+\setlength{\extrarowheight}{1pt} % for a bit more open "look"
+
+%\usepackage{graphics} % for pdf, bitmapped graphics files
+%\usepackage{epsfig} % for postscript graphics files
+%\usepackage{mathptmx} % assumes new font selection scheme installed
+%\usepackage{times} % assumes new font selection scheme installed
+
+% COMMANDS
+%%%%%%%%%% ----- CLEVER REFERENCE COMMANDS ----- %%%%%%%%%%
+% Clever Reference Commands - \cref will understand what you are referencing. \cref and \Cref do different things.
+\crefname{figure}{Fig.}{Fig.}
+\Crefname{figure}{Figure}{Figures}
+\Crefname{equation}{Equation}{Equations}
+\crefname{theorem}{Theorem}{Theorems}
+\crefname{section}{Section}{Sections}
+\crefname{hypothesis}{Hypothesis}{Hypotheses}
+\crefname{proposition}{Proposition}{Propositions}
+\crefname{algorithm}{Algorithm}{Algorithm}
+
+%%%%%%%%%% ----- USEFUL COMMANDS ----- %%%%%%%%%%
+\DeclareRobustCommand\red{\textcolor{red}} % TURNS TEXT RED COLOR
+\DeclareRobustCommand\blue{\textcolor{blue}} % TURNS TEXT BLUE COLOR
+\DeclareRobustCommand\bluetwo{\textcolor{green}} % TURNS TEXT BLUE COLOR
+\DeclareRobustCommand\cedit{\textcolor{maroon}} % TURNS TEXT BLUE COLOR
+\DeclareRobustCommand\eg{e.g., } % FOR CONSISTENCY PURPOSES
+\DeclareRobustCommand\ie{i.e., } % FOR CONSISTENCY PURPOSES
+
+%%%% PAPER STARTS
+
+\title{\LARGE \bf
+Multi-Agent Path Planning in GPS-Denied Environments with Localization Constraints and Optimality Guarantees
+}
+
+
+% \author{AuthorA$^{1}$ and AuthorB$^{1}$ and AuthorC$^{1}$ and AuthorD$^{1}$% <-this % stops a space
+% % \thanks{*This work was not supported by any organization}% <-this % stops a space
+% \thanks{$^{1}$Albert Author is with Faculty of Electrical Engineering, Mathematics and Computer Science,
+%         University of Twente, 7500 AE Enschede, The Netherlands
+%         {\tt\small albert.author@papercept.net}}%
+% % \thanks{$^{2}$Bernard D. Researcheris with the Department of Electrical Engineering, Wright State University,
+% %         Dayton, OH 45435, USA
+% %         {\tt\small b.d.researcher@ieee.org}}%
+% }
+
+\author{Ryan Bartholomew, Kalliyan Velasco, Joshua Mangelson, Brady Moon}
+
+
+\begin{document}
+
+
+
+\maketitle
+\thispagestyle{empty}
+\pagestyle{empty}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Is it too much background on prior work and how our approach narrows the gap? 
+
+\begin{abstract}
+
+    Centralized multi-agent path planning with cooperative localization (MAPP-CL) in GPS-denied environments is generally computationally intractable when formulated in full belief space due to tightly coupled uncertainty dynamics. Prior work addresses this challenge through scalable approximate belief-space methods that sacrifice optimality or formulations that provide guarantees only under restrictive modeling assumptions. We study a multi-agent planning problem in which a primary agent must reach a goal in minimum time while satisfying a terminal constraint on localization uncertainty. We produce a tractable surrogate of the underlying belief-space problem by optimizing over the mean-state trajectories of all agents and propagating covariance for terminal constraint evaluation. We propose a discrete-to-continuous pipeline combining hexagonal-grid joint search with spline-based trajectory refinement. The resulting solution is $\epsilon$-suboptimal with respect to the optimal feasible solution in the continuous state space. Empirically, the approach improves upon baselines by placeholder\% and reduces computation time by placeholder\%, while satisfying terminal uncertainty constraints.
+    
+\end{abstract} % ABSTRACT TEXT
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{INTRODUCTION}  \label{sec:1_intro}
+
+In environments where GPS signal is unreliable, such as underwater or in regions subject to spoofing or jamming, GPS-denied solutions must be employed. Autonomous multi-agent systems operating in such environments suffer from state uncertainty caused by inertial measurement unit (IMU) drift. As estimation error accumulates over time, an agent’s pose uncertainty can grow to the point where waypoint tracking degrades and mission objectives are compromised. Common planning strategies mitigate this growth by biasing trajectories toward informative landmarks and maintaining inter-agent measurements to enable cooperative localization. Consequently, trajectory planning must account for uncertainty propagation when estimation error significantly impacts task performance. While belief-space planning provides a principled formulation for uncertainty-aware decision-making, it is typically intractable in multi-agent settings due to the dimensionality of coupled belief dynamics. This motivates surrogate formulations that optimize mean trajectories while propagating uncertainty only for constraint evaluation.
+
+In this work, we consider a centralized multi-agent planning problem in which a primary agent must reach a goal in minimum time under constant-speed motion, which is equivalent to minimizing path length. The objective is subject to a terminal constraint on localization uncertainty.
+
+We compute a coordinated discrete plan over a joint state space that captures motion constraints and inter-agent ranging capabilities. This solution is then lifted into continuous space and refined into smooth, dynamically feasible trajectories that satisfy curvature constraints and terminal uncertainty requirements.
+
+Our contributions are as follows:
+\begin{enumerate}
+    \item A centralized multi-agent planning strategy for GPS-denied environments that explicitly couples task execution with uncertainty-aware support, enabling optimal performance of a primary agent under bounded localization uncertainty.
+    
+    \item A scalable discrete-to-continuous planning pipeline programmed in Julia, combining hexagonal-grid joint search with spline-based trajectory refinement and yielding $\epsilon$-suboptimal solutions with respect to the optimal continuous-time feasible trajectory.
+    
+    \item \emph{Placeholder} A comprehensive empirical evaluation in HoloOcean, demonstrating the effectiveness of the proposed approach in reducing primary-agent path length while maintaining localization reliability across multi-agent GPS-denied scenarios.
+\end{enumerate}
+
+In the following sections, we formalize the problem, describe the discrete and continuous planning stages in detail, and evaluate our approach in simulated GPS-denied environments with multiple supporting agents.
+
+\section{RELATED WORK} \label{sec:2_rw}
+\import{sections/sec2_lit}{lit.tex}
+
+\section{PROBLEM FORMULATION}  \label{sec:3_pf}
+\import{sections/sec3_pform}{pform.tex}
+
+\section{GLOBAL DISCRETE SEARCH} \label{sec:4_dis}
+\import{sections/sec4_discrete}{discrete.tex}
+
+\section{REFINING CONTINUOUS TRAJECTORIES} \label{sec:5_cont}
+\import{sections/sec5_continuous}{continuous.tex}
+
+\section{GUARANTEES AND BOUNDS} \label{sec:6_guar}
+\import{sections/sec6_guarantees}{guarantees.tex}
+
+\section{LIMITATIONS AND ASSUMPTIONS} \label{sec:7_limit}
+\import{sections/sec7_limitations}{limitations.tex}
+
+\section{RESULTS}  \label{sec:8_results}
+\import{sections/sec8_results}{results.tex}
+
+\section{CONCLUSION AND FUTURE WORK}  \label{sec:9_fw}
+\import{sections/sec9_conc}{conc.tex}
+
+\addtolength{\textheight}{-12cm}   % This command serves to balance the column lengths
+                                  % on the last page of the document manually. It shortens
+                                  % the textheight of the last page by a suitable amount.
+                                  % This command does not take effect until the next page
+                                  % so it should come on the page before the last. Make
+                                  % sure that you do not shorten the textheight too much.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section*{APPENDIX}
+
+\section*{ACKNOWLEDGMENT}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%References are important to the reader; therefore, each citation must be complete and correct. If at all possible, references should be commonly available publications.
+
+
+
+% \begin{thebibliography}{99}
+
+% \bibitem{c1} R. Platt, L. P. Kaelbling, T. Lozano-Perez, and R. Tedrake, “Belief space planning assuming maximum likelihood observations,” in Proc. Robotics: Science and Systems (RSS), Zaragoza, Spain, 2010.
+
+% \end{thebibliography}
+
+
+
+
+\end{document}

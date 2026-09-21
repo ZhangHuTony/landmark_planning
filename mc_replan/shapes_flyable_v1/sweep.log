@@ -1,0 +1,8 @@
+── constraint sweep shapes_flyable_v1 ──
+  methods: hexspline_cl
+  ladder:  100, 90, 80, 70, 60, 50, 40, 30%   patience=0   method_patience=0   timeout=1800s
+  scenarios: the fixed preset `ladder_shapes` (n_scenarios and the geometry ranges are ignored)
+  output:  /home/tony-zhang/Research/landmark_planning/mc_replan/shapes_flyable_v1
+  s001: REFERENCE FAILED (rc=0 killed=false) — scenario skipped, does NOT count toward n_scenarios
+  ! stopped after 1 draws with only 0/1 usable scenarios — references are failing more often than the guard allows
+── done: /home/tony-zhang/Research/landmark_planning/mc_replan/shapes_flyable_v1 ──

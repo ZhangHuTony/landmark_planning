@@ -4,7 +4,7 @@
 set -e
 cd "$(dirname "$0")/.."
 copy() { for ext in pdf eps; do cp "$1.$ext" "final/$2.$ext"; done; }
-copy figure2/rect_candidates/rect_r3/fig2_ladder_grid_hexspline_cl  fig2_ladder          # ladder_r3, staggered walls (chosen 2026-09-10)
+copy fig2_ladder_ours_rect_r3                                        fig2_ladder          # ladder_r3, staggered walls (chosen 2026-09-10); matplotlib, figure2/plot_fig2_ladder_mpl.py
 copy fig3a_success_vs_constraint                                     fig3a_success
 copy fig3b_length_vs_constraint                                      fig3b_length
 copy fig4_wall_5level_box                                            fig4_wall

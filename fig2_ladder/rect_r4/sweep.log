@@ -1,0 +1,15 @@
+── constraint sweep rect_r4 ──
+  methods: hexspline_cl
+  ladder:  100, 90, 80, 70, 60, 50, 40, 30%   patience=0   method_patience=0   timeout=1800s
+  scenarios: the fixed preset `ladder_r4` (n_scenarios and the geometry ranges are ignored)
+  output:  /home/tony-zhang/Research/landmark_planning/fig2_ladder/rect_r4
+  s001: scenario=ladder_r4  L_ref=1761.0 U_ref=14.968  (16.1s)  [1/1]
+    s001 p100  hexspline_cl      ok   ratio=1.0117   28.1s
+    s001 p90  hexspline_cl      ok   ratio=1.0117   27.7s
+    s001 p80  hexspline_cl      ok   ratio=1.0110   27.9s
+    s001 p70  hexspline_cl      ok   ratio=1.0124   27.7s
+    s001 p60  hexspline_cl      ok   ratio=1.0129   28.2s
+    s001 p50  hexspline_cl      ok   ratio=1.0172   25.9s
+    s001 p40  hexspline_cl      ok   ratio=1.0751   34.8s
+    s001 p30  hexspline_cl      ok   ratio=1.0751   34.2s
+── done: /home/tony-zhang/Research/landmark_planning/fig2_ladder/rect_r4 ──

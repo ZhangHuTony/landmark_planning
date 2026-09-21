@@ -1,0 +1,90 @@
+
+Let $\mathcal{I} = \{1,2,\dots,P\}$ denote a team of $P$ agents. Agent $i=1$ is the primary agent tasked with reaching a goal location $G \in \mathbb{R}^2$. All agents move at constant speed $v_i$, making minimization of time equivalent to minimizing trajectory length.
+
+\subsection{Decision Variables}
+
+The optimization is performed over mean-state trajectories. Specifically, the decision variables are the heading sequences
+\[
+\{\theta_i[k]\}_{i \in \mathcal{I},\, k=0}^{N-1}.
+\]
+
+Positions are deterministically induced by these controls:
+\[
+x_i[k+1] = x_i[k] + v_i \Delta t
+\begin{bmatrix}
+\cos \theta_i[k] \\
+\sin \theta_i[k]
+\end{bmatrix}.
+\]
+
+\subsection{Covariance Propagation}
+
+Let $\Sigma_i[k]$ denote the covariance of agent $i$. Covariance is not a decision variable and is propagated deterministically for constraint evaluation.
+
+We assume linearized motion with anisotropic process noise:
+\[
+\Sigma_i[k+1|k] = F(\theta_i[k])\,\Sigma_i[k|k-1]\,F(\theta_i[k])^\top + Q_i[k],
+\]
+where
+\[
+Q_i[k] =
+\begin{bmatrix}
+\sigma^2_{\parallel}[k] + \alpha_{\parallel}\Delta t & 0 \\
+0 & \sigma^2_{\perp}[k] + \alpha_{\perp}\Delta t
+\end{bmatrix}.
+\]
+
+\subsection{Measurement Model (Tapered Gaussian Sensing)}
+
+When an agent is within sensing range of a landmark or another agent, a measurement update is applied. The Kalman gain is
+\[
+K_i[k] = \Sigma_i[k|k-1] H^\top \left(H \Sigma_i[k|k-1] H^\top + R\right)^{-1},
+\]
+and the covariance is updated using the Joseph form:
+\[
+\Sigma_i[k] = (I - K_i[k]H)\Sigma_i[k|k-1](I - K_i[k]H)^\top + K_i[k] R K_i[k]^\top.
+\]
+
+Sensing quality is modeled via a tapered Gaussian function of distance:
+\[
+w_{ij}(k) = \exp\left(-\frac{\|x_i[k]-x_j[k]\|^2}{2\sigma_c^2}\right),
+\]
+which modulates measurement availability.
+
+\subsection{Constraints}
+
+\textbf{Terminal uncertainty constraint:}
+\[
+\det(\Sigma_i[N]) \le \bar{d}, \quad \forall i \in \mathcal{I}.
+\]
+Here, $\bar{d}$ is the maximum allowable terminal covariance determinant.
+
+\textbf{Dynamics:}
+\[
+x_i[k+1] = x_i[k] + v_i \Delta t
+\begin{bmatrix}
+\cos \theta_i[k] \\
+\sin \theta_i[k]
+\end{bmatrix}.
+\]
+
+\textbf{Curvature constraint:}
+\[
+|\theta_i[k+1] - \theta_i[k]| \le \frac{v_i \Delta t}{r}.
+\]
+
+\textbf{Initial conditions:}
+\[
+x_i[0] = x_i^0, \qquad \Sigma_i[0] = \Sigma_i^0, \quad \forall i \in \mathcal{I}.
+\]
+
+\subsection{Optimization Problem}
+
+\[
+\min_{\{\theta_i[k]\},\,N} \quad N
+\]
+subject to the above constraints.
+
+\subsection{Optimal Continuous Solution}
+
+Let $L^\star$ denote the optimal feasible solution cost in the continuous state space, defined as the minimum-time trajectory satisfying all motion, curvature, and terminal uncertainty constraints under exact continuous dynamics.

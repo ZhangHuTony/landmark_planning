@@ -1,0 +1,9 @@
+method,pct,n_total,n_success,success_rate,mean_length_ratio,median_length_ratio,mean_wall_s,median_wall_s,mean_wall_ratio,median_wall_ratio
+hexspline_cl,100,1,1,1.000,1.0157,1.0157,20.4,20.4,1.232,1.232
+hexspline_cl,90,1,1,1.000,1.0157,1.0157,20.3,20.3,1.222,1.222
+hexspline_cl,80,1,1,1.000,1.0157,1.0157,20.6,20.6,1.246,1.246
+hexspline_cl,70,1,1,1.000,1.0275,1.0275,17.0,17.0,1.025,1.025
+hexspline_cl,60,1,1,1.000,1.0484,1.0484,20.1,20.1,1.211,1.211
+hexspline_cl,50,1,1,1.000,1.0630,1.0630,19.1,19.1,1.153,1.153
+hexspline_cl,40,1,1,1.000,1.1030,1.1030,29.1,29.1,1.757,1.757
+hexspline_cl,30,1,1,1.000,1.1028,1.1028,29.4,29.4,1.772,1.772
