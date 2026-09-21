@@ -162,3 +162,10 @@ const EMIT_CSV                   = Bool(get(CFG, "emit_csv",     true))
 # rung at 1e6 expansions would be gigabytes.
 const TRACE_ASTAR                = Bool(get(CFG, "trace_astar", false))
 const TRACE_CONT                 = Bool(get(CFG, "trace_cont",  false))
+const TRACE_GREEDY               = Bool(get(CFG, "trace_greedy", false))
+# formation's own primary search reuses TRACE_ASTAR/astar_trace.csv (it is
+# structurally the same weighted single-agent A*, so the video's shared
+# "wavefront replay" reads one schema either way). sequential's primary legs
+# do the same; only its helper search (a different algorithm -- a layered
+# beam, not a priority queue) needs a schema of its own, hence this flag.
+const TRACE_SEQUENTIAL           = Bool(get(CFG, "trace_sequential", false))

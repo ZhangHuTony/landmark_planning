@@ -105,7 +105,8 @@ end
 # one edge_cov_continuous (~0.3 µs). A single-agent search space can afford it;
 # the joint one it was written for could not. ASTAR_ITERATION_LIMIT still caps it.
 function seq_primary_astar(graph::LandmarkGraph, lms::Vector{Landmark},
-                           roster::Vector{Vector{Int}}, threshold::Float64)
+                           roster::Vector{Vector{Int}}, threshold::Float64;
+                           trace_io::Union{Nothing, IO}=nothing)
     na = length(roster); primary = na; goal = graph.n
     is_goal_cell = falses(goal)
     for v in 1:(goal - 1); goal in graph.neighbors[v] && (is_goal_cell[v] = true); end
@@ -132,14 +133,24 @@ function seq_primary_astar(graph::LandmarkGraph, lms::Vector{Landmark},
         path
     end
 
+    # video/: same shape/schema as joint_astar's tap.
+    tr(ev, iter, si_, parent, g, h, f, covs, nodes, reason="") =
+        trace_io === nothing ? nothing :
+        println(trace_io, ev, ',', iter, ',', si_, ',', parent, ',', g, ',', h, ',', f, ',',
+                join((round(unc_radius(c), digits=6) for c in covs), ';'), ',',
+                join(nodes, ';'), ',', reason)
+
     while !isempty(pq) && iters < ASTAR_ITERATION_LIMIT
         si = dequeue!(pq); S = states[si]
         iters += 1
         astar_progress(iters, ASTAR_ITERATION_LIMIT, t0)
 
         unc = unc_radius(S.cov)
-        PRUNE_BY_PRIMARY_UNCERTAINTY &&
-            unc_exceeds_threshold(unc, threshold, UNC_FEAS_TOL) && continue
+        tr("pop", iters, si, S.parent, S.dist, "", "", [S.cov], [S.node])
+        if PRUNE_BY_PRIMARY_UNCERTAINTY && unc_exceeds_threshold(unc, threshold, UNC_FEAS_TOL)
+            tr("prune", iters, si, S.parent, S.dist, "", "", [S.cov], [S.node], "pop_unc")
+            continue
+        end
 
         if is_goal_cell[S.node]
             # No verify step here, unlike joint_astar: S.cov already IS the exact
@@ -155,8 +166,10 @@ function seq_primary_astar(graph::LandmarkGraph, lms::Vector{Landmark},
                 # re-routes around a wall — so a candidate that fails here is
                 # discarded and the search continues.
                 if !seed_spline_clear(seq_with(roster, primary, path), graph, lms)
+                    tr("prune", iters, si, S.parent, S.dist, "", "", [S.cov], [S.node], "goal_spline")
                     continue
                 end
+                tr("goal", iters, si, S.parent, S.dist, "", "", [S.cov], [S.node])
                 println()
                 println("    ✓ feasible at iter $(iters): dist=$(round(S.dist, digits=3)), " *
                         "unc=$(round(unc, digits=4))")
@@ -183,11 +196,17 @@ function seq_primary_astar(graph::LandmarkGraph, lms::Vector{Landmark},
             # call site as joint_astar's expansion (hexspline_cl.jl:904).
             if !isempty(OBSTACLES)
                 p0 = graph.landmarks[S.node]; p1 = graph.landmarks[u]
-                segment_obstacle_free((p0.x, p0.y), (p1.x, p1.y), ncov) || continue
+                if !segment_obstacle_free((p0.x, p0.y), (p1.x, p1.y), ncov)
+                    tr("prune", iters, 0, si, nd, "", "", [ncov], [u], "obstacle:1")
+                    continue
+                end
             end
 
             labels = get(frontier, u, Tuple{Float64, Matrix{Float64}}[])
-            any(l -> l[1] <= nd + SEQ_TIE_TOL && cov_dominates(l[2], ncov), labels) && continue
+            if any(l -> l[1] <= nd + SEQ_TIE_TOL && cov_dominates(l[2], ncov), labels)
+                tr("prune", iters, 0, si, nd, "", "", [ncov], [u], "dominated")
+                continue
+            end
             kept = [l for l in labels
                     if !(nd <= l[1] + SEQ_TIE_TOL && cov_dominates(ncov, l[2]))]
             push!(kept, (nd, copy(ncov)))
@@ -195,8 +214,11 @@ function seq_primary_astar(graph::LandmarkGraph, lms::Vector{Landmark},
 
             nvis = copy(S.visited); nvis[u] = true
             push!(states, State(u, nd, ncov, si, nvis))
-            enqueue!(pq, length(states),
-                     (nd + w * graph.shortest_paths[u, goal], unc_radius(ncov)))
+            nsi = length(states)
+            nh  = graph.shortest_paths[u, goal]
+            nf  = nd + w * nh
+            enqueue!(pq, nsi, (nf, unc_radius(ncov)))
+            tr("push", iters, nsi, si, nd, nh, nf, [ncov], [u])
         end
     end
 
@@ -247,7 +269,8 @@ end
 seq_rank(L::SeqLabel) = (L.up, L.uf, L.arc, L.path)
 
 function seq_helper_search(graph::LandmarkGraph, lms::Vector{Landmark},
-                           roster::Vector{Vector{Int}}, free::Int)
+                           roster::Vector{Vector{Int}}, free::Int;
+                           trace_io::Union{Nothing, IO}=nothing, helper_id::Int=free)
     na = length(roster)
     K  = length(roster[na])
     K < 2 && return Int[1]
@@ -292,6 +315,17 @@ function seq_helper_search(graph::LandmarkGraph, lms::Vector{Landmark},
         sort!(nxt, by=seq_rank)
         length(nxt) > SEQ_BEAM && resize!(nxt, SEQ_BEAM)
         layer = nxt
+        # video/: one row per SURVIVOR at this layer -- already exactly the
+        # "wavefront" shape (dominance + beam already did the thinning), so no
+        # reordering is needed to animate it. Different schema from the
+        # priority-queue trace above: there is no single "iteration" counter
+        # here, just layers.
+        if trace_io !== nothing
+            for L in layer
+                println(trace_io, "helper$(helper_id),", k, ',', L.path[end], ',',
+                        L.arc, ',', L.uf, ',', L.up, ',', join(L.path, ';'))
+            end
+        end
     end
 
     # Best-first: the layer is sorted by seq_rank, so this returns the highest-ranked
@@ -354,7 +388,20 @@ function plan_sequential(scenario, graph::LandmarkGraph, output_dir::String)
     println("  Leg 1 — primary, $(na - 1) helper(s) parked at start (bound " *
             "$(round(leg1_threshold, digits=4)) = $(leg1_slack)x the " *
             "$(UNC_RADIUS_THRESHOLD) threshold the shipped route is held to):")
-    ppath, _, _, iters = seq_primary_astar(graph, landmarks, roster, leg1_threshold)
+    # video/: leg 1 and leg 4 are separate searches (different threshold,
+    # different roster), so each gets its own file in the shared astar_trace
+    # schema rather than one file with a phase column to filter.
+    leg1_io = nothing
+    if TRACE_ASTAR
+        sdir = joinpath(output_dir, "csv"); mkpath(sdir)
+        leg1_io = open(joinpath(sdir, "astar_trace_leg1.csv"), "w")
+        println(leg1_io, "ev,iter,si,parent,g,h,f,uncs,nodes,reason")
+    end
+    ppath, _, _, iters = try
+        seq_primary_astar(graph, landmarks, roster, leg1_threshold; trace_io=leg1_io)
+    finally
+        leg1_io === nothing || close(leg1_io)
+    end
     if isempty(ppath)
         println("  ✗ No route to the goal for the primary.")
         write_no_solution(iters)
@@ -363,20 +410,30 @@ function plan_sequential(scenario, graph::LandmarkGraph, output_dir::String)
     roster[na] = ppath
 
     # ── Legs 2..P: one helper at a time, against everything already committed ──
-    for a in 1:(na - 1)
-        println("  Leg $(a + 1) — helper $(a) vs the fixed primary trajectory " *
-                "($(length(roster[na])) steps, beam $(SEQ_BEAM)):")
-        hpath = seq_helper_search(graph, landmarks, roster, a)
-        if hpath === nothing
-            println("    ✗ Helper $(a) stalled: no admissible successor clears the " *
-                    "support cap and the obstacle filter.")
-            write_no_solution(iters)
-            return NamedTuple[]
+    helper_io = nothing
+    if TRACE_SEQUENTIAL
+        sdir = joinpath(output_dir, "csv"); mkpath(sdir)
+        helper_io = open(joinpath(sdir, "sequential_helper_trace.csv"), "w")
+        println(helper_io, "helper,layer,node,arc,helper_unc,primary_unc,path")
+    end
+    try
+        for a in 1:(na - 1)
+            println("  Leg $(a + 1) — helper $(a) vs the fixed primary trajectory " *
+                    "($(length(roster[na])) steps, beam $(SEQ_BEAM)):")
+            hpath = seq_helper_search(graph, landmarks, roster, a; trace_io=helper_io, helper_id=a)
+            if hpath === nothing
+                println("    ✗ Helper $(a) stalled: no admissible successor clears the " *
+                        "support cap and the obstacle filter.")
+                write_no_solution(iters)
+                return NamedTuple[]
+            end
+            covs, _ = evaluate_full_paths(seq_with(roster, a, hpath), graph, landmarks, na)
+            roster[a] = hpath
+            println("    → helper $(a) placed; primary goal_unc now " *
+                    "$(round(unc_radius(covs[na]), digits=4))")
         end
-        covs, _ = evaluate_full_paths(seq_with(roster, a, hpath), graph, landmarks, na)
-        roster[a] = hpath
-        println("    → helper $(a) placed; primary goal_unc now " *
-                "$(round(unc_radius(covs[na]), digits=4))")
+    finally
+        helper_io === nothing || close(helper_io)
     end
 
     # ── Leg 4: re-plan the primary ONCE, now that the helpers are real ──
@@ -389,8 +446,17 @@ function plan_sequential(scenario, graph::LandmarkGraph, output_dir::String)
     len1 = base_dists[na]; unc1 = unc_radius(base_covs[na])
     if SEQ_REPLAN_PRIMARY && na > 1
         println("  Leg $(na + 1) — primary re-planned against the committed helper paths:")
-        ppath2, _, _, iters2 = seq_primary_astar(graph, landmarks, roster,
-                                                 UNC_RADIUS_THRESHOLD)
+        leg4_io = nothing
+        if TRACE_ASTAR
+            sdir = joinpath(output_dir, "csv"); mkpath(sdir)
+            leg4_io = open(joinpath(sdir, "astar_trace_leg4.csv"), "w")
+            println(leg4_io, "ev,iter,si,parent,g,h,f,uncs,nodes,reason")
+        end
+        ppath2, _, _, iters2 = try
+            seq_primary_astar(graph, landmarks, roster, UNC_RADIUS_THRESHOLD; trace_io=leg4_io)
+        finally
+            leg4_io === nothing || close(leg4_io)
+        end
         iters += iters2
         if !isempty(ppath2)
             # Helpers were planned in lockstep with the OLD primary. A longer new

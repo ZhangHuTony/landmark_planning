@@ -561,6 +561,21 @@ function joint_astar(graph::LandmarkGraph,
     is_goal_cell = falses(n)
     for v in 1:(n-1); goal in graph.neighbors[v] && (is_goal_cell[v] = true); end
 
+    # ── Expansion trace (video/): one row per pop, push and prune ────────
+    # Writes only. `trace_io === nothing` is the normal path and costs one
+    # pointer comparison per call. Node ids resolve to coordinates through the
+    # "nodes" table in the scene JSON the video exporter writes. Declared here,
+    # before the na==1/joint split, so BOTH branches share one definition and
+    # one CSV file — greedy's and formation's/sequential's primary searches all
+    # go through the na==1 branch below.
+    #   ev,iter,si,parent,g,h,f,uncs,nodes,reason
+    # `uncs` and `nodes` are ;-joined per agent, primary last.
+    tr(ev, iter, si_, parent, g, h, f, covs, nodes, reason="") =
+        trace_io === nothing ? nothing :
+        println(trace_io, ev, ',', iter, ',', si_, ',', parent, ',', g, ',', h, ',', f, ',',
+                join((round(unc_radius(c), digits=6) for c in covs), ';'), ',',
+                join(nodes, ';'), ',', reason)
+
     # Fast path: single-agent weighted A* with incremental covariance updates.
     # Avoids rebuilding/evaluating full trajectories on every expansion.
     if na == 1
@@ -597,7 +612,9 @@ function joint_astar(graph::LandmarkGraph,
             astar_progress(iter_count_sa, ASTAR_ITERATION_LIMIT, t0)
 
             popped_unc = unc_radius(S.cov)
+            tr("pop", iter_count_sa, si, S.parent, S.dist, "", "", [S.cov], [S.node])
             if PRUNE_BY_PRIMARY_UNCERTAINTY && unc_exceeds_threshold(popped_unc, unc_threshold, UNC_FEAS_TOL)
+                tr("prune", iter_count_sa, si, S.parent, S.dist, "", "", [S.cov], [S.node], "pop_unc")
                 println("\n  [Constraint A*] Pruned state at iter $iter_count_sa: node=$(S.node), primary_unc=$(round(popped_unc, digits=4)) > threshold=$(round(unc_threshold, digits=4))")
                 continue
             end
@@ -615,9 +632,13 @@ function joint_astar(graph::LandmarkGraph,
                 exact_unc = unc_radius(exact_covs[1])
                 if unc_within_threshold(exact_unc, unc_threshold, UNC_FEAS_TOL)
                     if !seed_spline_clear([path], graph, lms)
+                        tr("prune", iter_count_sa, si, S.parent, exact_dists[1], "", "",
+                           exact_covs, [S.node], "goal_spline")
                         println("\n  [Constraint A*] Goal popped, unc OK, but its B-spline breaches an obstacle; discarded.")
                         continue
                     end
+                    tr("goal", iter_count_sa, si, S.parent, exact_dists[1], "", "",
+                       exact_covs, [S.node])
                     println()   # release the status-bar line
                     println("  ✓ FEASIBLE SOLUTION at iter $iter_count_sa: dist=$(round(exact_dists[1], digits=3)), unc=$(round(exact_unc, digits=4))")
                     println("  [Constraint A*] Single-agent complete: $(iter_count_sa) iterations, final_dist=$(round(exact_dists[1], digits=3))")
@@ -643,7 +664,10 @@ function joint_astar(graph::LandmarkGraph,
                 # Chance-constrained static-obstacle feasibility filter (no-op if none).
                 if !isempty(OBSTACLES)
                     p0 = graph.landmarks[S.node]; p1 = graph.landmarks[u]
-                    segment_obstacle_free((p0.x, p0.y), (p1.x, p1.y), ncov) || continue
+                    if !segment_obstacle_free((p0.x, p0.y), (p1.x, p1.y), ncov)
+                        tr("prune", iter_count_sa, 0, si, nd, "", "", [ncov], [u], "obstacle:1")
+                        continue
+                    end
                 end
                 nunc = unc_radius(ncov)
 
@@ -660,7 +684,10 @@ function joint_astar(graph::LandmarkGraph,
                         break
                     end
                 end
-                dominated && continue
+                if dominated
+                    tr("prune", iter_count_sa, 0, si, nd, "", "", [ncov], [u], "dominated")
+                    continue
+                end
 
                 # Remove labels dominated by the new label.
                 kept = Tuple{Float64, Matrix{Float64}}[]
@@ -680,6 +707,7 @@ function joint_astar(graph::LandmarkGraph,
                 nh = graph.shortest_paths[u, goal]
                 nf = nd + w_astar * nh
                 enqueue!(pq_sa, nsi, (nf, nunc))
+                tr("push", iter_count_sa, nsi, si, nd, nh, nf, [ncov], [u])
             end
         end
 
@@ -791,18 +819,6 @@ function joint_astar(graph::LandmarkGraph,
         return plt
     end
 
-    # ── Expansion trace (video/): one row per pop, push and prune ────────
-    # Writes only. `trace_io === nothing` is the normal path and costs one
-    # pointer comparison per call. Node ids resolve to coordinates through the
-    # "nodes" table in the scene JSON the video exporter writes.
-    #   ev,iter,si,parent,g,h,f,uncs,nodes,reason
-    # `uncs` and `nodes` are ;-joined per agent, primary last.
-    tr(ev, iter, si_, parent, g, h, f, covs, nodes, reason="") =
-        trace_io === nothing ? nothing :
-        println(trace_io, ev, ',', iter, ',', si_, ',', parent, ',', g, ',', h, ',', f, ',',
-                join((round(unc_radius(c), digits=6) for c in covs), ';'), ',',
-                join(nodes, ';'), ',', reason)
-
     t0 = time()
     while !isempty(pq) && iter_count < ASTAR_ITERATION_LIMIT
         si  = dequeue!(pq)
@@ -902,7 +918,7 @@ function joint_astar(graph::LandmarkGraph,
                 for a in 1:(primary - 1)
                     if new_dists[a] > new_dists[primary]
                         tr("prune", iter_count, 0, si, new_dists[primary], "", "",
-                           new_covs, candidate_nodes, "support_dist")
+                           new_covs, candidate_nodes, "support_dist:$(a)")
                         return
                     end
                 end
@@ -925,7 +941,7 @@ function joint_astar(graph::LandmarkGraph,
                         p0 = graph.landmarks[S.nodes[a]]; p1 = graph.landmarks[candidate_nodes[a]]
                         if !segment_obstacle_free((p0.x, p0.y), (p1.x, p1.y), new_covs[a])
                             tr("prune", iter_count, 0, si, new_dists[primary], "", "",
-                               new_covs, candidate_nodes, "obstacle")
+                               new_covs, candidate_nodes, "obstacle:$(a)")
                             return
                         end
                     end
@@ -939,7 +955,7 @@ function joint_astar(graph::LandmarkGraph,
                         sup_unc = unc_radius(new_covs[a])
                         if unc_exceeds_threshold(sup_unc, unc_threshold, UNC_FEAS_TOL)
                             tr("prune", iter_count, 0, si, new_g, "", "",
-                               new_covs, candidate_nodes, "support_unc")
+                               new_covs, candidate_nodes, "support_unc:$(a)")
                             # println("  [Constraint A*] Pruned expansion: support $a unc=$(round(sup_unc, digits=4)) > threshold=$(round(unc_threshold, digits=4))")
                             return
                         end

@@ -340,7 +340,8 @@ end
 # Returns (paths, offsets, unc, iters); `paths` empty means no route at all.
 function formation_primary_astar(graph::LandmarkGraph, lms::Vector{Landmark},
                                  nbrs::Vector{Vector{Int}}, at::Dict{Tuple{Int,Int}, Int},
-                                 rosters::Vector{Vector{Int}}, threshold::Float64)
+                                 rosters::Vector{Vector{Int}}, threshold::Float64;
+                                 trace_io::Union{Nothing, IO}=nothing)
     goal = graph.n
     is_goal_cell = falses(goal)
     for v in 1:(goal - 1); goal in graph.neighbors[v] && (is_goal_cell[v] = true); end
@@ -370,19 +371,29 @@ function formation_primary_astar(graph::LandmarkGraph, lms::Vector{Landmark},
         path
     end
 
+    # video/: same shape as joint_astar's tap (ev,iter,si,parent,g,h,f,uncs,nodes,reason).
+    tr(ev, iter, si_, parent, g, h, f, covs, nodes, reason="") =
+        trace_io === nothing ? nothing :
+        println(trace_io, ev, ',', iter, ',', si_, ',', parent, ',', g, ',', h, ',', f, ',',
+                join((round(unc_radius(c), digits=6) for c in covs), ';'), ',',
+                join(nodes, ';'), ',', reason)
+
     while !isempty(pq) && iters < ASTAR_ITERATION_LIMIT
         si = dequeue!(pq); S = states[si]
         iters += 1
         astar_progress(iters, ASTAR_ITERATION_LIMIT, t0)
+        tr("pop", iters, si, S.parent, S.dist, "", "", [S.cov], [S.node])
 
         if is_goal_cell[S.node]
             cand, offs, unc, clear = formation_attach(graph, lms, nbrs, at, trace(si), rosters)
             if clear && unc_within_threshold(unc, threshold, UNC_FEAS_TOL)
+                tr("goal", iters, si, S.parent, S.dist, "", "", [S.cov], [S.node])
                 println()
                 println("    ✓ escorted-feasible at iter $(iters): dist=$(round(S.dist, digits=3)), " *
                         "unc=$(round(unc, digits=4)) (slot $(offs))")
                 return cand, offs, unc, iters
             end
+            tr("prune", iters, si, S.parent, S.dist, "", "", [S.cov], [S.node], "escort_unmet")
             key = (clear ? 0 : 1, unc)
             if best_key === nothing || key < best_key
                 best_key = key; best_paths = cand; best_offs = offs; best_unc = unc
@@ -400,19 +411,28 @@ function formation_primary_astar(graph::LandmarkGraph, lms::Vector{Landmark},
             # call site as joint_astar's expansion (hexspline_cl.jl:643).
             if !isempty(OBSTACLES)
                 p0 = graph.landmarks[S.node]; p1 = graph.landmarks[u]
-                segment_obstacle_free((p0.x, p0.y), (p1.x, p1.y), ncov) || continue
+                if !segment_obstacle_free((p0.x, p0.y), (p1.x, p1.y), ncov)
+                    tr("prune", iters, 0, si, nd, "", "", [ncov], [u], "obstacle:1")
+                    continue
+                end
             end
 
             labels = get(frontier, u, Tuple{Float64, Matrix{Float64}}[])
-            any(l -> l[1] <= nd + 1e-9 && cov_dominates(l[2], ncov), labels) && continue
+            if any(l -> l[1] <= nd + 1e-9 && cov_dominates(l[2], ncov), labels)
+                tr("prune", iters, 0, si, nd, "", "", [ncov], [u], "dominated")
+                continue
+            end
             kept = [l for l in labels if !(nd <= l[1] + 1e-9 && cov_dominates(ncov, l[2]))]
             push!(kept, (nd, copy(ncov)))
             frontier[u] = kept
 
             nvis = copy(S.visited); nvis[u] = true
             push!(states, State(u, nd, ncov, si, nvis))
-            enqueue!(pq, length(states),
-                     (nd + w * graph.shortest_paths[u, goal], unc_radius(ncov)))
+            nsi = length(states)
+            nh  = graph.shortest_paths[u, goal]
+            nf  = nd + w * nh
+            enqueue!(pq, nsi, (nf, unc_radius(ncov)))
+            tr("push", iters, nsi, si, nd, nh, nf, [ncov], [u])
         end
     end
 
@@ -470,8 +490,20 @@ function plan_formation(scenario, graph::LandmarkGraph, output_dir::String)
     at   = build_hex_lookup(graph)
     nbrs = build_formation_neighbors(graph, at)
 
-    paths, offsets, _, iters =
-        formation_primary_astar(graph, landmarks, nbrs, at, rosters, UNC_RADIUS_THRESHOLD)
+    # video/: reuses the trace_astar flag/schema -- this planner's own A* is
+    # structurally the same weighted search as the engine's single-agent path.
+    formation_astar_io = nothing
+    if TRACE_ASTAR
+        fdir = joinpath(output_dir, "csv"); mkpath(fdir)
+        formation_astar_io = open(joinpath(fdir, "astar_trace.csv"), "w")
+        println(formation_astar_io, "ev,iter,si,parent,g,h,f,uncs,nodes,reason")
+    end
+    paths, offsets, _, iters = try
+        formation_primary_astar(graph, landmarks, nbrs, at, rosters, UNC_RADIUS_THRESHOLD;
+                                trace_io=formation_astar_io)
+    finally
+        formation_astar_io === nothing || close(formation_astar_io)
+    end
     if isempty(paths)
         println("  ✗ No route to the goal for the primary.")
         write_no_solution(iters)

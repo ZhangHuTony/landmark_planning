@@ -39,7 +39,8 @@ end
 # next node greedily. Returns the support node paths, or `nothing` if any support
 # runs out of admissible moves (stall ⇒ the run fails; see plan_greedy).
 function greedy_support_rollout(primary_path::Vector{Int}, graph::LandmarkGraph,
-                                lms::Vector{Landmark}, na::Int)
+                                lms::Vector{Landmark}, na::Int;
+                                trace_io::Union{Nothing, IO}=nothing)
     ns = na - 1
     ns == 0 && return Vector{Vector{Int}}()
 
@@ -69,6 +70,11 @@ function greedy_support_rollout(primary_path::Vector{Int}, graph::LandmarkGraph,
 
         best_combo = nothing
         best_key   = nothing
+        # Video trace: one row per combo tried at this step. Collected here and
+        # written after best_combo is known (below), so each row can carry the
+        # "chosen" flag rather than needing a second pass over the data.
+        trace_rows = trace_io === nothing ? nothing :
+                     Vector{Tuple{NTuple{1,Int},Vector{Int},Float64,Float64,Bool,String}}()
         for combo in Iterators.product(options...)
             prefix = Vector{Vector{Int}}(undef, na)
             for a in 1:ns
@@ -81,19 +87,25 @@ function greedy_support_rollout(primary_path::Vector{Int}, graph::LandmarkGraph,
             covs, dists = evaluate_full_paths(prefix, graph, lms, na)
 
             admissible = true
+            fail_reason = ""
             for a in 1:ns
                 # Support cap — supports must not outrun the primary (hexspline_cl.jl:889).
                 if dists[a] > dists[na] + GREEDY_TIE_TOL
-                    admissible = false; break
+                    admissible = false; fail_reason = "support_cap:$(a)"; break
                 end
                 # Chance-constrained obstacle filter, same call site as the A*
                 # expansion (hexspline_cl.jl:904), at this support's own belief.
                 if !isempty(OBSTACLES)
                     p0 = graph.landmarks[paths[a][end]]; p1 = graph.landmarks[combo[a]]
                     if !segment_obstacle_free((p0.x, p0.y), (p1.x, p1.y), covs[a])
-                        admissible = false; break
+                        admissible = false; fail_reason = "obstacle:$(a)"; break
                     end
                 end
+            end
+            if trace_rows !== nothing
+                push!(trace_rows, ((k,), collect(combo), unc_radius(covs[na]),
+                                   sum(unc_radius(covs[a]) for a in 1:ns),
+                                   admissible, fail_reason))
             end
             admissible || continue
 
@@ -116,6 +128,14 @@ function greedy_support_rollout(primary_path::Vector{Int}, graph::LandmarkGraph,
             if best_key === nothing || greedy_better(key, best_key)
                 best_key   = key
                 best_combo = combo
+            end
+        end
+        # step,combo,primary_unc,helper_unc,admissible,reason,chosen
+        if trace_rows !== nothing
+            for (step, combo, punc, hunc, adm, reason) in trace_rows
+                chosen = best_combo !== nothing && combo == collect(best_combo)
+                println(trace_io, step[1], ',', join(combo, ';'), ',', punc, ',', hunc, ',',
+                        adm, ',', reason, ',', chosen)
             end
         end
 
@@ -155,7 +175,21 @@ function plan_greedy(scenario, graph::LandmarkGraph, output_dir::String)
     # goal gate. Same computation run_constraint_sweep.jl's reference run performs.
     println("\n── GREEDY PLANNING ──")
     println("  Primary: shortest obstacle-clear route (single-agent A*, no uncertainty bound)")
-    ppaths, _, _, iters = joint_astar(graph, landmarks, Inf, 1)
+    # video/: the primary's own A* is the na==1 fast path in joint_astar, which
+    # shares the SAME trace_astar flag and astar_trace.csv format the joint
+    # search uses (see hexspline_cl.jl -- the tr() closure moved above the
+    # na==1/joint split so both branches log identically).
+    astar_io = nothing
+    if TRACE_ASTAR
+        adir = joinpath(output_dir, "csv"); mkpath(adir)
+        astar_io = open(joinpath(adir, "astar_trace.csv"), "w")
+        println(astar_io, "ev,iter,si,parent,g,h,f,uncs,nodes,reason")
+    end
+    ppaths, _, _, iters = try
+        joint_astar(graph, landmarks, Inf, 1; trace_io=astar_io)
+    finally
+        astar_io === nothing || close(astar_io)
+    end
     if isempty(ppaths) || isempty(ppaths[1])
         println("  ✗ No obstacle-clear route to the goal exists for the primary.")
         write_no_solution(iters)
@@ -165,7 +199,17 @@ function plan_greedy(scenario, graph::LandmarkGraph, output_dir::String)
 
     # ── Helpers: greedy, one step at a time ──
     println("  Helpers: greedy placement, minimising the primary's uncertainty per step")
-    support_paths = greedy_support_rollout(primary_path, graph, landmarks, NUM_AGENTS)
+    greedy_io = nothing
+    if TRACE_GREEDY
+        gdir = joinpath(output_dir, "csv"); mkpath(gdir)
+        greedy_io = open(joinpath(gdir, "greedy_trace.csv"), "w")
+        println(greedy_io, "step,combo,primary_unc,helper_unc,admissible,reason,chosen")
+    end
+    support_paths = try
+        greedy_support_rollout(primary_path, graph, landmarks, NUM_AGENTS; trace_io=greedy_io)
+    finally
+        greedy_io === nothing || close(greedy_io)
+    end
     if support_paths === nothing
         write_no_solution(iters)
         return NamedTuple[]
