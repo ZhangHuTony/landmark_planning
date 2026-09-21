@@ -1,26 +1,30 @@
-"""Scene 3a (part of the method block) - the joint search.
+"""Scene 3a (part of the method block) - the joint search, replayed as a wavefront.
 
-The lattice cells light up in the order A* actually popped them, for both
-agents at once, because the search runs over the joint state of the whole team.
-Rejected expansions are shown too, with the reason the planner recorded.
+Design chosen with the user after the reference GIF (fig_astar_partial.gif)
+turned out too jittery to read: that GIF draws the current candidate's whole
+path every frame in raw pop order, which jumps between very different
+branches because best-first search has no spatial order. Here the SAME real
+pops are replayed sorted by the primary's cumulative distance -- a real
+quantity, monotonically growing -- so the frontier sweeps outward smoothly.
+Nothing is invented; only the playback order changes, and the caption says so.
 
-Replayed from video/data/fig1/astar_trace.csv, written by the trace_astar flag
-in the planner (pure logging, default off; a run with it on is byte-identical
-to one with it off). On this run: 1748 pops, matching results.yaml's
-astar_iterations, 8878 pushes and 2702 rejected expansions.
+Replayed from video/data/fig1/astar_trace.csv (trace_astar, pure logging,
+default off; a run with it on is byte-identical to one with it off). On this
+run: 1748 pops matching results.yaml's astar_iterations, 2702 rejected
+expansions, split 1517/1076 between the two agents (fixed: the trace now
+records WHICH agent triggered each obstacle rejection, since the two are not
+always at the same place).
 """
-import csv
 import sys
-from collections import defaultdict
 from pathlib import Path
-import numpy as np
 from manim import *
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from consort.data import DATA, load_scene
+from consort.data import load_scene
 from consort.world import World
 from consort.mapview import base_map
 from consort.mobjects import Caption
+from consort.astarreplay import WavefrontReplay, load_trace, reason_counts
 from consort.palette import PRIMARY, SUPPORT, INK, MUTED, BAD, FONT
 
 REASON_TEXT = {
@@ -35,96 +39,58 @@ REASON_TEXT = {
 }
 
 
-def load_trace(path):
-    pops, prunes = [], []
-    with open(path) as f:
-        for r in csv.DictReader(f):
-            nodes = [int(n) for n in r["nodes"].split(";")]
-            rec = (int(r["iter"]), nodes, r["reason"])
-            if r["ev"] == "pop":
-                pops.append(rec)
-            elif r["ev"] == "prune":
-                prunes.append(rec)
-    return pops, prunes
-
-
 class AStar(Scene):
     def construct(self):
         sc = load_scene("fig1/scene.json")
-        pops, prunes = load_trace(DATA / "fig1" / "astar_trace.csv")
         nodes = {int(i): (float(x), float(y)) for i, x, y in sc.raw["nodes"]}
         world = World.from_scene(sc, width=10.2, height=4.5, center=UP * 0.55)
 
         base = base_map(world, sc)
-        base.lattice.set_opacity(0.85)
         self.add(base)
-        cap = Caption("The search runs over the joint state of both agents at once.")
+        cap = Caption("The search runs over the joint state of both agents at "
+                      "once, replayed here ordered by distance from the start.")
         self.add(cap)
 
-        # first pop index per (agent, cell); a cell is a lattice position, and
-        # many heading states share one, so take the earliest
-        first = [defaultdict(lambda: None), defaultdict(lambda: None)]
-        n_ag = len(pops[0][1])
-        for it, nd, _ in pops:
-            for a, node in enumerate(nd):
-                p = nodes.get(node)
-                if p is None:
-                    continue
-                key = (round(p[0], 3), round(p[1], 3))
-                if first[a][key] is None:
-                    first[a][key] = it
-        total = pops[-1][0]
+        wf = WavefrontReplay("../data/fig1/astar_trace.csv", nodes,
+                            [SUPPORT, PRIMARY], world)
+        g = ValueTracker(0.0)
+        self.add(wf.mobject(g), wf.prune_flash_mobject(g))
 
-        prog = ValueTracker(0.0)
-        r = world.length(sc.hex_radius) * 0.92
-
-        def field(a, color):
-            items = sorted(first[a].items(), key=lambda kv: kv[1])
-
-            def f():
-                k = prog.get_value()
-                g = VGroup()
-                for (x, y), it in items:
-                    if it > k:
-                        break
-                    age = 1.0 - min((k - it) / max(total, 1), 1.0)
-                    g.add(RegularPolygon(6, radius=r, start_angle=PI / 2,
-                                         fill_color=color,
-                                         fill_opacity=0.16 + 0.42 * age,
-                                         stroke_width=0).move_to(world.pt(x, y)))
-                return g
-            return f
-
-        self.add(always_redraw(field(n_ag - 1, PRIMARY)),
-                 always_redraw(field(0, SUPPORT)))
-
-        counter = always_redraw(lambda: VGroup(
-            Text(f"{int(prog.get_value())}", font=FONT, font_size=42, color=INK),
-            Text("expansions", font=FONT, font_size=19, color=MUTED),
-        ).arrange(DOWN, buff=0.06).to_corner(UR, buff=0.35))
+        counter = wf.counter_mobject(g, INK, MUTED, corner=UR, buff=0.35)
         key = VGroup(
-            Text("primary states", font=FONT, font_size=20, color=PRIMARY),
-            Text("support states", font=FONT, font_size=20, color=SUPPORT),
+            Text("primary frontier", font=FONT, font_size=20, color=PRIMARY),
+            Text("support frontier", font=FONT, font_size=20, color=SUPPORT),
+            Text("✗ rejected expansion", font=FONT, font_size=18, color=BAD),
         ).arrange(DOWN, aligned_edge=LEFT, buff=0.10).to_corner(UL, buff=0.35)
         self.add(counter, key)
 
-        self.play(prog.animate.set_value(total * 0.45), run_time=3.4, rate_func=linear)
-        cap.set_text("Expanding both agents together is what lets it decide which "
-                     "landmark to use and when to relay.")
-        self.play(prog.animate.set_value(total), run_time=3.6, rate_func=linear)
+        self.play(g.animate.set_value(wf.max_g * 0.5), run_time=3.4, rate_func=linear)
+        cap.set_text("Expanding both agents together is what lets it decide "
+                     "which landmark to use and when to relay.")
+        self.play(g.animate.set_value(wf.max_g), run_time=3.6, rate_func=linear)
 
-        # one rejected expansion, with the planner's own reason
-        counts = defaultdict(int)
-        for _, _, why in prunes:
-            counts[why] += 1
+        # the dominant rejection reason, called out with the CORRECT agent
+        pops, pushes, prunes = load_trace("../data/fig1/astar_trace.csv")
+        counts = reason_counts(prunes)
         top = max(counts, key=counts.get)
-        ex = next(p for p in reversed(prunes) if p[2] == top)
-        pt = nodes.get(ex[1][-1])
+        by_agent = {}
+        for _, _, _, _, ns, reason in prunes:
+            if not reason.startswith(top):
+                continue
+            a = int(reason.split(":")[1]) - 1 if ":" in reason else 0
+            by_agent.setdefault(a, 0)
+            by_agent[a] += 1
+        ex = next(p for p in reversed(prunes) if p[5].startswith(top))
+        a_idx = int(ex[5].split(":")[1]) - 1 if ":" in ex[5] else 0
+        pt = nodes.get(ex[4][a_idx])
+        agent_color = SUPPORT if a_idx == 0 else PRIMARY
         if pt:
             mark = VGroup(
                 Cross(Square(side_length=0.22), stroke_color=BAD, stroke_width=4)
                 .move_to(world.pt(*pt)),
-                Text(REASON_TEXT.get(top, top), font=FONT, font_size=19, color=BAD),
+                Text(f"{'support' if a_idx == 0 else 'primary'}: "
+                     f"{REASON_TEXT.get(top, top)}",
+                     font=FONT, font_size=19, color=agent_color),
             )
             mark[1].next_to(mark[0], UP, buff=0.12)
             self.play(FadeIn(mark), run_time=0.5)
